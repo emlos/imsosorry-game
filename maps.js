@@ -1,20 +1,10 @@
+import { INTERACTIONS } from "./interactions.js";
 import { EMPTY_TILE_ID, TILE_IDS } from "./tiles.js";
 
 export const DEFAULT_TILE_SIZE = 32;
 
 const E = EMPTY_TILE_ID;
-const {
-    FLOOR,
-    FLOOR_ALT,
-    WALL,
-    WIDE_WALL,
-    PINK_ORB,
-    ROOM_01_NORTH_DOOR,
-    ROOM_02_SOUTH_DOOR,
-    BLUE_ORB,
-    ROOM_02_NORTH_DOOR,
-    ROOM_03_SOUTH_DOOR,
-} = TILE_IDS;
+const { FLOOR, FLOOR_ALT, WALL, WIDE_WALL } = TILE_IDS;
 
 export const MAPS = [
     {
@@ -35,6 +25,30 @@ export const MAPS = [
         },
 
         tiles: {},
+
+        entities: [
+            {
+                id: "pink-orb",
+                active: true,
+                col: 4,
+                row: 3,
+                spriteId: "pink-orb",
+                collision: false,
+                interaction: INTERACTIONS.PINK_ORB,
+                condition: {
+                    notItem: "pink-orb",
+                },
+            },
+            {
+                id: "north-door",
+                active: true,
+                col: 5,
+                row: 0,
+                spriteId: "door",
+                collision: false,
+                interaction: INTERACTIONS.ROOM_01_NORTH_DOOR,
+            },
+        ],
 
         layers: {
             base: [
@@ -111,16 +125,6 @@ export const MAPS = [
                 [WALL, E, E, E, E, E, E, E, E, WALL],
                 [WALL, E, E, WALL, E, E, E, E, E, E],
             ],
-
-            interactables: [
-                [E, E, E, E, E, ROOM_01_NORTH_DOOR, E, E, E, E],
-                [E, E, E, E, E, E, E, E, E, E],
-                [E, E, E, E, E, E, E, E, E, E],
-                [E, E, E, E, PINK_ORB, E, E, E, E, E],
-                [E, E, E, E, E, E, E, E, E, E],
-                [E, E, E, E, E, E, E, E, E, E],
-                [E, E, E, E, E, E, E, E, E, E],
-            ],
         },
     },
 
@@ -142,6 +146,27 @@ export const MAPS = [
 
         tiles: {},
 
+        entities: [
+            {
+                id: "south-door",
+                active: true,
+                col: 1,
+                row: 5,
+                spriteId: "door",
+                collision: true,
+                interaction: INTERACTIONS.ROOM_02_SOUTH_DOOR,
+            },
+            {
+                id: "north-door",
+                active: true,
+                col: 3,
+                row: 0,
+                spriteId: "door",
+                collision: true,
+                interaction: INTERACTIONS.ROOM_02_NORTH_DOOR,
+            },
+        ],
+
         layers: {
             base: [
                 [FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT],
@@ -161,16 +186,6 @@ export const MAPS = [
                 [WALL, E, WALL, E, WALL, E, WALL],
                 [WALL, E, E, E, E, E, WALL],
                 [WALL, WALL, WALL, WALL, WALL, WALL, WALL],
-            ],
-
-            interactables: [
-                [E, E, E, ROOM_02_NORTH_DOOR, E, E, E],
-                [E, E, E, E, E, E, E],
-                [E, E, E, E, E, E, E],
-                [E, E, E, E, E, E, E],
-                [E, E, E, E, E, E, E],
-                [E, ROOM_02_SOUTH_DOOR, E, E, E, E, E],
-                [E, E, E, E, E, E, E],
             ],
         },
     },
@@ -188,6 +203,30 @@ export const MAPS = [
 
         tiles: {},
 
+        entities: [
+            {
+                id: "blue-orb",
+                active: true,
+                col: 2,
+                row: 2,
+                spriteId: "blue-orb",
+                collision: false,
+                interaction: INTERACTIONS.BLUE_ORB,
+                condition: {
+                    all: [{ notFlag: "room03.orbCollected" }, { notItem: "blue-orb" }],
+                },
+            },
+            {
+                id: "south-door",
+                active: true,
+                col: 2,
+                row: 6,
+                spriteId: "door",
+                collision: true,
+                interaction: INTERACTIONS.ROOM_03_SOUTH_DOOR,
+            },
+        ],
+
         layers: {
             base: [
                 [FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR],
@@ -257,16 +296,6 @@ export const MAPS = [
                 [WALL, E, E, E, WALL, E, E, E, WALL],
                 [WALL, E, E, E, WALL, E, E, E, WALL],
                 [WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL],
-            ],
-
-            interactables: [
-                [E, E, E, E, E, E, E, E, E],
-                [E, E, E, E, E, E, E, E, E],
-                [E, E, BLUE_ORB, E, E, E, E, E, E],
-                [E, E, E, E, E, E, E, E, E],
-                [E, E, E, E, E, E, E, E, E],
-                [E, E, E, E, E, E, E, E, E],
-                [E, E, ROOM_03_SOUTH_DOOR, E, E, E, E, E, E],
             ],
         },
     },

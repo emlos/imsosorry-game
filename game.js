@@ -1,13 +1,14 @@
 import { evaluateCondition, validateCondition } from "./conditions.js";
 import { runEffects } from "./effects.js";
-import { DEFAULT_TILE_SIZE, MAPS } from "./maps.js";
+import { DEFAULT_TILE_SIZE } from "./maps.js";
 import {
     INTERACTION_HANDLERS,
-    INTERACTION_TRIGGERS,
-    validateInteractionCondition,
+    validateInteractionDefinition,
+    validateInteractionReferences,
 } from "./interactions.js";
 import { Player } from "./player.js";
 import { SOUNDS } from "./sounds.js";
+import { SPRITES } from "./sprites.js";
 import { EMPTY_TILE_ID, TILES } from "./tiles.js";
 
 function cloneLayers(layers) {
@@ -19,6 +20,34 @@ function cloneLayers(layers) {
     );
 }
 
+function createEntityState(entity) {
+    return {
+        active: entity.active,
+        col: entity.col,
+        row: entity.row,
+        spriteId: entity.spriteId,
+        collision: entity.collision,
+        interaction: structuredClone(entity.interaction),
+    };
+}
+
+function createMapState(map) {
+    return {
+        layers: cloneLayers(map.layers),
+        entities: Object.fromEntries(
+            map.entities.map((entity) => [entity.id, createEntityState(entity)]),
+        ),
+    };
+}
+
+function requireExactKeys(value, allowedKeys, label) {
+    for (const key of Object.keys(value)) {
+        if (!allowedKeys.has(key)) {
+            throw new Error(`${label} contains unsupported property "${key}".`);
+        }
+    }
+}
+
 export class Game {
     constructor(canvas, authoredMaps) {
         this.canvas = canvas;
@@ -28,14 +57,14 @@ export class Game {
         this.authoredMaps = authoredMaps;
         this.maps = [];
         this.mapsById = new Map();
-        this.entitiesByMap = new Map();
+        this.entityDefinitionsByMap = new Map();
         this.activeSpatialData = null;
 
         const initialMap = authoredMaps[0];
         const initialEntry = initialMap.entries[initialMap.initialEntryId];
 
         this.state = {
-            version: 1,
+            version: 2,
 
             player: {
                 mapId: initialMap.id,
@@ -49,18 +78,11 @@ export class Game {
 
             inventory: [],
 
-            maps: Object.fromEntries(
-                authoredMaps.map((map) => [
-                    map.id,
-                    {
-                        entities: {},
-                        layers: cloneLayers(map.layers),
-                    },
-                ]),
-            ),
+            maps: Object.fromEntries(authoredMaps.map((map) => [map.id, createMapState(map)])),
         };
 
         this.images = new Map();
+        this.spriteDefinitions = new Map(Object.entries(SPRITES));
         this.soundDefinitions = new Map(Object.entries(SOUNDS));
         this.soundTemplates = new Map();
         this.camera = { x: 0, y: 0 };
@@ -105,6 +127,8 @@ export class Game {
             throw new Error("At least one map is required.");
         }
 
+        this.validateSpriteDefinitions();
+
         this.maps = this.authoredMaps.map((map) => ({
             ...map,
             tiles: this.mergeTiles(map.tiles),
@@ -122,37 +146,18 @@ export class Game {
             this.mapsById.set(map.id, map);
         }
 
-        const entitiesByMap = new Map();
-
         this.maps.forEach((map, index) => {
-            const entities = this.validateMap(map, index === 0);
-            const entityDefinitions = new Map();
-
-            for (const entity of entities) {
-                entityDefinitions.set(entity.interaction.id, entity);
-                this.state.maps[map.id].entities[entity.interaction.id] = {
-                    removed: false,
-                };
-            }
-
-            this.entitiesByMap.set(map.id, entityDefinitions);
-
-            const spatialData = this.buildSpatialData(map);
-            this.validateEntries(map, spatialData);
-            entitiesByMap.set(map.id, entities);
+            this.validateMap(map, index === 0);
+            this.entityDefinitionsByMap.set(
+                map.id,
+                new Map(map.entities.map((entity) => [entity.id, entity])),
+            );
         });
 
-        for (const [mapId, entities] of entitiesByMap) {
-            for (const entity of entities) {
-                const interaction = entity.interaction;
-                const handler = INTERACTION_HANDLERS.get(interaction.handler);
-
-                handler.validateReferences?.({
-                    game: this,
-                    interaction,
-                    sourceMapId: mapId,
-                });
-            }
+        for (const map of this.maps) {
+            this.validateMapInteractionReferences(map);
+            const spatialData = this.buildSpatialData(map);
+            this.validateEntries(map, spatialData);
         }
     }
 
@@ -176,6 +181,10 @@ export class Game {
 
         if (!map.layers || typeof map.layers !== "object" || Array.isArray(map.layers)) {
             throw new Error(`Map "${map.id}" has no layers object.`);
+        }
+
+        if (!Array.isArray(map.entities)) {
+            throw new Error(`Map "${map.id}" has no entities array.`);
         }
 
         const baseLayer = map.layers.base;
@@ -205,8 +214,6 @@ export class Game {
         }
 
         const validatedTileIds = new Set();
-        const interactionIds = new Set();
-        const entities = [];
         let walkableBaseCells = 0;
 
         for (const [layerName, layer] of Object.entries(map.layers)) {
@@ -251,33 +258,17 @@ export class Game {
                         walkableBaseCells += 1;
                     }
 
-                    const interaction = tile.interaction;
-                    if (!interaction) return;
-
-                    if (interactionIds.has(interaction.id)) {
-                        throw new Error(
-                            `Duplicate interaction ID "${interaction.id}" in map "${map.id}".`,
-                        );
-                    }
-
                     if (
+                        tile.interaction &&
                         this.layerCreatesCollision(layerName, tile) &&
-                        (interaction.trigger === "touch" || interaction.trigger === "both")
+                        (tile.interaction.trigger === "touch" ||
+                            tile.interaction.trigger === "both")
                     ) {
                         throw new Error(
-                            `Interaction "${interaction.id}" in "${map.id}" cannot use ` +
-                                `${interaction.trigger} on a colliding tile.`,
+                            `Tile ${String(tileId)} in "${map.id}" cannot use ` +
+                                `${tile.interaction.trigger} interaction on a colliding layer.`,
                         );
                     }
-
-                    interactionIds.add(interaction.id);
-                    entities.push({
-                        interaction,
-                        tile,
-                        tileId,
-                        layerName,
-                        anchor: { col: colIndex, row: rowIndex },
-                    });
                 });
             });
         }
@@ -286,7 +277,16 @@ export class Game {
             throw new Error(`Map "${map.id}" has no walkable base cells.`);
         }
 
-        return entities;
+        const entityIds = new Set();
+        for (const entity of map.entities) {
+            this.validateEntityDefinition(entity, map);
+
+            if (entityIds.has(entity.id)) {
+                throw new Error(`Duplicate entity ID "${entity.id}" in map "${map.id}".`);
+            }
+
+            entityIds.add(entity.id);
+        }
     }
 
     validateTile(tileId, tile, mapId) {
@@ -303,69 +303,140 @@ export class Game {
         }
 
         if (tile.size !== undefined) {
-            const validSize =
-                Array.isArray(tile.size) &&
-                tile.size.length === 2 &&
-                tile.size.every((value) => Number.isFinite(value) && value > 0);
-
-            if (!validSize) {
-                throw new Error(`Tile ${String(tileId)} in "${mapId}" has an invalid size.`);
-            }
-        }
-
-        if (tile.sprites !== undefined) {
-            if (!tile.sprites || typeof tile.sprites !== "object" || Array.isArray(tile.sprites)) {
-                throw new Error(`Tile ${String(tileId)} in "${mapId}" has invalid sprites.`);
-            }
-
-            for (const [spriteId, path] of Object.entries(tile.sprites)) {
-                if (spriteId.length === 0 || typeof path !== "string" || path.length === 0) {
-                    throw new Error(
-                        `Tile ${String(tileId)} in "${mapId}" has invalid sprite "${spriteId}".`,
-                    );
-                }
-            }
+            this.validateSize(tile.size, `Tile ${String(tileId)} in "${mapId}"`);
         }
 
         if (tile.condition) {
             validateCondition(tile.condition, `Condition for tile ${String(tileId)} in "${mapId}"`);
         }
 
-        const interaction = tile.interaction;
-        if (!interaction) return;
-
-        if (
-            typeof interaction.id !== "string" ||
-            interaction.id.length === 0 ||
-            typeof interaction.handler !== "string" ||
-            interaction.handler.length === 0
-        ) {
-            throw new Error(`Tile ${String(tileId)} in "${mapId}" has an invalid interaction.`);
-        }
-
-        if (!INTERACTION_TRIGGERS.has(interaction.trigger)) {
-            throw new Error(
-                `Interaction "${interaction.id}" in "${mapId}" must use ` +
-                    'trigger: "action", "touch", or "both".',
+        if (tile.interaction) {
+            validateInteractionDefinition(
+                tile.interaction,
+                `interaction on tile ${String(tileId)} in "${mapId}"`,
             );
         }
+    }
 
-        validateInteractionCondition(interaction, mapId);
-
-        const handler = INTERACTION_HANDLERS.get(interaction.handler);
-        if (!handler) {
-            throw new Error(
-                `Interaction "${interaction.id}" in "${mapId}" references ` +
-                    `unknown handler "${interaction.handler}".`,
-            );
+    validateEntityDefinition(entity, map) {
+        const label = `Entity in "${map.id}"`;
+        if (!entity || typeof entity !== "object" || Array.isArray(entity)) {
+            throw new Error(`${label} must be an object.`);
         }
 
-        handler.validateDefinition({
-            game: this,
-            interaction,
-            mapId,
-            tileId,
-        });
+        requireExactKeys(
+            entity,
+            new Set([
+                "id",
+                "active",
+                "col",
+                "row",
+                "spriteId",
+                "collision",
+                "interaction",
+                "condition",
+            ]),
+            label,
+        );
+
+        if (typeof entity.id !== "string" || entity.id.length === 0) {
+            throw new Error(`${label} must define a non-empty string ID.`);
+        }
+
+        const entityLabel = `Entity "${entity.id}" in "${map.id}"`;
+        if (typeof entity.active !== "boolean") {
+            throw new Error(`${entityLabel}.active must be a boolean.`);
+        }
+
+        this.validateMapPosition(map.id, entity.col, entity.row, entityLabel);
+        this.validateSpriteReference(entity.spriteId, entityLabel);
+
+        if (typeof entity.collision !== "boolean") {
+            throw new Error(`${entityLabel}.collision must be a boolean.`);
+        }
+
+        if (entity.interaction !== null) {
+            validateInteractionDefinition(entity.interaction, `interaction for ${entityLabel}`);
+
+            if (
+                entity.collision &&
+                (entity.interaction.trigger === "touch" || entity.interaction.trigger === "both")
+            ) {
+                throw new Error(
+                    `${entityLabel} cannot use ${entity.interaction.trigger} interaction ` +
+                        "while collision is enabled.",
+                );
+            }
+        }
+
+        if (entity.condition) {
+            validateCondition(entity.condition, `Condition for ${entityLabel}`);
+        }
+
+        if (!Object.hasOwn(this.state.maps[map.id].entities, entity.id)) {
+            throw new Error(`${entityLabel} has no runtime state.`);
+        }
+    }
+
+    validateMapInteractionReferences(map) {
+        const validatedTileIds = new Set();
+
+        for (const layer of Object.values(map.layers)) {
+            for (const row of layer) {
+                for (const tileId of row) {
+                    if (tileId === EMPTY_TILE_ID || validatedTileIds.has(tileId)) continue;
+                    validatedTileIds.add(tileId);
+
+                    const interaction = map.tiles[tileId].interaction;
+                    if (interaction) {
+                        validateInteractionReferences(
+                            this,
+                            interaction,
+                            map.id,
+                            `interaction on tile ${String(tileId)} in "${map.id}"`,
+                        );
+                    }
+                }
+            }
+        }
+
+        for (const entity of map.entities) {
+            if (!entity.interaction) continue;
+
+            validateInteractionReferences(
+                this,
+                entity.interaction,
+                map.id,
+                `interaction for entity "${entity.id}" in "${map.id}"`,
+            );
+        }
+    }
+
+    validateSize(size, label) {
+        const validSize =
+            Array.isArray(size) &&
+            size.length === 2 &&
+            size.every((value) => Number.isFinite(value) && value > 0);
+
+        if (!validSize) {
+            throw new Error(`${label} has an invalid size.`);
+        }
+    }
+
+    validateSpriteDefinitions() {
+        for (const [spriteId, sprite] of this.spriteDefinitions) {
+            if (!sprite || typeof sprite !== "object" || Array.isArray(sprite)) {
+                throw new Error(`Sprite "${spriteId}" is invalid.`);
+            }
+
+            requireExactKeys(sprite, new Set(["path", "size"]), `Sprite "${spriteId}"`);
+
+            if (typeof sprite.path !== "string" || sprite.path.length === 0) {
+                throw new Error(`Sprite "${spriteId}" has no image path.`);
+            }
+
+            this.validateSize(sprite.size, `Sprite "${spriteId}"`);
+        }
     }
 
     validateEntry(entry, label) {
@@ -418,21 +489,31 @@ export class Game {
     }
 
     validateEntityReference(mapId, entityId, label) {
-        const entities = this.entitiesByMap.get(mapId);
+        const entities = this.entityDefinitionsByMap.get(mapId);
         if (!entities?.has(entityId)) {
             throw new Error(`${label} references missing entity "${entityId}" in "${mapId}".`);
         }
     }
 
-    validateEntitySpriteReference(mapId, entityId, spriteId, label) {
-        this.validateEntityReference(mapId, entityId, label);
+    validateMapPosition(mapId, col, row, label) {
+        const map =
+            this.mapsById.get(mapId) ?? this.maps.find((candidate) => candidate.id === mapId);
+        if (!map) {
+            throw new Error(`${label} references missing map "${mapId}".`);
+        }
 
-        const entity = this.entitiesByMap.get(mapId).get(entityId);
-        if (!entity.tile.sprites || !Object.hasOwn(entity.tile.sprites, spriteId)) {
-            throw new Error(
-                `${label} references missing sprite "${spriteId}" for entity ` +
-                    `"${entityId}" in "${mapId}".`,
-            );
+        if (!Number.isInteger(col) || !Number.isInteger(row) || col < 0 || row < 0) {
+            throw new Error(`${label} must use non-negative integer col and row values.`);
+        }
+
+        if (col >= map.gridSize.width || row >= map.gridSize.height) {
+            throw new Error(`${label} references position ${col},${row} outside "${mapId}".`);
+        }
+    }
+
+    validateSpriteReference(spriteId, label) {
+        if (typeof spriteId !== "string" || !this.spriteDefinitions.has(spriteId)) {
+            throw new Error(`${label} references missing sprite "${String(spriteId)}".`);
         }
     }
 
@@ -447,9 +528,7 @@ export class Game {
             throw new Error(`${label} references missing layer "${layerName}" in "${mapId}".`);
         }
 
-        if (row >= map.gridSize.height || col >= map.gridSize.width) {
-            throw new Error(`${label} references tile position ${col},${row} outside "${mapId}".`);
-        }
+        this.validateMapPosition(mapId, col, row, label);
 
         if (tileId !== EMPTY_TILE_ID && !map.tiles[tileId]) {
             throw new Error(`${label} references unknown tile ID ${String(tileId)} in "${mapId}".`);
@@ -472,6 +551,7 @@ export class Game {
         const walkable = new Set();
         const collision = new Set();
         const interactions = new Map();
+        const visibleEntities = [];
         const layers = this.state.maps[map.id].layers;
 
         for (const [layerName, layer] of Object.entries(layers)) {
@@ -480,7 +560,7 @@ export class Game {
                     if (tileId === EMPTY_TILE_ID) return;
 
                     const tile = map.tiles[tileId];
-                    if (!this.isTilePresent(map.id, tile)) return;
+                    if (!this.isTilePresent(tile)) return;
 
                     const anchorKey = `${colIndex},${rowIndex}`;
                     if (layerName === "base") {
@@ -494,6 +574,7 @@ export class Game {
 
                     const target = interactionActive
                         ? {
+                              kind: "tile",
                               mapId: map.id,
                               tileId,
                               tile,
@@ -502,7 +583,7 @@ export class Game {
                           }
                         : null;
 
-                    for (const occupied of this.getOccupiedCells(colIndex, rowIndex, tile)) {
+                    for (const occupied of this.getOccupiedTileCells(colIndex, rowIndex, tile)) {
                         const key = `${occupied.col},${occupied.row}`;
 
                         if (this.layerCreatesCollision(layerName, tile)) {
@@ -517,10 +598,44 @@ export class Game {
             });
         }
 
+        for (const definition of map.entities) {
+            const state = this.getEntityState(map.id, definition.id);
+            if (!this.isEntityPresent(definition, state)) continue;
+
+            visibleEntities.push({
+                mapId: map.id,
+                entityId: definition.id,
+                definition,
+                state,
+            });
+
+            const key = `${state.col},${state.row}`;
+            if (state.collision) {
+                collision.add(key);
+            }
+
+            const interaction = state.interaction;
+            if (
+                interaction &&
+                (!interaction.condition || this.evaluateCondition(interaction.condition))
+            ) {
+                interactions.set(key, {
+                    kind: "entity",
+                    mapId: map.id,
+                    entityId: definition.id,
+                    definition,
+                    state,
+                    anchor: { col: state.col, row: state.row },
+                    interaction,
+                });
+            }
+        }
+
         return {
             walkable,
             collision,
             interactions,
+            entities: visibleEntities,
             bounds: {
                 width: map.gridSize.width * DEFAULT_TILE_SIZE,
                 height: map.gridSize.height * DEFAULT_TILE_SIZE,
@@ -528,19 +643,16 @@ export class Game {
         };
     }
 
-    isTilePresent(mapId, tile) {
-        if (tile.condition && !this.evaluateCondition(tile.condition)) {
-            return false;
-        }
-
-        if (tile.interaction && this.isEntityRemoved(mapId, tile.interaction.id)) {
-            return false;
-        }
-
-        return true;
+    isTilePresent(tile) {
+        return !tile.condition || this.evaluateCondition(tile.condition);
     }
 
-    getOccupiedCells(col, row, tile) {
+    isEntityPresent(definition, state) {
+        if (!state.active) return false;
+        return !definition.condition || this.evaluateCondition(definition.condition);
+    }
+
+    getOccupiedTileCells(col, row, tile) {
         const [widthPx, heightPx] = tile.size ?? [DEFAULT_TILE_SIZE, DEFAULT_TILE_SIZE];
         const widthInTiles = Math.ceil(widthPx / DEFAULT_TILE_SIZE);
         const heightInTiles = Math.ceil(heightPx / DEFAULT_TILE_SIZE);
@@ -561,13 +673,11 @@ export class Game {
         for (const map of this.maps) {
             for (const tile of Object.values(map.tiles)) {
                 paths.add(tile.path);
-
-                if (tile.sprites) {
-                    for (const path of Object.values(tile.sprites)) {
-                        paths.add(path);
-                    }
-                }
             }
+        }
+
+        for (const sprite of this.spriteDefinitions.values()) {
+            paths.add(sprite.path);
         }
 
         await Promise.all([...paths].map((path) => this.loadImage(path)));
@@ -691,25 +801,42 @@ export class Game {
         runEffects(this, effects, mapId);
     }
 
-    removeEntity(mapId, entityId) {
-        this.state.maps[mapId].entities[entityId].removed = true;
+    getEntityState(mapId, entityId) {
+        return this.state.maps[mapId].entities[entityId];
     }
 
-    isEntityRemoved(mapId, entityId) {
-        return this.state.maps[mapId].entities[entityId].removed;
+    setEntityActive(mapId, entityId, active) {
+        this.getEntityState(mapId, entityId).active = active;
+    }
+
+    setEntityPosition(mapId, entityId, col, row) {
+        const state = this.getEntityState(mapId, entityId);
+        state.col = col;
+        state.row = row;
     }
 
     setEntitySprite(mapId, entityId, spriteId) {
-        this.state.maps[mapId].entities[entityId].spriteId = spriteId;
+        this.getEntityState(mapId, entityId).spriteId = spriteId;
     }
 
-    getEntityImagePath(mapId, tile) {
-        if (!tile.interaction) return tile.path;
+    setEntityCollision(mapId, entityId, collision) {
+        this.getEntityState(mapId, entityId).collision = collision;
+    }
 
-        const entityState = this.state.maps[mapId].entities[tile.interaction.id];
-        if (!Object.hasOwn(entityState, "spriteId")) return tile.path;
+    setEntityInteraction(mapId, entityId, interaction) {
+        this.validateEntityReference(mapId, entityId, "Entity interaction update");
 
-        return tile.sprites[entityState.spriteId];
+        if (interaction !== null) {
+            const label = `interaction update for entity "${entityId}" in "${mapId}"`;
+            validateInteractionDefinition(interaction, label);
+            validateInteractionReferences(this, interaction, mapId, label);
+        }
+
+        this.getEntityState(mapId, entityId).interaction = structuredClone(interaction);
+
+        if (this.state.player.mapId === mapId) {
+            this.rebuildActiveSpatialData();
+        }
     }
 
     setTile(mapId, layerName, col, row, tileId) {
@@ -866,6 +993,7 @@ export class Game {
             this.renderLayer(layer);
         }
 
+        this.renderEntities();
         this.player.render(this.ctx, this.camera);
     }
 
@@ -875,10 +1003,9 @@ export class Game {
                 if (tileId === EMPTY_TILE_ID) return;
 
                 const tile = this.activeMap.tiles[tileId];
-                if (!this.isTilePresent(this.activeMap.id, tile)) return;
+                if (!this.isTilePresent(tile)) return;
 
-                const path = this.getEntityImagePath(this.activeMap.id, tile);
-                const image = this.images.get(path);
+                const image = this.images.get(tile.path);
                 if (!image) return;
 
                 const [width, height] = tile.size ?? [DEFAULT_TILE_SIZE, DEFAULT_TILE_SIZE];
@@ -888,6 +1015,20 @@ export class Game {
                 this.ctx.drawImage(image, drawX, drawY, width, height);
             });
         });
+    }
+
+    renderEntities() {
+        for (const entity of this.activeSpatialData.entities) {
+            const sprite = this.spriteDefinitions.get(entity.state.spriteId);
+            const image = this.images.get(sprite.path);
+            if (!image) continue;
+
+            const [width, height] = sprite.size;
+            const drawX = entity.state.col * DEFAULT_TILE_SIZE - this.camera.x;
+            const drawY = entity.state.row * DEFAULT_TILE_SIZE - this.camera.y;
+
+            this.ctx.drawImage(image, drawX, drawY, width, height);
+        }
     }
 
     loop(time) {
@@ -912,15 +1053,3 @@ export class Game {
         this.eventLogElement.textContent = lines.slice(0, 8).join("\n");
     }
 }
-
-const canvas = document.querySelector("#game");
-export const game = new Game(canvas, MAPS);
-
-canvas.addEventListener("game-interaction", (event) => {
-    console.log("Interaction signal:", event.detail);
-});
-
-game.start().catch((error) => {
-    console.error(error);
-    document.querySelector("#status").textContent = error.message;
-});

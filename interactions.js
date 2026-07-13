@@ -6,21 +6,16 @@ export const INTERACTION_TRIGGERS = new Set(["action", "touch", "both"]); //TODO
 //TODO: there has to be a better system for this
 export const INTERACTIONS = {
     PINK_ORB: {
-        id: "pink-orb",
         handler: "effects",
         trigger: "both",
-        condition: {
-            notItem: "pink-orb",
-        },
         effects: [
             { type: "addItem", itemId: "pink-orb" },
             { type: "playSound", soundId: "orb-collect" },
-            { type: "removeEntity", entityId: "pink-orb" },
+            { type: "setEntityActive", entityId: "pink-orb", active: false },
         ],
         message: "You found the pink orb.",
     },
     ROOM_01_NORTH_DOOR: {
-        id: "north-door",
         handler: "teleport",
         trigger: "action",
         params: {
@@ -30,7 +25,6 @@ export const INTERACTIONS = {
         message: "The door opens.",
     },
     ROOM_02_SOUTH_DOOR: {
-        id: "south-door",
         handler: "teleport",
         trigger: "action",
         params: {
@@ -40,7 +34,6 @@ export const INTERACTIONS = {
         message: "You return through the door.",
     },
     ROOM_02_NORTH_DOOR: {
-        id: "north-door",
         handler: "teleport",
         trigger: "action",
         params: {
@@ -50,7 +43,6 @@ export const INTERACTIONS = {
         message: "The door opens into another room.",
     },
     ROOM_03_SOUTH_DOOR: {
-        id: "south-door",
         handler: "teleport",
         trigger: "action",
         params: {
@@ -60,32 +52,40 @@ export const INTERACTIONS = {
         message: "You return to the previous room.",
     },
     BLUE_ORB: {
-        id: "blue-orb",
         handler: "effects",
         trigger: "both",
-        condition: {
-            all: [{ notFlag: "room03.orbCollected" }, { notItem: "blue-orb" }],
-        },
         effects: [
             { type: "setFlag", flag: "room03.orbCollected", value: true },
             { type: "addItem", itemId: "blue-orb" },
             { type: "playSound", soundId: "orb-collect" },
             { type: "setTile", layer: "obstacles", col: 4, row: 3, tileId: -1 },
-            { type: "removeEntity", entityId: "blue-orb" },
+            { type: "setEntityActive", entityId: "blue-orb", active: false },
         ],
         message: "The blue orb dissolves. A section of the wall disappears.",
     },
 };
 
-function requireParamsObject(interaction, mapId) {
+function requireInteractionObject(interaction, label) {
+    if (!interaction || typeof interaction !== "object" || Array.isArray(interaction)) {
+        throw new Error(`${label} must be an object.`);
+    }
+}
+
+function requireExactKeys(interaction, allowedKeys, label) {
+    for (const key of Object.keys(interaction)) {
+        if (!allowedKeys.has(key)) {
+            throw new Error(`${label} contains unsupported property "${key}".`);
+        }
+    }
+}
+
+function requireParamsObject(interaction, label) {
     if (
         !interaction.params ||
         typeof interaction.params !== "object" ||
         Array.isArray(interaction.params)
     ) {
-        throw new Error(
-            `Interaction "${interaction.id}" in "${mapId}" must define a params object.`,
-        );
+        throw new Error(`${label} must define a params object.`);
     }
 }
 
@@ -93,19 +93,18 @@ export const INTERACTION_HANDLERS = new Map([
     [
         "effects",
         {
-            validateDefinition({ interaction, mapId }) {
-                validateEffectsDefinition(
-                    interaction.effects,
-                    `Effects for interaction "${interaction.id}" in "${mapId}"`,
-                );
+            allowedKeys: new Set(["handler", "trigger", "condition", "effects", "message"]),
+
+            validateDefinition({ interaction, label }) {
+                validateEffectsDefinition(interaction.effects, `Effects for ${label}`);
             },
 
-            validateReferences({ game, interaction, sourceMapId }) {
+            validateReferences({ game, interaction, sourceMapId, label }) {
                 validateEffectsReferences(
                     game,
                     interaction.effects,
                     sourceMapId,
-                    `Effects for interaction "${interaction.id}" in "${sourceMapId}"`,
+                    `Effects for ${label}`,
                 );
             },
 
@@ -119,33 +118,24 @@ export const INTERACTION_HANDLERS = new Map([
     [
         "teleport",
         {
-            validateDefinition({ interaction, mapId }) {
-                requireParamsObject(interaction, mapId);
+            allowedKeys: new Set(["handler", "trigger", "condition", "params", "message"]),
 
-                const { mapId: destinationMapId, entryId } = interaction.params;
+            validateDefinition({ interaction, label }) {
+                requireParamsObject(interaction, label);
 
-                if (typeof destinationMapId !== "string") {
-                    throw new Error(
-                        `Teleport interaction "${interaction.id}" in "${mapId}" ` +
-                            "must define params.mapId.",
-                    );
+                const { mapId, entryId } = interaction.params;
+                if (typeof mapId !== "string" || mapId.length === 0) {
+                    throw new Error(`${label} must define params.mapId.`);
                 }
 
-                if (typeof entryId !== "string") {
-                    throw new Error(
-                        `Teleport interaction "${interaction.id}" in "${mapId}" ` +
-                            "must define params.entryId.",
-                    );
+                if (typeof entryId !== "string" || entryId.length === 0) {
+                    throw new Error(`${label} must define params.entryId.`);
                 }
             },
 
-            validateReferences({ game, interaction, sourceMapId }) {
+            validateReferences({ game, interaction, sourceMapId, label }) {
                 const { mapId, entryId } = interaction.params;
-                game.validateEntryReference(
-                    mapId,
-                    entryId,
-                    `Teleport "${interaction.id}" from "${sourceMapId}"`,
-                );
+                game.validateEntryReference(mapId, entryId, `${label} from "${sourceMapId}"`);
             },
 
             execute({ game, target }) {
@@ -155,11 +145,35 @@ export const INTERACTION_HANDLERS = new Map([
     ],
 ]);
 
-export function validateInteractionCondition(interaction, mapId) {
-    if (!interaction.condition) return;
+export function validateInteractionDefinition(interaction, label) {
+    requireInteractionObject(interaction, label);
 
-    validateCondition(
-        interaction.condition,
-        `Condition for interaction "${interaction.id}" in "${mapId}"`,
-    );
+    if (typeof interaction.handler !== "string" || interaction.handler.length === 0) {
+        throw new Error(`${label} must define a handler.`);
+    }
+
+    if (!INTERACTION_TRIGGERS.has(interaction.trigger)) {
+        throw new Error(`${label} must use trigger: "action", "touch", or "both".`);
+    }
+
+    if (interaction.message !== undefined && typeof interaction.message !== "string") {
+        throw new Error(`${label}.message must be a string.`);
+    }
+
+    if (interaction.condition) {
+        validateCondition(interaction.condition, `Condition for ${label}`);
+    }
+
+    const handler = INTERACTION_HANDLERS.get(interaction.handler);
+    if (!handler) {
+        throw new Error(`${label} references unknown handler "${interaction.handler}".`);
+    }
+
+    requireExactKeys(interaction, handler.allowedKeys, label);
+    handler.validateDefinition({ interaction, label });
+}
+
+export function validateInteractionReferences(game, interaction, sourceMapId, label) {
+    const handler = INTERACTION_HANDLERS.get(interaction.handler);
+    handler.validateReferences?.({ game, interaction, sourceMapId, label });
 }
