@@ -10,10 +10,13 @@ export const TILE_IDS = {
     PINK_ORB: 4,
     ROOM_01_NORTH_DOOR: 5,
     ROOM_02_SOUTH_DOOR: 6,
+    BLUE_ORB: 7,
+    ROOM_02_NORTH_DOOR: 8,
+    ROOM_03_SOUTH_DOOR: 9,
 };
 //TODO: move tile size to here from maps.js
 
-//TODO: allow collission independently of size, e.g for a tree, a 2x1 tile, where only the bottom has collission, and the top is just a visual. 
+//TODO: allow collission independently of size, e.g for a tree, a 2x1 tile, where only the bottom has collission, and the top is just a visual.
 //This will require a new property for tiles, and specify whether the 'walkable' part of the tile is to be rendered above or below the player
 export const TILES = {
     [TILE_IDS.FLOOR]: {
@@ -41,5 +44,19 @@ export const TILES = {
         path: "./assets/tiles/door.png",
         collision: true,
         interaction: INTERACTIONS.ROOM_02_SOUTH_DOOR,
+    },
+    [TILE_IDS.BLUE_ORB]: {
+        path: "./assets/tiles/orb_blue.png",
+        interaction: INTERACTIONS.BLUE_ORB,
+    },
+    [TILE_IDS.ROOM_02_NORTH_DOOR]: {
+        path: "./assets/tiles/door.png",
+        collision: true,
+        interaction: INTERACTIONS.ROOM_02_NORTH_DOOR,
+    },
+    [TILE_IDS.ROOM_03_SOUTH_DOOR]: {
+        path: "./assets/tiles/door.png",
+        collision: true,
+        interaction: INTERACTIONS.ROOM_03_SOUTH_DOOR,
     },
 };

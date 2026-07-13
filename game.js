@@ -1,9 +1,25 @@
+import { evaluateCondition, validateCondition } from "./conditions.js";
+import { runEffects } from "./effects.js";
 import { DEFAULT_TILE_SIZE, MAPS } from "./maps.js";
-import { INTERACTION_HANDLERS, INTERACTION_TRIGGERS } from "./interactions.js";
-import { EMPTY_TILE_ID, TILES } from "./tiles.js";
+import {
+    INTERACTION_HANDLERS,
+    INTERACTION_TRIGGERS,
+    validateInteractionCondition,
+} from "./interactions.js";
 import { Player } from "./player.js";
+import { SOUNDS } from "./sounds.js";
+import { EMPTY_TILE_ID, TILES } from "./tiles.js";
 
-class Game {
+function cloneLayers(layers) {
+    return Object.fromEntries(
+        Object.entries(layers).map(([layerName, layer]) => [
+            layerName,
+            layer.map((row) => [...row]),
+        ]),
+    );
+}
+
+export class Game {
     constructor(canvas, authoredMaps) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
@@ -12,6 +28,7 @@ class Game {
         this.authoredMaps = authoredMaps;
         this.maps = [];
         this.mapsById = new Map();
+        this.entitiesByMap = new Map();
         this.activeSpatialData = null;
 
         const initialMap = authoredMaps[0];
@@ -36,14 +53,16 @@ class Game {
                 authoredMaps.map((map) => [
                     map.id,
                     {
-                        flags: {},
                         entities: {},
+                        layers: cloneLayers(map.layers),
                     },
                 ]),
             ),
         };
 
         this.images = new Map();
+        this.soundDefinitions = new Map(Object.entries(SOUNDS));
+        this.soundTemplates = new Map();
         this.camera = { x: 0, y: 0 };
         this.player = new Player(DEFAULT_TILE_SIZE, this.state.player);
 
@@ -69,6 +88,7 @@ class Game {
 
     async start() {
         this.prepareMaps();
+        this.prepareSounds();
         await this.preloadAllImages();
 
         const initialMap = this.maps[0];
@@ -81,7 +101,7 @@ class Game {
     }
 
     prepareMaps() {
-        if (!Array.isArray(this.authoredMaps)) {
+        if (!Array.isArray(this.authoredMaps) || this.authoredMaps.length === 0) {
             throw new Error("At least one map is required.");
         }
 
@@ -91,7 +111,7 @@ class Game {
         }));
 
         for (const map of this.maps) {
-            if (typeof map.id !== "string") {
+            if (typeof map.id !== "string" || map.id.length === 0) {
                 throw new Error("Every map must have a non-empty string ID.");
             }
 
@@ -102,25 +122,29 @@ class Game {
             this.mapsById.set(map.id, map);
         }
 
-        const interactionsByMap = new Map();
+        const entitiesByMap = new Map();
 
         this.maps.forEach((map, index) => {
-            const interactions = this.validateMap(map, index === 0);
+            const entities = this.validateMap(map, index === 0);
+            const entityDefinitions = new Map();
 
-            for (const interaction of interactions) {
-                this.state.maps[map.id].entities[interaction.id] = {
+            for (const entity of entities) {
+                entityDefinitions.set(entity.interaction.id, entity);
+                this.state.maps[map.id].entities[entity.interaction.id] = {
                     removed: false,
                 };
             }
 
-            const spatialData = this.buildSpatialData(map);
+            this.entitiesByMap.set(map.id, entityDefinitions);
 
+            const spatialData = this.buildSpatialData(map);
             this.validateEntries(map, spatialData);
-            interactionsByMap.set(map.id, interactions);
+            entitiesByMap.set(map.id, entities);
         });
 
-        for (const [mapId, interactions] of interactionsByMap) {
-            for (const interaction of interactions) {
+        for (const [mapId, entities] of entitiesByMap) {
+            for (const entity of entities) {
+                const interaction = entity.interaction;
                 const handler = INTERACTION_HANDLERS.get(interaction.handler);
 
                 handler.validateReferences?.({
@@ -182,7 +206,7 @@ class Game {
 
         const validatedTileIds = new Set();
         const interactionIds = new Set();
-        const interactions = [];
+        const entities = [];
         let walkableBaseCells = 0;
 
         for (const [layerName, layer] of Object.entries(map.layers)) {
@@ -247,7 +271,13 @@ class Game {
                     }
 
                     interactionIds.add(interaction.id);
-                    interactions.push(interaction);
+                    entities.push({
+                        interaction,
+                        tile,
+                        tileId,
+                        layerName,
+                        anchor: { col: colIndex, row: rowIndex },
+                    });
                 });
             });
         }
@@ -256,11 +286,11 @@ class Game {
             throw new Error(`Map "${map.id}" has no walkable base cells.`);
         }
 
-        return interactions;
+        return entities;
     }
 
     validateTile(tileId, tile, mapId) {
-        if (!tile || typeof tile !== "object") {
+        if (!tile || typeof tile !== "object" || Array.isArray(tile)) {
             throw new Error(`Tile ${String(tileId)} in "${mapId}" is invalid.`);
         }
 
@@ -283,6 +313,24 @@ class Game {
             }
         }
 
+        if (tile.sprites !== undefined) {
+            if (!tile.sprites || typeof tile.sprites !== "object" || Array.isArray(tile.sprites)) {
+                throw new Error(`Tile ${String(tileId)} in "${mapId}" has invalid sprites.`);
+            }
+
+            for (const [spriteId, path] of Object.entries(tile.sprites)) {
+                if (spriteId.length === 0 || typeof path !== "string" || path.length === 0) {
+                    throw new Error(
+                        `Tile ${String(tileId)} in "${mapId}" has invalid sprite "${spriteId}".`,
+                    );
+                }
+            }
+        }
+
+        if (tile.condition) {
+            validateCondition(tile.condition, `Condition for tile ${String(tileId)} in "${mapId}"`);
+        }
+
         const interaction = tile.interaction;
         if (!interaction) return;
 
@@ -301,6 +349,8 @@ class Game {
                     'trigger: "action", "touch", or "both".',
             );
         }
+
+        validateInteractionCondition(interaction, mapId);
 
         const handler = INTERACTION_HANDLERS.get(interaction.handler);
         if (!handler) {
@@ -367,6 +417,51 @@ class Game {
         }
     }
 
+    validateEntityReference(mapId, entityId, label) {
+        const entities = this.entitiesByMap.get(mapId);
+        if (!entities?.has(entityId)) {
+            throw new Error(`${label} references missing entity "${entityId}" in "${mapId}".`);
+        }
+    }
+
+    validateEntitySpriteReference(mapId, entityId, spriteId, label) {
+        this.validateEntityReference(mapId, entityId, label);
+
+        const entity = this.entitiesByMap.get(mapId).get(entityId);
+        if (!entity.tile.sprites || !Object.hasOwn(entity.tile.sprites, spriteId)) {
+            throw new Error(
+                `${label} references missing sprite "${spriteId}" for entity ` +
+                    `"${entityId}" in "${mapId}".`,
+            );
+        }
+    }
+
+    validateTileReference(mapId, layerName, col, row, tileId, label) {
+        const map = this.mapsById.get(mapId);
+        if (!map) {
+            throw new Error(`${label} references missing map "${mapId}".`);
+        }
+
+        const layer = map.layers[layerName];
+        if (!layer) {
+            throw new Error(`${label} references missing layer "${layerName}" in "${mapId}".`);
+        }
+
+        if (row >= map.gridSize.height || col >= map.gridSize.width) {
+            throw new Error(`${label} references tile position ${col},${row} outside "${mapId}".`);
+        }
+
+        if (tileId !== EMPTY_TILE_ID && !map.tiles[tileId]) {
+            throw new Error(`${label} references unknown tile ID ${String(tileId)} in "${mapId}".`);
+        }
+    }
+
+    validateSoundReference(soundId, label) {
+        if (!this.soundDefinitions.has(soundId)) {
+            throw new Error(`${label} references missing sound "${soundId}".`);
+        }
+    }
+
     layerCreatesCollision(layerName, tile) {
         if (layerName === "base") return false;
         if (layerName === "obstacles") return tile.collision !== false;
@@ -377,24 +472,27 @@ class Game {
         const walkable = new Set();
         const collision = new Set();
         const interactions = new Map();
+        const layers = this.state.maps[map.id].layers;
 
-        for (const [layerName, layer] of Object.entries(map.layers)) {
+        for (const [layerName, layer] of Object.entries(layers)) {
             layer.forEach((row, rowIndex) => {
                 row.forEach((tileId, colIndex) => {
                     if (tileId === EMPTY_TILE_ID) return;
 
                     const tile = map.tiles[tileId];
-                    const anchorKey = `${colIndex},${rowIndex}`;
+                    if (!this.isTilePresent(map.id, tile)) return;
 
+                    const anchorKey = `${colIndex},${rowIndex}`;
                     if (layerName === "base") {
                         walkable.add(anchorKey);
                     }
 
-                    if (tile.interaction && this.isInteractionRemoved(map.id, tile.interaction)) {
-                        return;
-                    }
+                    const interactionActive =
+                        tile.interaction &&
+                        (!tile.interaction.condition ||
+                            this.evaluateCondition(tile.interaction.condition));
 
-                    const target = tile.interaction
+                    const target = interactionActive
                         ? {
                               mapId: map.id,
                               tileId,
@@ -430,6 +528,18 @@ class Game {
         };
     }
 
+    isTilePresent(mapId, tile) {
+        if (tile.condition && !this.evaluateCondition(tile.condition)) {
+            return false;
+        }
+
+        if (tile.interaction && this.isEntityRemoved(mapId, tile.interaction.id)) {
+            return false;
+        }
+
+        return true;
+    }
+
     getOccupiedCells(col, row, tile) {
         const [widthPx, heightPx] = tile.size ?? [DEFAULT_TILE_SIZE, DEFAULT_TILE_SIZE];
         const widthInTiles = Math.ceil(widthPx / DEFAULT_TILE_SIZE);
@@ -451,6 +561,12 @@ class Game {
         for (const map of this.maps) {
             for (const tile of Object.values(map.tiles)) {
                 paths.add(tile.path);
+
+                if (tile.sprites) {
+                    for (const path of Object.values(tile.sprites)) {
+                        paths.add(path);
+                    }
+                }
             }
         }
 
@@ -478,7 +594,38 @@ class Game {
         });
     }
 
+    prepareSounds() {
+        for (const [soundId, sound] of this.soundDefinitions) {
+            if (
+                !sound ||
+                typeof sound !== "object" ||
+                typeof sound.path !== "string" ||
+                sound.path.length === 0 ||
+                typeof sound.volume !== "number" ||
+                sound.volume < 0 ||
+                sound.volume > 1
+            ) {
+                throw new Error(`Sound "${soundId}" has an invalid definition.`);
+            }
+
+            const audio = new Audio(sound.path);
+            audio.preload = "auto";
+            this.soundTemplates.set(soundId, audio);
+        }
+    }
+
+    playSound(soundId) {
+        const sound = this.soundDefinitions.get(soundId);
+        const audio = this.soundTemplates.get(soundId).cloneNode();
+        audio.volume = sound.volume;
+        audio.play().catch((error) => {
+            console.warn(`Could not play sound "${soundId}".`, error);
+        });
+    }
+
     transitionTo({ mapId, entryId }) {
+        this.validateEntryReference(mapId, entryId, "Transition");
+
         const map = this.mapsById.get(mapId);
         const entry = map.entries[entryId];
 
@@ -493,14 +640,80 @@ class Game {
     }
 
     rebuildActiveSpatialData() {
-        const map = this.activeMap;
-        const spatialData = this.buildSpatialData(map);
-
-        this.activeSpatialData = spatialData;
+        this.activeSpatialData = this.buildSpatialData(this.activeMap);
     }
 
     get activeMap() {
         return this.mapsById.get(this.state.player.mapId);
+    }
+
+    get activeMapState() {
+        return this.state.maps[this.state.player.mapId];
+    }
+
+    setFlag(flag, value) {
+        this.state.flags[flag] = value;
+    }
+
+    getFlag(flag) {
+        return this.state.flags[flag];
+    }
+
+    hasFlag(flag) {
+        return this.getFlag(flag) === true;
+    }
+
+    addItem(itemId) {
+        if (!this.hasItem(itemId)) {
+            this.state.inventory.push(itemId);
+        }
+    }
+
+    removeItem(itemId) {
+        this.state.inventory = this.state.inventory.filter(
+            (storedItemId) => storedItemId !== itemId,
+        );
+    }
+
+    hasItem(itemId) {
+        return this.state.inventory.includes(itemId);
+    }
+
+    evaluateCondition(condition) {
+        return evaluateCondition(this, condition);
+    }
+
+    runEffects(effects, { mapId }) {
+        if (!this.mapsById.has(mapId)) {
+            throw new Error(`Effects reference missing map "${mapId}".`);
+        }
+
+        runEffects(this, effects, mapId);
+    }
+
+    removeEntity(mapId, entityId) {
+        this.state.maps[mapId].entities[entityId].removed = true;
+    }
+
+    isEntityRemoved(mapId, entityId) {
+        return this.state.maps[mapId].entities[entityId].removed;
+    }
+
+    setEntitySprite(mapId, entityId, spriteId) {
+        this.state.maps[mapId].entities[entityId].spriteId = spriteId;
+    }
+
+    getEntityImagePath(mapId, tile) {
+        if (!tile.interaction) return tile.path;
+
+        const entityState = this.state.maps[mapId].entities[tile.interaction.id];
+        if (!Object.hasOwn(entityState, "spriteId")) return tile.path;
+
+        return tile.sprites[entityState.spriteId];
+    }
+
+    setTile(mapId, layerName, col, row, tileId) {
+        this.state.maps[mapId].layers[layerName][row][col] = tileId;
     }
 
     bindInput() {
@@ -570,21 +783,25 @@ class Game {
             return false;
         }
 
-        this.triggerInteraction(target, "action");
-        return true;
+        return this.triggerInteraction(target, "action");
     }
 
     handleTouchInteraction() {
         const target = this.player.getInteraction(this.activeSpatialData.interactions, "touch");
         if (!target) return false;
 
-        this.triggerInteraction(target, "touch");
-        return true;
+        return this.triggerInteraction(target, "touch");
     }
 
     triggerInteraction(target, triggerSource) {
         const sourceMapId = target.mapId;
         const interaction = target.interaction;
+
+        if (interaction.condition && !this.evaluateCondition(interaction.condition)) {
+            this.rebuildActiveSpatialData();
+            return false;
+        }
+
         const handler = INTERACTION_HANDLERS.get(interaction.handler);
 
         this.canvas.dispatchEvent(
@@ -607,19 +824,8 @@ class Game {
             sourceMapId,
             triggerSource,
         });
-    }
 
-    collectInteraction(sourceMapId, interaction) {
-        this.state.inventory.push(interaction.id);
-        this.state.maps[sourceMapId].entities[interaction.id].removed = true;
-
-        if (this.state.player.mapId === sourceMapId) {
-            this.rebuildActiveSpatialData();
-        }
-    }
-
-    isInteractionRemoved(mapId, interaction) {
-        return this.state.maps[mapId].entities[interaction.id].removed;
+        return true;
     }
 
     update(deltaMs) {
@@ -656,7 +862,7 @@ class Game {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        for (const layer of Object.values(this.activeMap.layers)) {
+        for (const layer of Object.values(this.activeMapState.layers)) {
             this.renderLayer(layer);
         }
 
@@ -669,15 +875,10 @@ class Game {
                 if (tileId === EMPTY_TILE_ID) return;
 
                 const tile = this.activeMap.tiles[tileId];
+                if (!this.isTilePresent(this.activeMap.id, tile)) return;
 
-                if (
-                    tile.interaction &&
-                    this.isInteractionRemoved(this.activeMap.id, tile.interaction)
-                ) {
-                    return;
-                }
-
-                const image = this.images.get(tile.path);
+                const path = this.getEntityImagePath(this.activeMap.id, tile);
+                const image = this.images.get(path);
                 if (!image) return;
 
                 const [width, height] = tile.size ?? [DEFAULT_TILE_SIZE, DEFAULT_TILE_SIZE];
@@ -713,7 +914,7 @@ class Game {
 }
 
 const canvas = document.querySelector("#game");
-const game = new Game(canvas, MAPS);
+export const game = new Game(canvas, MAPS);
 
 canvas.addEventListener("game-interaction", (event) => {
     console.log("Interaction signal:", event.detail);

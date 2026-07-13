@@ -1,12 +1,22 @@
+import { validateCondition } from "./conditions.js";
+import { validateEffectsDefinition, validateEffectsReferences } from "./effects.js";
+
 export const INTERACTION_TRIGGERS = new Set(["action", "touch", "both"]); //TODO: remove 'both', make the trigger property into triggers: []
 
 //TODO: there has to be a better system for this
 export const INTERACTIONS = {
     PINK_ORB: {
         id: "pink-orb",
-        handler: "collect",
+        handler: "effects",
         trigger: "both",
-        params: {},
+        condition: {
+            notItem: "pink-orb",
+        },
+        effects: [
+            { type: "addItem", itemId: "pink-orb" },
+            { type: "playSound", soundId: "orb-collect" },
+            { type: "removeEntity", entityId: "pink-orb" },
+        ],
         message: "You found the pink orb.",
     },
     ROOM_01_NORTH_DOOR: {
@@ -29,6 +39,42 @@ export const INTERACTIONS = {
         },
         message: "You return through the door.",
     },
+    ROOM_02_NORTH_DOOR: {
+        id: "north-door",
+        handler: "teleport",
+        trigger: "action",
+        params: {
+            mapId: "room-03",
+            entryId: "fromRoom02",
+        },
+        message: "The door opens into another room.",
+    },
+    ROOM_03_SOUTH_DOOR: {
+        id: "south-door",
+        handler: "teleport",
+        trigger: "action",
+        params: {
+            mapId: "room-02",
+            entryId: "fromRoom03",
+        },
+        message: "You return to the previous room.",
+    },
+    BLUE_ORB: {
+        id: "blue-orb",
+        handler: "effects",
+        trigger: "both",
+        condition: {
+            all: [{ notFlag: "room03.orbCollected" }, { notItem: "blue-orb" }],
+        },
+        effects: [
+            { type: "setFlag", flag: "room03.orbCollected", value: true },
+            { type: "addItem", itemId: "blue-orb" },
+            { type: "playSound", soundId: "orb-collect" },
+            { type: "setTile", layer: "obstacles", col: 4, row: 3, tileId: -1 },
+            { type: "removeEntity", entityId: "blue-orb" },
+        ],
+        message: "The blue orb dissolves. A section of the wall disappears.",
+    },
 };
 
 function requireParamsObject(interaction, mapId) {
@@ -45,14 +91,28 @@ function requireParamsObject(interaction, mapId) {
 
 export const INTERACTION_HANDLERS = new Map([
     [
-        "collect",
+        "effects",
         {
             validateDefinition({ interaction, mapId }) {
-                requireParamsObject(interaction, mapId);
+                validateEffectsDefinition(
+                    interaction.effects,
+                    `Effects for interaction "${interaction.id}" in "${mapId}"`,
+                );
+            },
+
+            validateReferences({ game, interaction, sourceMapId }) {
+                validateEffectsReferences(
+                    game,
+                    interaction.effects,
+                    sourceMapId,
+                    `Effects for interaction "${interaction.id}" in "${sourceMapId}"`,
+                );
             },
 
             execute({ game, target, sourceMapId }) {
-                game.collectInteraction(sourceMapId, target.interaction);
+                game.runEffects(target.interaction.effects, {
+                    mapId: sourceMapId,
+                });
             },
         },
     ],
@@ -94,3 +154,12 @@ export const INTERACTION_HANDLERS = new Map([
         },
     ],
 ]);
+
+export function validateInteractionCondition(interaction, mapId) {
+    if (!interaction.condition) return;
+
+    validateCondition(
+        interaction.condition,
+        `Condition for interaction "${interaction.id}" in "${mapId}"`,
+    );
+}
