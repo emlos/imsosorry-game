@@ -14,8 +14,8 @@ export const INTERACTIONS = {
         handler: "teleport",
         trigger: "action",
         params: {
-            targetMapId: "room-02",
-            targetEntryId: "fromRoom01",
+            mapId: "room-02",
+            entryId: "fromRoom01",
         },
         message: "The door opens.",
     },
@@ -24,8 +24,8 @@ export const INTERACTIONS = {
         handler: "teleport",
         trigger: "action",
         params: {
-            targetMapId: "room-01",
-            targetEntryId: "fromRoom02",
+            mapId: "room-01",
+            entryId: "fromRoom02",
         },
         message: "You return through the door.",
     },
@@ -62,36 +62,34 @@ export const INTERACTION_HANDLERS = new Map([
             validateDefinition({ interaction, mapId }) {
                 requireParamsObject(interaction, mapId);
 
-                const { targetMapId, targetEntryId } = interaction.params;
+                const { mapId: destinationMapId, entryId } = interaction.params;
 
-                if (typeof targetMapId !== "string" || targetMapId.length === 0) {
-                    //TODO: only reference maps by their id, not by their index -> remove in map.js if any remain as well, this is redundant
+                if (typeof destinationMapId !== "string") {
                     throw new Error(
                         `Teleport interaction "${interaction.id}" in "${mapId}" ` +
-                            "must define params.targetMapId.",
+                            "must define params.mapId.",
                     );
                 }
 
-                if (typeof targetEntryId !== "string" || targetEntryId.length === 0) {
+                if (typeof entryId !== "string") {
                     throw new Error(
                         `Teleport interaction "${interaction.id}" in "${mapId}" ` +
-                            "must define params.targetEntryId.",
+                            "must define params.entryId.",
                     );
                 }
             },
 
             validateReferences({ game, interaction, sourceMapId }) {
-                const { targetMapId, targetEntryId } = interaction.params;
+                const { mapId, entryId } = interaction.params;
                 game.validateEntryReference(
-                    targetMapId,
-                    targetEntryId,
+                    mapId,
+                    entryId,
                     `Teleport "${interaction.id}" from "${sourceMapId}"`,
                 );
             },
 
             execute({ game, target }) {
-                const { targetMapId, targetEntryId } = target.interaction.params;
-                game.loadMapEntry(targetMapId, targetEntryId);
+                game.transitionTo(target.interaction.params);
             },
         },
     ],

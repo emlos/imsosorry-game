@@ -12,18 +12,40 @@ class Game {
         this.authoredMaps = authoredMaps;
         this.maps = [];
         this.mapsById = new Map();
-        this.mapSpatialData = new Map();
-        this.currentMap = null;
+        this.activeSpatialData = null;
+
+        const initialMap = authoredMaps[0];
+        const initialEntry = initialMap.entries[initialMap.initialEntryId];
+
+        this.state = {
+            version: 1,
+
+            player: {
+                mapId: initialMap.id,
+                col: initialEntry.col,
+                row: initialEntry.row,
+                facing: { ...initialEntry.facing },
+                spriteId: "default",
+            },
+
+            flags: {},
+
+            inventory: [],
+
+            maps: Object.fromEntries(
+                authoredMaps.map((map) => [
+                    map.id,
+                    {
+                        flags: {},
+                        entities: {},
+                    },
+                ]),
+            ),
+        };
 
         this.images = new Map();
-        this.walkableMap = new Set();
-        this.collisionMap = new Set();
-        this.interactionMap = new Map();
-        this.collected = new Set();
-        this.currentMapBounds = { width: 0, height: 0 };
-
         this.camera = { x: 0, y: 0 };
-        this.player = new Player(DEFAULT_TILE_SIZE);
+        this.player = new Player(DEFAULT_TILE_SIZE, this.state.player);
 
         this.movementDirections = new Map([
             ["ArrowUp", { dc: 0, dr: -1 }],
@@ -50,13 +72,16 @@ class Game {
         await this.preloadAllImages();
 
         const initialMap = this.maps[0];
-        this.loadMapEntry(initialMap.id, initialMap.initialEntryId);
+        this.transitionTo({
+            mapId: initialMap.id,
+            entryId: initialMap.initialEntryId,
+        });
 
         requestAnimationFrame((time) => this.loop(time));
     }
 
     prepareMaps() {
-        if (!Array.isArray(this.authoredMaps) || this.authoredMaps.length === 0) {
+        if (!Array.isArray(this.authoredMaps)) {
             throw new Error("At least one map is required.");
         }
 
@@ -66,7 +91,7 @@ class Game {
         }));
 
         for (const map of this.maps) {
-            if (typeof map.id !== "string" || map.id.length === 0) {
+            if (typeof map.id !== "string") {
                 throw new Error("Every map must have a non-empty string ID.");
             }
 
@@ -81,10 +106,16 @@ class Game {
 
         this.maps.forEach((map, index) => {
             const interactions = this.validateMap(map, index === 0);
+
+            for (const interaction of interactions) {
+                this.state.maps[map.id].entities[interaction.id] = {
+                    removed: false,
+                };
+            }
+
             const spatialData = this.buildSpatialData(map);
 
             this.validateEntries(map, spatialData);
-            this.mapSpatialData.set(map.id, spatialData);
             interactionsByMap.set(map.id, interactions);
         });
 
@@ -359,7 +390,7 @@ class Game {
                         walkable.add(anchorKey);
                     }
 
-                    if (tile.interaction && this.isInteractionCollected(map.id, tile.interaction)) {
+                    if (tile.interaction && this.isInteractionRemoved(map.id, tile.interaction)) {
                         return;
                     }
 
@@ -447,32 +478,29 @@ class Game {
         });
     }
 
-    loadMapEntry(mapId, entryId) {
+    transitionTo({ mapId, entryId }) {
         const map = this.mapsById.get(mapId);
         const entry = map.entries[entryId];
-        const spatialData = this.mapSpatialData.get(mapId);
 
-        this.currentMap = map;
-        this.walkableMap = spatialData.walkable;
-        this.collisionMap = spatialData.collision;
-        this.interactionMap = spatialData.interactions;
-        this.currentMapBounds = spatialData.bounds;
-
+        this.state.player.mapId = mapId;
         this.player.setPosition(entry.col, entry.row);
         this.player.setFacing(entry.facing.dc, entry.facing.dr);
+        this.activeSpatialData = this.buildSpatialData(map);
 
         this.clearMovementInput();
         this.updateCamera();
-        this.setStatus(`Map: ${map.id} · Entry: ${entryId}`);
+        this.setStatus(`Map: ${mapId} -- Entry: ${entryId}`);
     }
 
-    rebuildCurrentSpatialData() {
-        const spatialData = this.buildSpatialData(this.currentMap);
-        this.mapSpatialData.set(this.currentMap.id, spatialData);
-        this.walkableMap = spatialData.walkable;
-        this.collisionMap = spatialData.collision;
-        this.interactionMap = spatialData.interactions;
-        this.currentMapBounds = spatialData.bounds;
+    rebuildActiveSpatialData() {
+        const map = this.activeMap;
+        const spatialData = this.buildSpatialData(map);
+
+        this.activeSpatialData = spatialData;
+    }
+
+    get activeMap() {
+        return this.mapsById.get(this.state.player.mapId);
     }
 
     bindInput() {
@@ -529,11 +557,13 @@ class Game {
 
     canPlayerEnter(col, row) {
         const key = `${col},${row}`;
-        return this.walkableMap.has(key) && !this.collisionMap.has(key);
+        return (
+            this.activeSpatialData.walkable.has(key) && !this.activeSpatialData.collision.has(key)
+        );
     }
 
     handleActionInteraction() {
-        const target = this.player.getInteraction(this.interactionMap, "action");
+        const target = this.player.getInteraction(this.activeSpatialData.interactions, "action");
 
         if (!target) {
             this.logEvent("Nothing responds.");
@@ -545,7 +575,7 @@ class Game {
     }
 
     handleTouchInteraction() {
-        const target = this.player.getInteraction(this.interactionMap, "touch");
+        const target = this.player.getInteraction(this.activeSpatialData.interactions, "touch");
         if (!target) return false;
 
         this.triggerInteraction(target, "touch");
@@ -580,15 +610,16 @@ class Game {
     }
 
     collectInteraction(sourceMapId, interaction) {
-        this.collected.add(`${sourceMapId}:${interaction.id}`);
+        this.state.inventory.push(interaction.id);
+        this.state.maps[sourceMapId].entities[interaction.id].removed = true;
 
-        if (this.currentMap.id === sourceMapId) {
-            this.rebuildCurrentSpatialData();
+        if (this.state.player.mapId === sourceMapId) {
+            this.rebuildActiveSpatialData();
         }
     }
 
-    isInteractionCollected(mapId, interaction) {
-        return this.collected.has(`${mapId}:${interaction.id}`);
+    isInteractionRemoved(mapId, interaction) {
+        return this.state.maps[mapId].entities[interaction.id].removed;
     }
 
     update(deltaMs) {
@@ -615,8 +646,8 @@ class Game {
         const desiredX = this.player.x + DEFAULT_TILE_SIZE / 2 - this.canvas.width / 2;
         const desiredY = this.player.y + DEFAULT_TILE_SIZE / 2 - this.canvas.height / 2;
 
-        const maxX = Math.max(0, this.currentMapBounds.width - this.canvas.width);
-        const maxY = Math.max(0, this.currentMapBounds.height - this.canvas.height);
+        const maxX = Math.max(0, this.activeSpatialData.bounds.width - this.canvas.width);
+        const maxY = Math.max(0, this.activeSpatialData.bounds.height - this.canvas.height);
 
         this.camera.x = Math.max(0, Math.min(desiredX, maxX));
         this.camera.y = Math.max(0, Math.min(desiredY, maxY));
@@ -625,7 +656,7 @@ class Game {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        for (const layer of Object.values(this.currentMap.layers)) {
+        for (const layer of Object.values(this.activeMap.layers)) {
             this.renderLayer(layer);
         }
 
@@ -637,11 +668,11 @@ class Game {
             row.forEach((tileId, colIndex) => {
                 if (tileId === EMPTY_TILE_ID) return;
 
-                const tile = this.currentMap.tiles[tileId];
+                const tile = this.activeMap.tiles[tileId];
 
                 if (
                     tile.interaction &&
-                    this.isInteractionCollected(this.currentMap.id, tile.interaction)
+                    this.isInteractionRemoved(this.activeMap.id, tile.interaction)
                 ) {
                     return;
                 }

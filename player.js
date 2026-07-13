@@ -1,18 +1,15 @@
 export class Player {
-    constructor(tileSize) {
+    constructor(tileSize, state) {
         this.tileSize = tileSize;
+        this.state = state;
 
-        this.col = 0;
-        this.row = 0;
-        this.x = 0;
-        this.y = 0;
+        this.x = state.col * tileSize;
+        this.y = state.row * tileSize;
+        this.fromX = this.x;
+        this.fromY = this.y;
+        this.toX = this.x;
+        this.toY = this.y;
 
-        this.fromX = 0;
-        this.fromY = 0;
-        this.toX = 0;
-        this.toY = 0;
-
-        this.facing = { dc: 0, dr: 1 };
         this.isMoving = false;
         this.moveProgress = 1;
         this.moveDurationMs = 220;
@@ -21,9 +18,22 @@ export class Player {
         this.strokeStyle = "#141821";
     }
 
+    get col() {
+        return this.state.col;
+    }
+
+    get row() {
+        return this.state.row;
+    }
+
+    get facing() {
+        return this.state.facing;
+    }
+
     setPosition(col, row) {
-        this.col = col;
-        this.row = row;
+        this.state.col = col;
+        this.state.row = row;
+
         this.x = col * this.tileSize;
         this.y = row * this.tileSize;
         this.fromX = this.x;
@@ -35,13 +45,13 @@ export class Player {
     }
 
     setFacing(dc, dr) {
-        this.facing = { dc, dr };
+        this.state.facing = { dc, dr };
     }
 
     tryMove(dc, dr, canEnter) {
         if (this.isMoving) return false;
 
-        this.facing = { dc, dr };
+        this.setFacing(dc, dr);
 
         const nextCol = this.col + dc;
         const nextRow = this.row + dr;
@@ -53,8 +63,8 @@ export class Player {
         this.toX = nextCol * this.tileSize;
         this.toY = nextRow * this.tileSize;
 
-        this.col = nextCol;
-        this.row = nextRow;
+        this.state.col = nextCol;
+        this.state.row = nextRow;
         this.moveProgress = 0;
         this.isMoving = true;
 
@@ -133,10 +143,7 @@ export class Player {
 
         ctx.beginPath();
         ctx.moveTo(centerX, centerY);
-        ctx.lineTo(
-            centerX + this.facing.dc * length,
-            centerY + this.facing.dr * length,
-        );
+        ctx.lineTo(centerX + this.facing.dc * length, centerY + this.facing.dr * length);
         ctx.stroke();
     }
 }

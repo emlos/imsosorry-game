@@ -13,6 +13,8 @@ export const TILE_IDS = {
 };
 //TODO: move tile size to here from maps.js
 
+//TODO: allow collission independently of size, e.g for a tree, a 2x1 tile, where only the bottom has collission, and the top is just a visual. 
+//This will require a new property for tiles, and specify whether the 'walkable' part of the tile is to be rendered above or below the player
 export const TILES = {
     [TILE_IDS.FLOOR]: {
         path: "./assets/tiles/floor.png",
