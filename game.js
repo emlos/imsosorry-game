@@ -1076,6 +1076,10 @@ export class Game {
     }
 
     createSaveData() {
+        if (this.mode !== "world" || this.player.isMoving) {
+            throw new Error("Cannot save or export unless the game is idle in world mode.");
+        }
+
         const maps = {};
 
         for (const map of this.maps) {
