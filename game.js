@@ -1136,7 +1136,6 @@ export class Game {
             maps,
         };
 
-        this.prepareSaveData(saveData);
         return saveData;
     }
 
