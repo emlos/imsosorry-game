@@ -360,27 +360,16 @@ export class Game {
                         validatedTileIds.add(tileId);
                     }
 
+                    this.validateTileLayerCompatibility(
+                        map,
+                        layerName,
+                        tileId,
+                        `Tile ${String(tileId)} at ${colIndex},${rowIndex} in layer ` +
+                            `"${layerName}" of map "${map.id}"`,
+                    );
+
                     if (layerName === "base") {
-                        if (tile.size) {
-                            throw new Error(
-                                `Base tile ${String(tileId)} in "${map.id}" has a size. ` +
-                                    "Base tiles must occupy one grid cell.",
-                            );
-                        }
-
                         walkableBaseCells += 1;
-                    }
-
-                    if (
-                        tile.interaction &&
-                        this.layerCreatesCollision(layerName, tile) &&
-                        (tile.interaction.trigger === "touch" ||
-                            tile.interaction.trigger === "both")
-                    ) {
-                        throw new Error(
-                            `Tile ${String(tileId)} in "${map.id}" cannot use ` +
-                                `${tile.interaction.trigger} interaction on a colliding layer.`,
-                        );
                     }
                 });
             });
@@ -633,17 +622,9 @@ export class Game {
 
         if (entity.interaction !== null) {
             validateInteractionDefinition(entity.interaction, `interaction for ${entityLabel}`);
-
-            if (
-                entity.collision &&
-                (entity.interaction.trigger === "touch" || entity.interaction.trigger === "both")
-            ) {
-                throw new Error(
-                    `${entityLabel} cannot use ${entity.interaction.trigger} interaction ` +
-                        "while collision is enabled.",
-                );
-            }
         }
+
+        this.validateEntityCollisionInteraction(entity.collision, entity.interaction, entityLabel);
 
         if (entity.condition) {
             validateCondition(entity.condition, `Condition for ${entityLabel}`);
@@ -871,6 +852,40 @@ export class Game {
 
         if (tileId !== EMPTY_TILE_ID && !map.tiles[tileId]) {
             throw new Error(`${label} references unknown tile ID ${String(tileId)} in "${mapId}".`);
+        }
+
+        this.validateTileLayerCompatibility(map, layerName, tileId, label);
+    }
+
+    validateTileLayerCompatibility(map, layerName, tileId, label) {
+        if (tileId === EMPTY_TILE_ID) return;
+
+        const tile = map.tiles[tileId];
+        if (layerName === "base" && tile.size) {
+            throw new Error(`${label} cannot place a sized tile on the base layer.`);
+        }
+
+        if (
+            tile.interaction &&
+            this.layerCreatesCollision(layerName, tile) &&
+            (tile.interaction.trigger === "touch" || tile.interaction.trigger === "both")
+        ) {
+            throw new Error(
+                `${label} cannot place a tile with ${tile.interaction.trigger} interaction ` +
+                    "on a colliding layer.",
+            );
+        }
+    }
+
+    validateEntityCollisionInteraction(collision, interaction, label) {
+        if (
+            collision &&
+            interaction &&
+            (interaction.trigger === "touch" || interaction.trigger === "both")
+        ) {
+            throw new Error(
+                `${label} cannot combine collision with ${interaction.trigger} interaction.`,
+            );
         }
     }
 
@@ -1368,17 +1383,11 @@ export class Game {
                 runtimeEntity.interaction = structuredClone(changes.interaction);
             }
 
-            if (
-                runtimeEntity.collision &&
-                runtimeEntity.interaction &&
-                (runtimeEntity.interaction.trigger === "touch" ||
-                    runtimeEntity.interaction.trigger === "both")
-            ) {
-                throw new Error(
-                    `Saved entity "${map.id}.${entityId}" cannot combine collision with ` +
-                        `${runtimeEntity.interaction.trigger} interaction.`,
-                );
-            }
+            this.validateEntityCollisionInteraction(
+                runtimeEntity.collision,
+                runtimeEntity.interaction,
+                `Saved entity "${map.id}.${entityId}"`,
+            );
         }
     }
 
@@ -1476,6 +1485,19 @@ export class Game {
         this.activeSpatialData = this.buildSpatialData(this.activeMap);
     }
 
+    refreshSpatialDataAfterMutation(mapId, label) {
+        if (this.state.player.mapId !== mapId) return;
+
+        const spatialData = this.buildSpatialData(this.mapsById.get(mapId));
+        this.validateTransitionCell(
+            spatialData,
+            this.player.col,
+            this.player.row,
+            `${label} would invalidate the player position`,
+        );
+        this.activeSpatialData = spatialData;
+    }
+
     get activeMap() {
         return this.mapsById.get(this.state.player.mapId);
     }
@@ -1485,11 +1507,24 @@ export class Game {
     }
 
     setFlag(flag, value) {
+        const hadFlag = Object.hasOwn(this.state.flags, flag);
+        const previousValue = this.state.flags[flag];
         this.state.flags[flag] = value;
+
+        try {
+            this.refreshSpatialDataAfterMutation(this.state.player.mapId, `Setting flag "${flag}"`);
+        } catch (error) {
+            if (hadFlag) {
+                this.state.flags[flag] = previousValue;
+            } else {
+                delete this.state.flags[flag];
+            }
+            throw error;
+        }
     }
 
     toggleFlag(flag) {
-        this.state.flags[flag] = !this.hasFlag(flag);
+        this.setFlag(flag, !this.hasFlag(flag));
     }
 
     getFlag(flag) {
@@ -1501,6 +1536,9 @@ export class Game {
     }
 
     addItem(itemId, quantity) {
+        const previousItemState = this.state.inventory[itemId]
+            ? { ...this.state.inventory[itemId] }
+            : null;
         const itemState = this.state.inventory[itemId];
         if (itemState) {
             itemState.quantity += quantity;
@@ -1509,6 +1547,20 @@ export class Game {
                 quantity,
                 active: false,
             };
+        }
+
+        try {
+            this.refreshSpatialDataAfterMutation(
+                this.state.player.mapId,
+                `Adding item "${itemId}"`,
+            );
+        } catch (error) {
+            if (previousItemState) {
+                this.state.inventory[itemId] = previousItemState;
+            } else {
+                delete this.state.inventory[itemId];
+            }
+            throw error;
         }
 
         this.refreshInventoryPanel();
@@ -1521,12 +1573,25 @@ export class Game {
             throw new Error(`Cannot remove ${quantity} of item "${itemId}".`);
         }
 
+        const previousItemState = { ...itemState };
+        const previousSelectedItemId = this.selectedItemId;
         itemState.quantity -= quantity;
         if (itemState.quantity === 0) {
             delete this.state.inventory[itemId];
             if (this.selectedItemId === itemId) {
                 this.selectedItemId = Object.keys(this.state.inventory)[0] ?? null;
             }
+        }
+
+        try {
+            this.refreshSpatialDataAfterMutation(
+                this.state.player.mapId,
+                `Removing item "${itemId}"`,
+            );
+        } catch (error) {
+            this.state.inventory[itemId] = previousItemState;
+            this.selectedItemId = previousSelectedItemId;
+            throw error;
         }
 
         this.refreshInventoryPanel();
@@ -1633,13 +1698,37 @@ export class Game {
     }
 
     setEntityActive(mapId, entityId, active) {
-        this.getEntityState(mapId, entityId).active = active;
+        const state = this.getEntityState(mapId, entityId);
+        const previousActive = state.active;
+        state.active = active;
+
+        try {
+            this.refreshSpatialDataAfterMutation(
+                mapId,
+                `Changing active state for entity "${entityId}" in "${mapId}"`,
+            );
+        } catch (error) {
+            state.active = previousActive;
+            throw error;
+        }
     }
 
     setEntityPosition(mapId, entityId, col, row) {
         const state = this.getEntityState(mapId, entityId);
+        const previousPosition = { col: state.col, row: state.row };
         state.col = col;
         state.row = row;
+
+        try {
+            this.refreshSpatialDataAfterMutation(
+                mapId,
+                `Moving entity "${entityId}" in "${mapId}"`,
+            );
+        } catch (error) {
+            state.col = previousPosition.col;
+            state.row = previousPosition.row;
+            throw error;
+        }
     }
 
     setEntitySprite(mapId, entityId, spriteId) {
@@ -1647,7 +1736,25 @@ export class Game {
     }
 
     setEntityCollision(mapId, entityId, collision) {
-        this.getEntityState(mapId, entityId).collision = collision;
+        const state = this.getEntityState(mapId, entityId);
+        this.validateEntityCollisionInteraction(
+            collision,
+            state.interaction,
+            `Entity "${entityId}" in "${mapId}"`,
+        );
+
+        const previousCollision = state.collision;
+        state.collision = collision;
+
+        try {
+            this.refreshSpatialDataAfterMutation(
+                mapId,
+                `Changing collision for entity "${entityId}" in "${mapId}"`,
+            );
+        } catch (error) {
+            state.collision = previousCollision;
+            throw error;
+        }
     }
 
     setEntityInteraction(mapId, entityId, interaction) {
@@ -1659,7 +1766,13 @@ export class Game {
             validateInteractionReferences(this, interaction, mapId, label);
         }
 
-        this.getEntityState(mapId, entityId).interaction = structuredClone(interaction);
+        const state = this.getEntityState(mapId, entityId);
+        this.validateEntityCollisionInteraction(
+            state.collision,
+            interaction,
+            `Entity "${entityId}" in "${mapId}"`,
+        );
+        state.interaction = structuredClone(interaction);
 
         if (this.state.player.mapId === mapId) {
             this.rebuildActiveSpatialData();
@@ -1667,7 +1780,17 @@ export class Game {
     }
 
     setTile(mapId, layerName, col, row, tileId) {
-        this.state.maps[mapId].layers[layerName][row][col] = tileId;
+        const label = `Tile update at ${col},${row} in layer "${layerName}" of "${mapId}"`;
+        const layer = this.state.maps[mapId].layers[layerName];
+        const previousTileId = layer[row][col];
+        layer[row][col] = tileId;
+
+        try {
+            this.refreshSpatialDataAfterMutation(mapId, label);
+        } catch (error) {
+            layer[row][col] = previousTileId;
+            throw error;
+        }
     }
 
     canPlayerEnter(col, row) {
