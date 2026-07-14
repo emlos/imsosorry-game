@@ -1620,7 +1620,7 @@ export class Game {
     }
 
     openInventory() {
-        if (this.mode !== "world") return false;
+        if (this.mode !== "world" || this.player.isMoving) return false;
 
         const ownedItemIds = Object.keys(this.state.inventory);
         if (this.selectedItemId === null || !this.hasItem(this.selectedItemId)) {
