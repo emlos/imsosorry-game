@@ -1,27 +1,14 @@
+import {
+    requireExactKeys,
+    requireNonEmptyArray,
+    requireObject,
+    requireString,
+} from "./validation.js";
+
 const CONDITION_OPERATORS = ["flag", "notFlag", "hasItem", "notItem", "all", "any"];
 
-function requireConditionObject(condition, label) {
-    if (!condition || typeof condition !== "object" || Array.isArray(condition)) {
-        throw new Error(`${label} must be an object.`);
-    }
-}
-
-function requireString(value, label) {
-    if (typeof value !== "string" || value.length === 0) {
-        throw new Error(`${label} must be a non-empty string.`);
-    }
-}
-
-function requireExactKeys(value, allowedKeys, label) {
-    for (const key of Object.keys(value)) {
-        if (!allowedKeys.has(key)) {
-            throw new Error(`${label} contains unsupported property "${key}".`);
-        }
-    }
-}
-
 export function validateCondition(condition, label) {
-    requireConditionObject(condition, label);
+    requireObject(condition, label);
 
     const operators = CONDITION_OPERATORS.filter((operator) => Object.hasOwn(condition, operator));
 
@@ -58,9 +45,7 @@ export function validateCondition(condition, label) {
     requireExactKeys(condition, new Set([operator]), label);
 
     const children = condition[operator];
-    if (!Array.isArray(children) || children.length === 0) {
-        throw new Error(`${label}.${operator} must be a non-empty array.`);
-    }
+    requireNonEmptyArray(children, `${label}.${operator}`);
 
     children.forEach((child, index) => {
         validateCondition(child, `${label}.${operator}[${index}]`);

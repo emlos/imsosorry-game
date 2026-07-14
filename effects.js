@@ -4,82 +4,25 @@ import {
     validateConditionReferences,
 } from "./conditions.js";
 
-function requireEffectObject(effect, label) {
-    if (!effect || typeof effect !== "object" || Array.isArray(effect)) {
-        throw new Error(`${label} must be an object.`);
-    }
-}
-
-function requireString(value, label) {
-    if (typeof value !== "string" || value.length === 0) {
-        throw new Error(`${label} must be a non-empty string.`);
-    }
-}
-
-function requireInteger(value, label) {
-    if (!Number.isInteger(value) || value < 0) {
-        throw new Error(`${label} must be a non-negative integer.`);
-    }
-}
-
-function requirePositiveInteger(value, label) {
-    if (!Number.isInteger(value) || value <= 0) {
-        throw new Error(`${label} must be a positive integer.`);
-    }
-}
-
-function requirePositiveNumber(value, label) {
-    if (!Number.isFinite(value) || value <= 0) {
-        throw new Error(`${label} must be a positive number.`);
-    }
-}
-
-function requireBoolean(value, label) {
-    if (typeof value !== "boolean") {
-        throw new Error(`${label} must be a boolean.`);
-    }
-}
-
-function requireExactKeys(effect, allowedKeys, label) {
-    for (const key of Object.keys(effect)) {
-        if (!allowedKeys.has(key)) {
-            throw new Error(`${label} contains unsupported property "${key}".`);
-        }
-    }
-}
-
-function validateJsonValue(value, label) {
-    if (value === null || typeof value === "string" || typeof value === "boolean") return;
-    if (typeof value === "number" && Number.isFinite(value)) return;
-
-    if (Array.isArray(value)) {
-        value.forEach((child, index) => validateJsonValue(child, `${label}[${index}]`));
-        return;
-    }
-
-    if (value && typeof value === "object") {
-        const prototype = Object.getPrototypeOf(value);
-        if (prototype !== Object.prototype && prototype !== null) {
-            throw new Error(`${label} must contain only JSON-compatible values.`);
-        }
-
-        for (const [key, child] of Object.entries(value)) {
-            validateJsonValue(child, `${label}.${key}`);
-        }
-        return;
-    }
-
-    throw new Error(`${label} must contain only JSON-compatible values.`);
-}
+import {
+    requireBoolean,
+    requireExactKeys,
+    requireInteger,
+    requireJsonValue,
+    requireNonEmptyArray,
+    requireNonNegativeInteger,
+    requireObject,
+    requirePositiveInteger,
+    requirePositiveNumber,
+    requireString,
+} from "./validation.js";
 
 function effectKeys(...keys) {
     return new Set(["type", "condition", ...keys]);
 }
 
 function validatePages(pages, label) {
-    if (!Array.isArray(pages) || pages.length === 0) {
-        throw new Error(`${label} must be a non-empty array.`);
-    }
+    requireNonEmptyArray(pages, label);
 
     pages.forEach((page, index) => {
         requireString(page, `${label}[${index}]`);
@@ -104,7 +47,7 @@ const EFFECT_HANDLERS = new Map([
                 if (!Object.hasOwn(effect, "value")) {
                     throw new Error(`${label} must define value.`);
                 }
-                validateJsonValue(effect.value, `${label}.value`);
+                requireJsonValue(effect.value, `${label}.value`);
             },
             execute({ game, effect }) {
                 game.setFlag(effect.flag, effect.value);
@@ -210,8 +153,8 @@ const EFFECT_HANDLERS = new Map([
                 requireExactKeys(effect, effectKeys("mapId", "entityId", "col", "row"), label);
                 if (effect.mapId !== undefined) requireString(effect.mapId, `${label}.mapId`);
                 requireString(effect.entityId, `${label}.entityId`);
-                requireInteger(effect.col, `${label}.col`);
-                requireInteger(effect.row, `${label}.row`);
+                requireNonNegativeInteger(effect.col, `${label}.col`);
+                requireNonNegativeInteger(effect.row, `${label}.row`);
             },
             validateReferences({ game, effect, mapId, label }) {
                 const effectMapId = getEffectMapId(effect, mapId, label);
@@ -282,11 +225,9 @@ const EFFECT_HANDLERS = new Map([
                 );
                 if (effect.mapId !== undefined) requireString(effect.mapId, `${label}.mapId`);
                 requireString(effect.layer, `${label}.layer`);
-                requireInteger(effect.col, `${label}.col`);
-                requireInteger(effect.row, `${label}.row`);
-                if (!Number.isInteger(effect.tileId)) {
-                    throw new Error(`${label}.tileId must be an integer.`);
-                }
+                requireNonNegativeInteger(effect.col, `${label}.col`);
+                requireNonNegativeInteger(effect.row, `${label}.row`);
+                requireInteger(effect.tileId, `${label}.tileId`);
             },
 
             validateReferences({ game, effect, mapId, label }) {
@@ -430,13 +371,11 @@ function validateEffectSequence(effects, label) {
 }
 
 export function validateEffectsDefinition(effects, label) {
-    if (!Array.isArray(effects) || effects.length === 0) {
-        throw new Error(`${label} must be a non-empty array.`);
-    }
+    requireNonEmptyArray(effects, label);
 
     effects.forEach((effect, index) => {
         const effectLabel = `${label}[${index}]`;
-        requireEffectObject(effect, effectLabel);
+        requireObject(effect, effectLabel);
         requireString(effect.type, `${effectLabel}.type`);
 
         if (effect.condition !== undefined) {

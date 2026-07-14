@@ -15,6 +15,20 @@ import { MUSIC, SOUNDS } from "./sounds.js";
 import { PLAYER_SPRITES, SPRITES } from "./sprites.js";
 import { EMPTY_TILE_ID, TILES } from "./tiles.js";
 import { SAVE_VERSION } from "./saves.js";
+import {
+    requireArray,
+    requireBoolean,
+    requireExactKeys,
+    requireInteger,
+    requireJsonValue,
+    requireNonEmptyArray,
+    requireNonNegativeInteger,
+    requireObject,
+    requirePlainObject,
+    requirePositiveInteger,
+    requirePositiveNumber,
+    requireString,
+} from "./validation.js";
 
 function cloneLayers(layers) {
     return Object.fromEntries(
@@ -61,51 +75,6 @@ function createRuntimeState(maps) {
         inventory: {},
         maps: Object.fromEntries(maps.map((map) => [map.id, createMapState(map)])),
     };
-}
-
-function isPlainObject(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-    const prototype = Object.getPrototypeOf(value);
-    return prototype === Object.prototype || prototype === null;
-}
-
-function requirePlainObject(value, label) {
-    if (!isPlainObject(value)) {
-        throw new Error(`${label} must be an object.`);
-    }
-}
-
-function requireString(value, label) {
-    if (typeof value !== "string" || value.length === 0) {
-        throw new Error(`${label} must be a non-empty string.`);
-    }
-}
-
-function validateJsonValue(value, label) {
-    if (value === null || typeof value === "string" || typeof value === "boolean") return;
-    if (typeof value === "number" && Number.isFinite(value)) return;
-
-    if (Array.isArray(value)) {
-        value.forEach((child, index) => validateJsonValue(child, `${label}[${index}]`));
-        return;
-    }
-
-    if (isPlainObject(value)) {
-        for (const [key, child] of Object.entries(value)) {
-            validateJsonValue(child, `${label}.${key}`);
-        }
-        return;
-    }
-
-    throw new Error(`${label} contains a value that cannot be saved as JSON.`);
-}
-
-function requireExactKeys(value, allowedKeys, label) {
-    for (const key of Object.keys(value)) {
-        if (!allowedKeys.has(key)) {
-            throw new Error(`${label} contains unsupported property "${key}".`);
-        }
-    }
 }
 
 export class Game {
@@ -163,9 +132,7 @@ export class Game {
     }
 
     prepareMaps() {
-        if (!Array.isArray(this.authoredMaps) || this.authoredMaps.length === 0) {
-            throw new Error("At least one map is required.");
-        }
+        requireNonEmptyArray(this.authoredMaps, "Map definitions");
 
         this.validateSpriteDefinitions();
         this.validatePlayerSpriteDefinitions();
@@ -177,9 +144,7 @@ export class Game {
         }));
 
         for (const map of this.maps) {
-            if (typeof map.id !== "string" || map.id.length === 0) {
-                throw new Error("Every map must have a non-empty string ID.");
-            }
+            requireString(map.id, "Map ID");
 
             if (this.mapsById.has(map.id)) {
                 throw new Error(`Duplicate map ID: "${map.id}".`);
@@ -226,13 +191,7 @@ export class Game {
     }
 
     prepareItems() {
-        if (
-            !this.authoredItems ||
-            typeof this.authoredItems !== "object" ||
-            Array.isArray(this.authoredItems)
-        ) {
-            throw new Error("Item definitions must be an object.");
-        }
+        requireObject(this.authoredItems, "Item definitions");
 
         for (const [itemId, item] of Object.entries(this.authoredItems)) {
             const label = `Item "${itemId}"`;
@@ -240,9 +199,7 @@ export class Game {
                 throw new Error("Item definitions contain an empty ID.");
             }
 
-            if (!item || typeof item !== "object" || Array.isArray(item)) {
-                throw new Error(`${label} must be an object.`);
-            }
+            requireObject(item, label);
 
             requireExactKeys(
                 item,
@@ -251,14 +208,10 @@ export class Game {
             );
 
             for (const property of ["name", "icon", "description"]) {
-                if (typeof item[property] !== "string" || item[property].length === 0) {
-                    throw new Error(`${label}.${property} must be a non-empty string.`);
-                }
+                requireString(item[property], `${label}.${property}`);
             }
 
-            if (typeof item.usable !== "boolean") {
-                throw new Error(`${label}.usable must be a boolean.`);
-            }
+            requireBoolean(item.usable, `${label}.usable`);
 
             if (item.usable) {
                 validateEffectsDefinition(item.effects, `Effects for ${label}`);
@@ -278,33 +231,18 @@ export class Game {
     }
 
     validateMap(map, isInitialMap) {
-        if (!map.entries || typeof map.entries !== "object" || Array.isArray(map.entries)) {
-            throw new Error(`Map "${map.id}" has no entries object.`);
-        }
-
-        if (!map.layers || typeof map.layers !== "object" || Array.isArray(map.layers)) {
-            throw new Error(`Map "${map.id}" has no layers object.`);
-        }
-
-        if (!Array.isArray(map.entities)) {
-            throw new Error(`Map "${map.id}" has no entities array.`);
-        }
-
-        if (!Array.isArray(map.exits)) {
-            throw new Error(`Map "${map.id}" has no exits array.`);
-        }
+        requireObject(map.entries, `Map "${map.id}" entries`);
+        requireObject(map.layers, `Map "${map.id}" layers`);
+        requireArray(map.entities, `Map "${map.id}" entities`);
+        requireArray(map.exits, `Map "${map.id}" exits`);
 
         const baseLayer = map.layers.base;
-        if (!Array.isArray(baseLayer) || baseLayer.length === 0) {
-            throw new Error(`Map "${map.id}" has no base layer.`);
-        }
+        requireNonEmptyArray(baseLayer, `Map "${map.id}" base layer`);
 
         const width = baseLayer[0]?.length;
         const height = baseLayer.length;
 
-        if (!Number.isInteger(width) || width <= 0) {
-            throw new Error(`Map "${map.id}" has an empty base layer.`);
-        }
+        requirePositiveInteger(width, `Map "${map.id}" base layer width`);
 
         map.gridSize = { width, height };
 
@@ -389,9 +327,7 @@ export class Game {
 
     validateExitDefinition(exit, map, index) {
         const label = `Exit ${index} in "${map.id}"`;
-        if (!exit || typeof exit !== "object" || Array.isArray(exit)) {
-            throw new Error(`${label} must be an object.`);
-        }
+        requireObject(exit, label);
 
         const edges = new Set(["north", "south", "east", "west"]);
         if (!edges.has(exit.edge)) {
@@ -414,15 +350,11 @@ export class Game {
             throw new Error(`${label}.range exceeds the ${exit.edge} edge of "${map.id}".`);
         }
 
-        if (typeof exit.targetMapId !== "string" || exit.targetMapId.length === 0) {
-            throw new Error(`${label}.targetMapId must be a non-empty string.`);
-        }
+        requireString(exit.targetMapId, `${label}.targetMapId`);
 
         if (Object.hasOwn(exit, "entryId")) {
             requireExactKeys(exit, new Set(["edge", "range", "targetMapId", "entryId"]), label);
-            if (typeof exit.entryId !== "string" || exit.entryId.length === 0) {
-                throw new Error(`${label}.entryId must be a non-empty string.`);
-            }
+            requireString(exit.entryId, `${label}.entryId`);
             return;
         }
 
@@ -432,6 +364,7 @@ export class Game {
                 new Set(["edge", "range", "targetMapId", "targetPosition"]),
                 label,
             );
+            requireObject(exit.targetPosition, `${label}.targetPosition`);
             requireExactKeys(
                 exit.targetPosition,
                 new Set(["col", "row", "facing"]),
@@ -461,9 +394,7 @@ export class Game {
             throw new Error(`${label}.targetEdge must preserve the same movement axis.`);
         }
 
-        if (!Number.isInteger(exit.offset)) {
-            throw new Error(`${label}.offset must be an integer.`);
-        }
+        requireInteger(exit.offset, `${label}.offset`);
     }
 
     validateExitReferences(map, initialSpatialDataByMap) {
@@ -549,16 +480,12 @@ export class Game {
     }
 
     validateTile(tileId, tile, mapId) {
-        if (!tile || typeof tile !== "object" || Array.isArray(tile)) {
-            throw new Error(`Tile ${String(tileId)} in "${mapId}" is invalid.`);
-        }
+        const label = `Tile ${String(tileId)} in "${mapId}"`;
+        requireObject(tile, label);
+        requireString(tile.path, `${label}.path`);
 
-        if (typeof tile.path !== "string" || tile.path.length === 0) {
-            throw new Error(`Tile ${String(tileId)} in "${mapId}" has no image path.`);
-        }
-
-        if (tile.collision !== undefined && typeof tile.collision !== "boolean") {
-            throw new Error(`Tile ${String(tileId)} in "${mapId}" has an invalid collision value.`);
+        if (tile.collision !== undefined) {
+            requireBoolean(tile.collision, `${label}.collision`);
         }
 
         if (tile.size !== undefined) {
@@ -579,9 +506,7 @@ export class Game {
 
     validateEntityDefinition(entity, map) {
         const label = `Entity in "${map.id}"`;
-        if (!entity || typeof entity !== "object" || Array.isArray(entity)) {
-            throw new Error(`${label} must be an object.`);
-        }
+        requireObject(entity, label);
 
         requireExactKeys(
             entity,
@@ -598,21 +523,15 @@ export class Game {
             label,
         );
 
-        if (typeof entity.id !== "string" || entity.id.length === 0) {
-            throw new Error(`${label} must define a non-empty string ID.`);
-        }
+        requireString(entity.id, `${label}.id`);
 
         const entityLabel = `Entity "${entity.id}" in "${map.id}"`;
-        if (typeof entity.active !== "boolean") {
-            throw new Error(`${entityLabel}.active must be a boolean.`);
-        }
+        requireBoolean(entity.active, `${entityLabel}.active`);
 
         this.validateMapPosition(map.id, entity.col, entity.row, entityLabel);
         this.validateSpriteReference(entity.spriteId, entityLabel);
 
-        if (typeof entity.collision !== "boolean") {
-            throw new Error(`${entityLabel}.collision must be a boolean.`);
-        }
+        requireBoolean(entity.collision, `${entityLabel}.collision`);
 
         if (entity.interaction !== null) {
             validateInteractionDefinition(entity.interaction, `interaction for ${entityLabel}`);
@@ -693,15 +612,10 @@ export class Game {
 
     validateSpriteDefinitions() {
         for (const [spriteId, sprite] of this.spriteDefinitions) {
-            if (!sprite || typeof sprite !== "object" || Array.isArray(sprite)) {
-                throw new Error(`Sprite "${spriteId}" is invalid.`);
-            }
-
-            requireExactKeys(sprite, new Set(["path", "size"]), `Sprite "${spriteId}"`);
-
-            if (typeof sprite.path !== "string" || sprite.path.length === 0) {
-                throw new Error(`Sprite "${spriteId}" has no image path.`);
-            }
+            const label = `Sprite "${spriteId}"`;
+            requireObject(sprite, label);
+            requireExactKeys(sprite, new Set(["path", "size"]), label);
+            requireString(sprite.path, `${label}.path`);
 
             this.validateSize(sprite.size, `Sprite "${spriteId}"`);
         }
@@ -710,29 +624,19 @@ export class Game {
     validatePlayerSpriteDefinitions() {
         for (const [spriteId, sprite] of this.playerSpriteDefinitions) {
             const label = `Player sprite "${spriteId}"`;
-            if (!sprite || typeof sprite !== "object" || Array.isArray(sprite)) {
-                throw new Error(`${label} is invalid.`);
-            }
+            requireObject(sprite, label);
 
             if (sprite.kind === "shape") {
                 requireExactKeys(sprite, new Set(["kind", "fillStyle", "strokeStyle"]), label);
 
-                if (
-                    typeof sprite.fillStyle !== "string" ||
-                    sprite.fillStyle.length === 0 ||
-                    typeof sprite.strokeStyle !== "string" ||
-                    sprite.strokeStyle.length === 0
-                ) {
-                    throw new Error(`${label} must define fillStyle and strokeStyle.`);
-                }
+                requireString(sprite.fillStyle, `${label}.fillStyle`);
+                requireString(sprite.strokeStyle, `${label}.strokeStyle`);
                 continue;
             }
 
             if (sprite.kind === "image") {
                 requireExactKeys(sprite, new Set(["kind", "path", "size"]), label);
-                if (typeof sprite.path !== "string" || sprite.path.length === 0) {
-                    throw new Error(`${label} has no image path.`);
-                }
+                requireString(sprite.path, `${label}.path`);
                 this.validateSize(sprite.size, label);
                 continue;
             }
@@ -804,9 +708,8 @@ export class Game {
             throw new Error(`${label} references missing map "${mapId}".`);
         }
 
-        if (!Number.isInteger(col) || !Number.isInteger(row) || col < 0 || row < 0) {
-            throw new Error(`${label} must use non-negative integer col and row values.`);
-        }
+        requireNonNegativeInteger(col, `${label}.col`);
+        requireNonNegativeInteger(row, `${label}.row`);
 
         if (col >= map.gridSize.width || row >= map.gridSize.height) {
             throw new Error(`${label} references position ${col},${row} outside "${mapId}".`);
@@ -1196,9 +1099,7 @@ export class Game {
         this.validateMapPosition(player.mapId, player.col, player.row, "Save data.player position");
         this.validatePlayerSpriteReference(player.spriteId, "Save data.player");
 
-        if (!Number.isFinite(player.movementSpeed) || player.movementSpeed <= 0) {
-            throw new Error("Save data.player.movementSpeed must be a positive number.");
-        }
+        requirePositiveNumber(player.movementSpeed, "Save data.player.movementSpeed");
 
         candidate.player = structuredClone(player);
     }
@@ -1208,7 +1109,7 @@ export class Game {
 
         for (const [flag, value] of Object.entries(flags)) {
             requireString(flag, "Save flag ID");
-            validateJsonValue(value, `Save flag "${flag}"`);
+            requireJsonValue(value, `Save flag "${flag}"`);
         }
 
         candidate.flags = structuredClone(flags);
@@ -1222,9 +1123,7 @@ export class Game {
             requirePlainObject(itemState, `Saved item "${itemId}"`);
             requireExactKeys(itemState, new Set(["quantity"]), `Saved item "${itemId}"`);
 
-            if (!Number.isInteger(itemState.quantity) || itemState.quantity <= 0) {
-                throw new Error(`Saved item "${itemId}" has an invalid quantity.`);
-            }
+            requirePositiveInteger(itemState.quantity, `Saved item "${itemId}".quantity`);
         }
 
         candidate.inventory = structuredClone(inventory);
@@ -1264,9 +1163,7 @@ export class Game {
             if (!Object.hasOwn(map.layers, layerName)) {
                 throw new Error(`Saved map "${map.id}" references missing layer "${layerName}".`);
             }
-            if (!Array.isArray(patches) || patches.length === 0) {
-                throw new Error(`Saved layer "${map.id}.${layerName}" must contain tile changes.`);
-            }
+            requireNonEmptyArray(patches, `Saved layer "${map.id}.${layerName}"`);
 
             const changedCells = new Set();
             patches.forEach((patch, index) => {
@@ -1274,13 +1171,9 @@ export class Game {
                 requirePlainObject(patch, label);
                 requireExactKeys(patch, new Set(["col", "row", "tileId"]), label);
 
-                if (
-                    !Number.isInteger(patch.col) ||
-                    !Number.isInteger(patch.row) ||
-                    !Number.isInteger(patch.tileId)
-                ) {
-                    throw new Error(`${label} must define integer col, row, and tileId values.`);
-                }
+                requireInteger(patch.col, `${label}.col`);
+                requireInteger(patch.row, `${label}.row`);
+                requireInteger(patch.tileId, `${label}.tileId`);
 
                 this.validateTileReference(
                     map.id,
@@ -1330,11 +1223,7 @@ export class Game {
             const runtimeEntity = candidate.maps[map.id].entities[entityId];
 
             if (Object.hasOwn(changes, "active")) {
-                if (typeof changes.active !== "boolean") {
-                    throw new Error(
-                        `Saved entity "${map.id}.${entityId}" has invalid active state.`,
-                    );
-                }
+                requireBoolean(changes.active, `Saved entity "${map.id}.${entityId}".active`);
                 runtimeEntity.active = changes.active;
             }
 
@@ -1358,9 +1247,7 @@ export class Game {
             }
 
             if (Object.hasOwn(changes, "collision")) {
-                if (typeof changes.collision !== "boolean") {
-                    throw new Error(`Saved entity "${map.id}.${entityId}" has invalid collision.`);
-                }
+                requireBoolean(changes.collision, `Saved entity "${map.id}.${entityId}".collision`);
                 runtimeEntity.collision = changes.collision;
             }
 

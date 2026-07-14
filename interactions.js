@@ -1,5 +1,6 @@
 import { validateCondition, validateConditionReferences } from "./conditions.js";
 import { validateEffectsDefinition, validateEffectsReferences } from "./effects.js";
+import { requireExactKeys, requireObject, requireString } from "./validation.js";
 
 export const INTERACTION_TRIGGERS = new Set(["action", "touch", "both"]); //TODO: remove 'both', make the trigger property into triggers: []
 
@@ -148,30 +149,6 @@ export const INTERACTIONS = {
     },
 };
 
-function requireInteractionObject(interaction, label) {
-    if (!interaction || typeof interaction !== "object" || Array.isArray(interaction)) {
-        throw new Error(`${label} must be an object.`);
-    }
-}
-
-function requireExactKeys(interaction, allowedKeys, label) {
-    for (const key of Object.keys(interaction)) {
-        if (!allowedKeys.has(key)) {
-            throw new Error(`${label} contains unsupported property "${key}".`);
-        }
-    }
-}
-
-function requireParamsObject(interaction, label) {
-    if (
-        !interaction.params ||
-        typeof interaction.params !== "object" ||
-        Array.isArray(interaction.params)
-    ) {
-        throw new Error(`${label} must define a params object.`);
-    }
-}
-
 export const INTERACTION_HANDLERS = new Map([
     [
         "effects",
@@ -204,16 +181,14 @@ export const INTERACTION_HANDLERS = new Map([
             allowedKeys: new Set(["handler", "trigger", "condition", "params", "message"]),
 
             validateDefinition({ interaction, label }) {
-                requireParamsObject(interaction, label);
+                if (!Object.hasOwn(interaction, "params")) {
+                    throw new Error(`${label} must define a params object.`);
+                }
+                requireObject(interaction.params, `${label}.params`);
 
                 const { mapId, entryId } = interaction.params;
-                if (typeof mapId !== "string" || mapId.length === 0) {
-                    throw new Error(`${label} must define params.mapId.`);
-                }
-
-                if (typeof entryId !== "string" || entryId.length === 0) {
-                    throw new Error(`${label} must define params.entryId.`);
-                }
+                requireString(mapId, `${label}.params.mapId`);
+                requireString(entryId, `${label}.params.entryId`);
             },
 
             validateReferences({ game, interaction, sourceMapId, label }) {
@@ -229,11 +204,9 @@ export const INTERACTION_HANDLERS = new Map([
 ]);
 
 export function validateInteractionDefinition(interaction, label) {
-    requireInteractionObject(interaction, label);
+    requireObject(interaction, label);
 
-    if (typeof interaction.handler !== "string" || interaction.handler.length === 0) {
-        throw new Error(`${label} must define a handler.`);
-    }
+    requireString(interaction.handler, `${label}.handler`);
 
     if (!INTERACTION_TRIGGERS.has(interaction.trigger)) {
         throw new Error(`${label} must use trigger: "action", "touch", or "both".`);

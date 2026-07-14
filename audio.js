@@ -1,16 +1,11 @@
+import { requireObject, requireString } from "./validation.js";
+
 function validateAudioRegistry(registry, label) {
-    if (!registry || typeof registry !== "object" || Array.isArray(registry)) {
-        throw new Error(`${label} must be an object.`);
-    }
+    requireObject(registry, label);
 
     for (const [audioId, path] of Object.entries(registry)) {
-        if (typeof audioId !== "string" || audioId.length === 0) {
-            throw new Error(`${label} contains an invalid ID.`);
-        }
-
-        if (typeof path !== "string" || path.length === 0) {
-            throw new Error(`${label} entry "${audioId}" must be a non-empty path.`);
-        }
+        requireString(audioId, `${label} ID`);
+        requireString(path, `${label} entry "${audioId}"`);
     }
 }
 
