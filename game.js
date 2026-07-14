@@ -32,7 +32,6 @@ function createEntityState(entity) {
         row: entity.row,
         spriteId: entity.spriteId,
         collision: entity.collision,
-        interaction: structuredClone(entity.interaction),
     };
 }
 
@@ -100,10 +99,6 @@ function validateJsonValue(value, label) {
     }
 
     throw new Error(`${label} contains a value that cannot be saved as JSON.`);
-}
-
-function valuesEqual(left, right) {
-    return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function requireExactKeys(value, allowedKeys, label) {
@@ -974,7 +969,7 @@ export class Game {
                 collision.add(key);
             }
 
-            const interaction = state.interaction;
+            const interaction = definition.interaction;
             if (
                 interaction &&
                 (!interaction.condition ||
@@ -1122,10 +1117,6 @@ export class Game {
                 if (runtimeEntity.collision !== definition.collision) {
                     changes.collision = runtimeEntity.collision;
                 }
-                if (!valuesEqual(runtimeEntity.interaction, definition.interaction)) {
-                    changes.interaction = structuredClone(runtimeEntity.interaction);
-                }
-
                 if (Object.keys(changes).length > 0) {
                     entityChanges[definition.id] = changes;
                 }
@@ -1326,7 +1317,7 @@ export class Game {
             requirePlainObject(changes, `Saved entity "${map.id}.${entityId}"`);
             requireExactKeys(
                 changes,
-                new Set(["active", "col", "row", "spriteId", "collision", "interaction"]),
+                new Set(["active", "col", "row", "spriteId", "collision"]),
                 `Saved entity "${map.id}.${entityId}"`,
             );
             if (Object.keys(changes).length === 0) {
@@ -1378,18 +1369,10 @@ export class Game {
                 runtimeEntity.collision = changes.collision;
             }
 
-            if (Object.hasOwn(changes, "interaction")) {
-                if (changes.interaction !== null) {
-                    const label = `Saved interaction for "${map.id}.${entityId}"`;
-                    validateInteractionDefinition(changes.interaction, label);
-                    validateInteractionReferences(this, changes.interaction, map.id, label);
-                }
-                runtimeEntity.interaction = structuredClone(changes.interaction);
-            }
-
+            const definition = this.entityDefinitionsByMap.get(map.id).get(entityId);
             this.validateEntityCollisionInteraction(
                 runtimeEntity.collision,
-                runtimeEntity.interaction,
+                definition.interaction,
                 `Saved entity "${map.id}.${entityId}"`,
             );
         }
@@ -1741,9 +1724,10 @@ export class Game {
 
     setEntityCollision(mapId, entityId, collision) {
         const state = this.getEntityState(mapId, entityId);
+        const definition = this.entityDefinitionsByMap.get(mapId).get(entityId);
         this.validateEntityCollisionInteraction(
             collision,
-            state.interaction,
+            definition.interaction,
             `Entity "${entityId}" in "${mapId}"`,
         );
 
@@ -1758,28 +1742,6 @@ export class Game {
         } catch (error) {
             state.collision = previousCollision;
             throw error;
-        }
-    }
-
-    setEntityInteraction(mapId, entityId, interaction) {
-        this.validateEntityReference(mapId, entityId, "Entity interaction update");
-
-        if (interaction !== null) {
-            const label = `interaction update for entity "${entityId}" in "${mapId}"`;
-            validateInteractionDefinition(interaction, label);
-            validateInteractionReferences(this, interaction, mapId, label);
-        }
-
-        const state = this.getEntityState(mapId, entityId);
-        this.validateEntityCollisionInteraction(
-            state.collision,
-            interaction,
-            `Entity "${entityId}" in "${mapId}"`,
-        );
-        state.interaction = structuredClone(interaction);
-
-        if (this.state.player.mapId === mapId) {
-            this.rebuildActiveSpatialData();
         }
     }
 
