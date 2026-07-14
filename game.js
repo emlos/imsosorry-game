@@ -1222,13 +1222,10 @@ export class Game {
         for (const [itemId, itemState] of Object.entries(inventory)) {
             this.validateItemReference(itemId, "Saved inventory");
             requirePlainObject(itemState, `Saved item "${itemId}"`);
-            requireExactKeys(itemState, new Set(["quantity", "active"]), `Saved item "${itemId}"`);
+            requireExactKeys(itemState, new Set(["quantity"]), `Saved item "${itemId}"`);
 
             if (!Number.isInteger(itemState.quantity) || itemState.quantity <= 0) {
                 throw new Error(`Saved item "${itemId}" has an invalid quantity.`);
-            }
-            if (typeof itemState.active !== "boolean") {
-                throw new Error(`Saved item "${itemId}" has an invalid active state.`);
             }
         }
 
@@ -1530,10 +1527,7 @@ export class Game {
         if (itemState) {
             itemState.quantity += quantity;
         } else {
-            this.state.inventory[itemId] = {
-                quantity,
-                active: false,
-            };
+            this.state.inventory[itemId] = { quantity };
         }
 
         try {
@@ -1591,19 +1585,6 @@ export class Game {
     hasItem(itemId) {
         const itemState = this.state.inventory[itemId];
         return itemState !== undefined && itemState.quantity > 0;
-    }
-
-    setItemActive(itemId, active) {
-        this.validateItemReference(itemId, "Set item active");
-        if (typeof active !== "boolean") {
-            throw new Error("Item active state must be a boolean.");
-        }
-        const itemState = this.state.inventory[itemId];
-        if (!itemState) {
-            throw new Error(`Cannot set inactive inventory item "${itemId}".`);
-        }
-        itemState.active = active;
-        this.refreshInventoryPanel();
     }
 
     openInventory() {
