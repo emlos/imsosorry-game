@@ -105,13 +105,7 @@ export class Player {
     getActionCandidateCells() {
         const { dc, dr } = this.facing;
 
-        return [
-            { col: this.col + dc, row: this.row + dr },
-            { col: this.col, row: this.row },
-            { col: this.col + dr, row: this.row - dc },
-            { col: this.col - dr, row: this.row + dc },
-            { col: this.col - dc, row: this.row - dr },
-        ];
+        return [{ col: this.col + dc, row: this.row + dr }];
     }
 
     render(ctx, camera, sprite, image) {
