@@ -24,6 +24,10 @@ body {
   width: min(1320px, 100%);
 }
 
+.game-viewport {
+  position: relative;
+}
+
 canvas {
   display: block;
   width: 100%;
@@ -31,6 +35,45 @@ canvas {
   background: #000;
   border: 1px solid #3a4050;
   image-rendering: pixelated;
+}
+
+.dialogue {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 4%;
+  min-height: 138px;
+  padding: 22px 24px 36px;
+  background: rgba(8, 10, 16, 0.96);
+  border: 3px solid #e8eaf0;
+  box-shadow: 0 0 0 3px #171b24;
+  color: #f5f6fa;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: clamp(0.9rem, 1.7vw, 1.2rem);
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.dialogue[hidden] {
+  display: none;
+}
+
+.dialogue-speaker {
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: #9fd5df;
+}
+
+.dialogue-text {
+  white-space: pre-wrap;
+}
+
+.dialogue-prompt {
+  position: absolute;
+  right: 18px;
+  bottom: 10px;
+  color: #aeb6c7;
+  font-size: 0.72em;
 }
 
 aside {

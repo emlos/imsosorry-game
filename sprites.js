@@ -11,4 +11,12 @@ export const SPRITES = {
         path: "./assets/tiles/orb_blue.png",
         size: [32, 32],
     },
+    receiver: {
+        path: "./assets/tiles/receiver.png",
+        size: [32, 32],
+    },
+    "glass-figure": {
+        path: "./assets/tiles/glass-figure.png",
+        size: [32, 32],
+    },
 };

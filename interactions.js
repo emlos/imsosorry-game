@@ -24,6 +24,15 @@ export const INTERACTIONS = {
         },
         message: "The door opens.",
     },
+    ROOM_01_EAST_DOOR: {
+        handler: "teleport",
+        trigger: "action",
+        params: {
+            mapId: "room-04",
+            entryId: "fromRoom01",
+        },
+        message: "The side door opens.",
+    },
     ROOM_02_SOUTH_DOOR: {
         handler: "teleport",
         trigger: "action",
@@ -51,6 +60,15 @@ export const INTERACTIONS = {
         },
         message: "You return to the previous room.",
     },
+    ROOM_04_WEST_DOOR: {
+        handler: "teleport",
+        trigger: "action",
+        params: {
+            mapId: "room-01",
+            entryId: "fromRoom04",
+        },
+        message: "You return to the main room.",
+    },
     BLUE_ORB: {
         handler: "effects",
         trigger: "both",
@@ -62,6 +80,50 @@ export const INTERACTIONS = {
             { type: "setEntityActive", entityId: "blue-orb", active: false },
         ],
         message: "The blue orb dissolves. A section of the wall disappears.",
+    },
+    RECEIVER: {
+        handler: "effects",
+        trigger: "action",
+        effects: [
+            { type: "playSound", soundId: "receiver-chime" },
+            {
+                type: "showText",
+                speaker: "Receiver",
+                pages: [
+                    "The receiver wakes with a clear two-note chime.",
+                    "A voice beneath the static says: The glass remembers who listened.",
+                    "Then the signal cuts out.",
+                ],
+                afterClose: [
+                    { type: "setFlag", flag: "room04.receiverUsed", value: true },
+                ],
+            },
+        ],
+    },
+    GLASS_FIGURE: {
+        handler: "effects",
+        trigger: "action",
+        effects: [
+            {
+                type: "showText",
+                condition: { notFlag: "room04.receiverUsed" },
+                speaker: "Glass Figure",
+                pages: [
+                    "The glass figure is cold and perfectly still.",
+                    "Its blank face is turned away from the receiver.",
+                ],
+            },
+            {
+                type: "showText",
+                condition: { flag: "room04.receiverUsed", equals: true },
+                speaker: "Glass Figure",
+                pages: [
+                    "A faint vibration runs through the glass.",
+                    "Its face is now angled toward the receiver.",
+                    "There is no seam showing how it moved.",
+                ],
+            },
+        ],
     },
 };
 

@@ -1,3 +1,5 @@
+import { validateCondition } from "./conditions.js";
+
 function requireEffectObject(effect, label) {
     if (!effect || typeof effect !== "object" || Array.isArray(effect)) {
         throw new Error(`${label} must be an object.`);
@@ -30,6 +32,20 @@ function requireExactKeys(effect, allowedKeys, label) {
     }
 }
 
+function effectKeys(...keys) {
+    return new Set(["type", "condition", ...keys]);
+}
+
+function validatePages(pages, label) {
+    if (!Array.isArray(pages) || pages.length === 0) {
+        throw new Error(`${label} must be a non-empty array.`);
+    }
+
+    pages.forEach((page, index) => {
+        requireString(page, `${label}[${index}]`);
+    });
+}
+
 const EFFECT_HANDLERS = new Map([
     [
         "setFlag",
@@ -37,7 +53,7 @@ const EFFECT_HANDLERS = new Map([
             rebuild: "active",
 
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, new Set(["type", "flag", "value"]), label);
+                requireExactKeys(effect, effectKeys("flag", "value"), label);
                 requireString(effect.flag, `${label}.flag`);
 
                 if (!Object.hasOwn(effect, "value")) {
@@ -56,7 +72,7 @@ const EFFECT_HANDLERS = new Map([
             rebuild: "active",
 
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, new Set(["type", "itemId"]), label);
+                requireExactKeys(effect, effectKeys("itemId"), label);
                 requireString(effect.itemId, `${label}.itemId`);
             },
 
@@ -71,7 +87,7 @@ const EFFECT_HANDLERS = new Map([
             rebuild: "active",
 
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, new Set(["type", "itemId"]), label);
+                requireExactKeys(effect, effectKeys("itemId"), label);
                 requireString(effect.itemId, `${label}.itemId`);
             },
 
@@ -86,7 +102,7 @@ const EFFECT_HANDLERS = new Map([
             rebuild: "sourceMap",
 
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, new Set(["type", "entityId", "active"]), label);
+                requireExactKeys(effect, effectKeys("entityId", "active"), label);
                 requireString(effect.entityId, `${label}.entityId`);
                 requireBoolean(effect.active, `${label}.active`);
             },
@@ -106,7 +122,7 @@ const EFFECT_HANDLERS = new Map([
             rebuild: "sourceMap",
 
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, new Set(["type", "entityId", "col", "row"]), label);
+                requireExactKeys(effect, effectKeys("entityId", "col", "row"), label);
                 requireString(effect.entityId, `${label}.entityId`);
                 requireInteger(effect.col, `${label}.col`);
                 requireInteger(effect.row, `${label}.row`);
@@ -128,7 +144,7 @@ const EFFECT_HANDLERS = new Map([
             rebuild: false,
 
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, new Set(["type", "entityId", "spriteId"]), label);
+                requireExactKeys(effect, effectKeys("entityId", "spriteId"), label);
                 requireString(effect.entityId, `${label}.entityId`);
                 requireString(effect.spriteId, `${label}.spriteId`);
             },
@@ -149,7 +165,7 @@ const EFFECT_HANDLERS = new Map([
             rebuild: "sourceMap",
 
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, new Set(["type", "entityId", "collision"]), label);
+                requireExactKeys(effect, effectKeys("entityId", "collision"), label);
                 requireString(effect.entityId, `${label}.entityId`);
                 requireBoolean(effect.collision, `${label}.collision`);
             },
@@ -169,7 +185,7 @@ const EFFECT_HANDLERS = new Map([
             rebuild: "sourceMap",
 
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, new Set(["type", "layer", "col", "row", "tileId"]), label);
+                requireExactKeys(effect, effectKeys("layer", "col", "row", "tileId"), label);
                 requireString(effect.layer, `${label}.layer`);
                 requireInteger(effect.col, `${label}.col`);
                 requireInteger(effect.row, `${label}.row`);
@@ -201,7 +217,7 @@ const EFFECT_HANDLERS = new Map([
             rebuild: false,
 
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, new Set(["type", "soundId"]), label);
+                requireExactKeys(effect, effectKeys("soundId"), label);
                 requireString(effect.soundId, `${label}.soundId`);
             },
 
@@ -211,6 +227,45 @@ const EFFECT_HANDLERS = new Map([
 
             execute({ game, effect }) {
                 game.playSound(effect.soundId);
+            },
+        },
+    ],
+    [
+        "showText",
+        {
+            rebuild: false,
+
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, effectKeys("pages", "speaker", "afterClose"), label);
+                validatePages(effect.pages, `${label}.pages`);
+
+                if (effect.speaker !== undefined) {
+                    requireString(effect.speaker, `${label}.speaker`);
+                }
+
+                if (effect.afterClose !== undefined) {
+                    validateEffectsDefinition(effect.afterClose, `${label}.afterClose`);
+                }
+            },
+
+            validateReferences({ game, effect, mapId, label }) {
+                if (effect.afterClose !== undefined) {
+                    validateEffectsReferences(
+                        game,
+                        effect.afterClose,
+                        mapId,
+                        `${label}.afterClose`,
+                    );
+                }
+            },
+
+            execute({ game, effect, mapId }) {
+                game.showText({
+                    pages: effect.pages,
+                    speaker: effect.speaker ?? null,
+                    afterClose: effect.afterClose ?? null,
+                    mapId,
+                });
             },
         },
     ],
@@ -225,6 +280,10 @@ export function validateEffectsDefinition(effects, label) {
         const effectLabel = `${label}[${index}]`;
         requireEffectObject(effect, effectLabel);
         requireString(effect.type, `${effectLabel}.type`);
+
+        if (effect.condition !== undefined) {
+            validateCondition(effect.condition, `${effectLabel}.condition`);
+        }
 
         const handler = EFFECT_HANDLERS.get(effect.type);
         if (!handler) {
@@ -255,6 +314,10 @@ export function runEffects(game, effects, mapId) {
     let rebuildSourceMap = false;
 
     for (const effect of effects) {
+        if (effect.condition && !game.evaluateCondition(effect.condition)) {
+            continue;
+        }
+
         const handler = EFFECT_HANDLERS.get(effect.type);
         handler.execute({ game, effect, mapId });
 

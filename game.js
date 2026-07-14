@@ -1,4 +1,6 @@
+import { AudioSystem } from "./audio.js";
 import { evaluateCondition, validateCondition } from "./conditions.js";
+import { DialogueBox } from "./dialogue.js";
 import { runEffects } from "./effects.js";
 import { DEFAULT_TILE_SIZE } from "./maps.js";
 import {
@@ -7,7 +9,7 @@ import {
     validateInteractionReferences,
 } from "./interactions.js";
 import { Player } from "./player.js";
-import { SOUNDS } from "./sounds.js";
+import { MUSIC, SOUNDS } from "./sounds.js";
 import { SPRITES } from "./sprites.js";
 import { EMPTY_TILE_ID, TILES } from "./tiles.js";
 
@@ -64,7 +66,7 @@ export class Game {
         const initialEntry = initialMap.entries[initialMap.initialEntryId];
 
         this.state = {
-            version: 2,
+            version: 3,
 
             player: {
                 mapId: initialMap.id,
@@ -83,8 +85,9 @@ export class Game {
 
         this.images = new Map();
         this.spriteDefinitions = new Map(Object.entries(SPRITES));
-        this.soundDefinitions = new Map(Object.entries(SOUNDS));
-        this.soundTemplates = new Map();
+        this.audio = new AudioSystem(SOUNDS, MUSIC);
+        this.dialogueBox = new DialogueBox(document.querySelector("#dialogue"));
+        this.uiMode = "exploration";
         this.camera = { x: 0, y: 0 };
         this.player = new Player(DEFAULT_TILE_SIZE, this.state.player);
 
@@ -110,7 +113,7 @@ export class Game {
 
     async start() {
         this.prepareMaps();
-        this.prepareSounds();
+        this.audio.prepare();
         await this.preloadAllImages();
 
         const initialMap = this.maps[0];
@@ -536,8 +539,14 @@ export class Game {
     }
 
     validateSoundReference(soundId, label) {
-        if (!this.soundDefinitions.has(soundId)) {
+        if (!this.audio.hasSound(soundId)) {
             throw new Error(`${label} references missing sound "${soundId}".`);
+        }
+    }
+
+    validateMusicReference(musicId, label) {
+        if (!this.audio.hasMusic(musicId)) {
+            throw new Error(`${label} references missing music "${musicId}".`);
         }
     }
 
@@ -704,33 +713,45 @@ export class Game {
         });
     }
 
-    prepareSounds() {
-        for (const [soundId, sound] of this.soundDefinitions) {
-            if (
-                !sound ||
-                typeof sound !== "object" ||
-                typeof sound.path !== "string" ||
-                sound.path.length === 0 ||
-                typeof sound.volume !== "number" ||
-                sound.volume < 0 ||
-                sound.volume > 1
-            ) {
-                throw new Error(`Sound "${soundId}" has an invalid definition.`);
-            }
-
-            const audio = new Audio(sound.path);
-            audio.preload = "auto";
-            this.soundTemplates.set(soundId, audio);
-        }
+    playSound(soundId) {
+        this.audio.playSound(soundId);
     }
 
-    playSound(soundId) {
-        const sound = this.soundDefinitions.get(soundId);
-        const audio = this.soundTemplates.get(soundId).cloneNode();
-        audio.volume = sound.volume;
-        audio.play().catch((error) => {
-            console.warn(`Could not play sound "${soundId}".`, error);
+    playMusic(musicId) {
+        this.audio.playMusic(musicId);
+    }
+
+    stopMusic() {
+        this.audio.stopMusic();
+    }
+
+    showText({ pages, speaker, afterClose, mapId }) {
+        if (this.uiMode !== "exploration") {
+            throw new Error(`Cannot open dialogue while UI mode is "${this.uiMode}".`);
+        }
+
+        this.uiMode = "dialogue";
+        this.clearMovementInput();
+
+        this.dialogueBox.open({
+            pages: [...pages],
+            speaker,
+            onClose: () => {
+                this.uiMode = "exploration";
+
+                if (afterClose !== null) {
+                    this.runEffects(afterClose, { mapId });
+                }
+            },
         });
+    }
+
+    advanceDialogue() {
+        if (this.uiMode !== "dialogue") {
+            throw new Error("Cannot advance dialogue while dialogue mode is inactive.");
+        }
+
+        this.dialogueBox.advance();
     }
 
     transitionTo({ mapId, entryId }) {
@@ -848,6 +869,10 @@ export class Game {
             if (this.movementDirections.has(event.code)) {
                 event.preventDefault();
 
+                if (this.uiMode !== "exploration") {
+                    return;
+                }
+
                 if (!event.repeat && !this.keysPressed.has(event.code)) {
                     this.keysPressed.add(event.code);
                     this.movementKeyOrder = this.movementKeyOrder.filter(
@@ -862,10 +887,16 @@ export class Game {
             const isInteractionKey =
                 event.code === "KeyZ" || event.code === "Enter" || event.code === "NumpadEnter";
 
-            if (isInteractionKey && !event.repeat) {
-                event.preventDefault();
-                this.handleActionInteraction();
+            if (!isInteractionKey || event.repeat) return;
+
+            event.preventDefault();
+
+            if (this.uiMode === "dialogue") {
+                this.advanceDialogue();
+                return;
             }
+
+            this.handleActionInteraction();
         });
 
         window.addEventListener("keyup", (event) => {
@@ -903,6 +934,8 @@ export class Game {
     }
 
     handleActionInteraction() {
+        if (this.uiMode !== "exploration") return false;
+
         const target = this.player.getInteraction(this.activeSpatialData.interactions, "action");
 
         if (!target) {
@@ -914,6 +947,8 @@ export class Game {
     }
 
     handleTouchInteraction() {
+        if (this.uiMode !== "exploration") return false;
+
         const target = this.player.getInteraction(this.activeSpatialData.interactions, "touch");
         if (!target) return false;
 
@@ -962,7 +997,7 @@ export class Game {
             this.handleTouchInteraction();
         }
 
-        if (!this.player.isMoving) {
+        if (this.uiMode === "exploration" && !this.player.isMoving) {
             const direction = this.getActiveMovementDirection();
 
             if (direction) {

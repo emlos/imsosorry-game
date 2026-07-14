@@ -1,6 +1,6 @@
 export const SOUNDS = {
-    "orb-collect": {
-        path: "./assets/sounds/orb-collect.wav",
-        volume: 0.35,
-    },
+    "orb-collect": "./assets/sounds/orb-collect.wav",
+    "receiver-chime": "./assets/sounds/receiver-chime.wav",
 };
+
+export const MUSIC = {};

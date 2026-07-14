@@ -22,6 +22,11 @@ export const MAPS = [
                 row: 1,
                 facing: { dc: 0, dr: -1 },
             },
+            fromRoom04: {
+                col: 8,
+                row: 5,
+                facing: { dc: 1, dr: 0 },
+            },
         },
 
         tiles: {},
@@ -47,6 +52,15 @@ export const MAPS = [
                 spriteId: "door",
                 collision: false,
                 interaction: INTERACTIONS.ROOM_01_NORTH_DOOR,
+            },
+            {
+                id: "east-door",
+                active: true,
+                col: 9,
+                row: 5,
+                spriteId: "door",
+                collision: true,
+                interaction: INTERACTIONS.ROOM_01_EAST_DOOR,
             },
         ],
 
@@ -299,4 +313,71 @@ export const MAPS = [
             ],
         },
     },
+
+    {
+        id: "room-04",
+
+        entries: {
+            fromRoom01: {
+                col: 1,
+                row: 3,
+                facing: { dc: 1, dr: 0 },
+            },
+        },
+
+        tiles: {},
+
+        entities: [
+            {
+                id: "west-door",
+                active: true,
+                col: 0,
+                row: 3,
+                spriteId: "door",
+                collision: true,
+                interaction: INTERACTIONS.ROOM_04_WEST_DOOR,
+            },
+            {
+                id: "receiver",
+                active: true,
+                col: 4,
+                row: 2,
+                spriteId: "receiver",
+                collision: true,
+                interaction: INTERACTIONS.RECEIVER,
+            },
+            {
+                id: "glass-figure",
+                active: true,
+                col: 6,
+                row: 3,
+                spriteId: "glass-figure",
+                collision: true,
+                interaction: INTERACTIONS.GLASS_FIGURE,
+            },
+        ],
+
+        layers: {
+            base: [
+                [FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT],
+                [FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT],
+                [FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT],
+                [FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT],
+                [FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT],
+                [FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT],
+                [FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT],
+            ],
+
+            obstacles: [
+                [WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL],
+                [WALL, E, E, E, E, E, E, E, WALL],
+                [WALL, E, WALL, E, E, E, WALL, E, WALL],
+                [E, E, E, E, E, E, E, E, WALL],
+                [WALL, E, WALL, E, E, E, WALL, E, WALL],
+                [WALL, E, E, E, E, E, E, E, WALL],
+                [WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL],
+            ],
+        },
+    },
+
 ];
