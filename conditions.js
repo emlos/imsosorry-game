@@ -87,6 +87,127 @@ export function validateConditionReferences(game, condition, label) {
     });
 }
 
+function createConditionClause() {
+    return {
+        flagEquals: new Map(),
+        flagsNotTrue: new Set(),
+        itemPresence: new Map(),
+    };
+}
+
+function cloneConditionClause(clause) {
+    return {
+        flagEquals: new Map(clause.flagEquals),
+        flagsNotTrue: new Set(clause.flagsNotTrue),
+        itemPresence: new Map(clause.itemPresence),
+    };
+}
+
+function addFlagEquals(clause, flag, value) {
+    if (clause.flagEquals.has(flag) && !Object.is(clause.flagEquals.get(flag), value)) {
+        return false;
+    }
+
+    if (Object.is(value, true) && clause.flagsNotTrue.has(flag)) {
+        return false;
+    }
+
+    clause.flagEquals.set(flag, value);
+    return true;
+}
+
+function addFlagNotTrue(clause, flag) {
+    if (clause.flagEquals.has(flag) && Object.is(clause.flagEquals.get(flag), true)) {
+        return false;
+    }
+
+    clause.flagsNotTrue.add(flag);
+    return true;
+}
+
+function addItemPresence(clause, itemId, present) {
+    if (clause.itemPresence.has(itemId) && clause.itemPresence.get(itemId) !== present) {
+        return false;
+    }
+
+    clause.itemPresence.set(itemId, present);
+    return true;
+}
+
+function mergeConditionClauses(left, right) {
+    const merged = cloneConditionClause(left);
+
+    for (const [flag, value] of right.flagEquals) {
+        if (!addFlagEquals(merged, flag, value)) return null;
+    }
+
+    for (const flag of right.flagsNotTrue) {
+        if (!addFlagNotTrue(merged, flag)) return null;
+    }
+
+    for (const [itemId, present] of right.itemPresence) {
+        if (!addItemPresence(merged, itemId, present)) return null;
+    }
+
+    return merged;
+}
+
+function getConditionClauses(condition) {
+    if (condition === undefined) return [createConditionClause()];
+
+    const clause = createConditionClause();
+
+    if (Object.hasOwn(condition, "flag")) {
+        const value = Object.hasOwn(condition, "equals") ? condition.equals : true;
+        return addFlagEquals(clause, condition.flag, value) ? [clause] : [];
+    }
+
+    if (Object.hasOwn(condition, "notFlag")) {
+        return addFlagNotTrue(clause, condition.notFlag) ? [clause] : [];
+    }
+
+    if (Object.hasOwn(condition, "hasItem")) {
+        return addItemPresence(clause, condition.hasItem, true) ? [clause] : [];
+    }
+
+    if (Object.hasOwn(condition, "notItem")) {
+        return addItemPresence(clause, condition.notItem, false) ? [clause] : [];
+    }
+
+    if (Object.hasOwn(condition, "any")) {
+        return condition.any.flatMap((child) => getConditionClauses(child));
+    }
+
+    let clauses = [createConditionClause()];
+    for (const child of condition.all) {
+        const childClauses = getConditionClauses(child);
+        const mergedClauses = [];
+
+        for (const existing of clauses) {
+            for (const childClause of childClauses) {
+                const merged = mergeConditionClauses(existing, childClause);
+                if (merged !== null) mergedClauses.push(merged);
+            }
+        }
+
+        clauses = mergedClauses;
+        if (clauses.length === 0) break;
+    }
+
+    return clauses;
+}
+
+export function conditionsCanOverlap(first, second) {
+    const firstClauses = getConditionClauses(first);
+    const secondClauses = getConditionClauses(second);
+
+    return firstClauses.some((firstClause) =>
+        secondClauses.some(
+            (secondClause) => mergeConditionClauses(firstClause, secondClause) !== null,
+        ),
+    );
+}
+
 function hasFlag(state, flag) {
     return state.flags[flag] === true;
 }

@@ -1,4 +1,8 @@
-import { validateCondition, validateConditionReferences } from "./conditions.js";
+import {
+    conditionsCanOverlap,
+    validateCondition,
+    validateConditionReferences,
+} from "./conditions.js";
 
 function requireEffectObject(effect, label) {
     if (!effect || typeof effect !== "object" || Array.isArray(effect)) {
@@ -417,6 +421,30 @@ const EFFECT_HANDLERS = new Map([
     ],
 ]);
 
+function validateEffectSequence(effects, label) {
+    effects.forEach((effect, index) => {
+        if (effect.type !== "showText") return;
+
+        for (let laterIndex = index + 1; laterIndex < effects.length; laterIndex += 1) {
+            const laterEffect = effects[laterIndex];
+            if (!conditionsCanOverlap(effect.condition, laterEffect.condition)) continue;
+
+            const laterLabel = `${label}[${laterIndex}]`;
+            if (laterEffect.type === "showText") {
+                throw new Error(
+                    `${laterLabel} can open dialogue after ${label}[${index}] on the same condition path. ` +
+                        "Only one showText may be reachable in an effect array; use afterClose for later dialogue.",
+                );
+            }
+
+            throw new Error(
+                `${laterLabel} can run after ${label}[${index}] opens dialogue. ` +
+                    "showText must be the final reachable effect; move later effects into afterClose.",
+            );
+        }
+    });
+}
+
 export function validateEffectsDefinition(effects, label) {
     if (!Array.isArray(effects) || effects.length === 0) {
         throw new Error(`${label} must be a non-empty array.`);
@@ -438,6 +466,8 @@ export function validateEffectsDefinition(effects, label) {
 
         handler.validateDefinition({ effect, label: effectLabel });
     });
+
+    validateEffectSequence(effects, label);
 }
 
 export function validateEffectsReferences(game, effects, mapId, label) {
