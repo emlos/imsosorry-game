@@ -11,7 +11,6 @@ export const INTERACTIONS = {
         effects: [
             { type: "addItem", itemId: "pink-orb", quantity: 1 },
             { type: "playSound", soundId: "orb-collect" },
-            { type: "setEntityActive", entityId: "pink-orb", active: false },
         ],
         message: "You found the pink orb.",
     },
@@ -74,12 +73,36 @@ export const INTERACTIONS = {
         trigger: "both",
         effects: [
             { type: "setFlag", flag: "room03.orbCollected", value: true },
-            { type: "addItem", itemId: "blue-orb", quantity: 1 },
             { type: "playSound", soundId: "orb-collect" },
-            { type: "setTile", layer: "obstacles", col: 4, row: 3, tileId: -1 },
-            { type: "setEntityActive", entityId: "blue-orb", active: false },
         ],
         message: "The blue orb dissolves. A section of the wall disappears.",
+    },
+    ROOM_05_PERMANENT_COLLECTIBLE: {
+        handler: "effects",
+        trigger: "both",
+        effects: [
+            { type: "setFlag", flag: "room05.permanentCollected", value: true },
+            { type: "playSound", soundId: "orb-collect" },
+        ],
+        message: "The permanent collectible is recorded by its flag.",
+    },
+    ROOM_05_POSSESSION_COLLECTIBLE: {
+        handler: "effects",
+        trigger: "both",
+        effects: [
+            { type: "addItem", itemId: "room05-possession-collectible", quantity: 1 },
+            { type: "playSound", soundId: "orb-collect" },
+        ],
+        message: "The possession collectible enters your inventory.",
+    },
+    ROOM_05_SPAWNED_COLLECTIBLE: {
+        handler: "effects",
+        trigger: "both",
+        effects: [
+            { type: "setEntityActive", entityId: "spawned-collectible", active: false },
+            { type: "playSound", soundId: "orb-collect" },
+        ],
+        message: "The independent spawned collectible disappears.",
     },
     RECEIVER: {
         handler: "effects",

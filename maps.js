@@ -5,6 +5,7 @@ export const DEFAULT_TILE_SIZE = 32;
 
 const E = EMPTY_TILE_ID;
 const { FLOOR, FLOOR_ALT, WALL, WIDE_WALL } = TILE_IDS;
+const ROOM_03_ORB_WALL = 4;
 
 export const MAPS = [
     {
@@ -228,7 +229,12 @@ export const MAPS = [
 
         exits: [],
 
-        tiles: {},
+        tiles: {
+            [ROOM_03_ORB_WALL]: {
+                path: "./assets/tiles/wall.png",
+                condition: { notFlag: "room03.orbCollected" },
+            },
+        },
 
         entities: [
             {
@@ -239,10 +245,7 @@ export const MAPS = [
                 spriteId: "blue-orb",
                 collision: false,
                 interaction: INTERACTIONS.BLUE_ORB,
-                //TODO: is this necessary if i already set the blue orb to not active via effect? evaluate
-                condition: {
-                    all: [{ notFlag: "room03.orbCollected" }, { notItem: "blue-orb" }],
-                },
+                condition: { notFlag: "room03.orbCollected" },
             },
             {
                 id: "south-door",
@@ -320,7 +323,7 @@ export const MAPS = [
                 [WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL],
                 [WALL, E, E, E, WALL, E, E, E, WALL],
                 [WALL, E, E, E, WALL, E, E, E, WALL],
-                [WALL, E, E, E, WALL, E, E, E, WALL],
+                [WALL, E, E, E, ROOM_03_ORB_WALL, E, E, E, WALL],
                 [WALL, E, E, E, WALL, E, E, E, WALL],
                 [WALL, E, E, E, WALL, E, E, E, WALL],
                 [WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL],
@@ -489,7 +492,37 @@ export const MAPS = [
 
         tiles: {},
 
-        entities: [],
+        entities: [
+            {
+                id: "permanent-collectible",
+                active: true,
+                col: 2,
+                row: 1,
+                spriteId: "blue-orb",
+                collision: false,
+                interaction: INTERACTIONS.ROOM_05_PERMANENT_COLLECTIBLE,
+                condition: { notFlag: "room05.permanentCollected" },
+            },
+            {
+                id: "possession-collectible",
+                active: true,
+                col: 4,
+                row: 2,
+                spriteId: "pink-orb",
+                collision: false,
+                interaction: INTERACTIONS.ROOM_05_POSSESSION_COLLECTIBLE,
+                condition: { notItem: "room05-possession-collectible" },
+            },
+            {
+                id: "spawned-collectible",
+                active: true,
+                col: 6,
+                row: 4,
+                spriteId: "blue-orb",
+                collision: false,
+                interaction: INTERACTIONS.ROOM_05_SPAWNED_COLLECTIBLE,
+            },
+        ],
 
         layers: {
             base: [

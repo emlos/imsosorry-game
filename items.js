@@ -18,10 +18,10 @@ export const ITEMS = {
         ],
     },
 
-    "blue-orb": {
-        name: "Blue Orb",
-        icon: "./assets/items/blue-orb.png",
-        description: "A cold blue sphere left behind by the vanished wall.",
+    "room05-possession-collectible": {
+        name: "Possession Collectible",
+        icon: "./assets/items/pink-orb.png",
+        description: "A test collectible whose current inventory ownership is authoritative.",
         usable: false,
     },
 };
