@@ -70,7 +70,7 @@ export class Game {
         const initialEntry = initialMap.entries[initialMap.initialEntryId];
 
         this.state = {
-            version: 4,
+            version: 5,
 
             player: {
                 mapId: initialMap.id,
@@ -164,6 +164,7 @@ export class Game {
             this.validateMapInteractionReferences(map);
             const spatialData = this.buildSpatialData(map);
             this.validateEntries(map, spatialData);
+            this.validateExitReferences(map);
         }
     }
 
@@ -236,6 +237,10 @@ export class Game {
 
         if (!Array.isArray(map.entities)) {
             throw new Error(`Map "${map.id}" has no entities array.`);
+        }
+
+        if (!Array.isArray(map.exits)) {
+            throw new Error(`Map "${map.id}" has no exits array.`);
         }
 
         const baseLayer = map.layers.base;
@@ -338,6 +343,161 @@ export class Game {
 
             entityIds.add(entity.id);
         }
+
+        map.exits.forEach((exit, index) => this.validateExitDefinition(exit, map, index));
+    }
+
+    validateExitDefinition(exit, map, index) {
+        const label = `Exit ${index} in "${map.id}"`;
+        if (!exit || typeof exit !== "object" || Array.isArray(exit)) {
+            throw new Error(`${label} must be an object.`);
+        }
+
+        const edges = new Set(["north", "south", "east", "west"]);
+        if (!edges.has(exit.edge)) {
+            throw new Error(`${label}.edge must be north, south, east, or west.`);
+        }
+
+        if (
+            !Array.isArray(exit.range) ||
+            exit.range.length !== 2 ||
+            !exit.range.every(Number.isInteger) ||
+            exit.range[0] < 0 ||
+            exit.range[1] < exit.range[0]
+        ) {
+            throw new Error(`${label}.range must contain two ordered non-negative integers.`);
+        }
+
+        const axisLimit =
+            exit.edge === "east" || exit.edge === "west"
+                ? map.gridSize.height
+                : map.gridSize.width;
+        if (exit.range[1] >= axisLimit) {
+            throw new Error(`${label}.range exceeds the ${exit.edge} edge of "${map.id}".`);
+        }
+
+        if (typeof exit.targetMapId !== "string" || exit.targetMapId.length === 0) {
+            throw new Error(`${label}.targetMapId must be a non-empty string.`);
+        }
+
+        if (Object.hasOwn(exit, "entryId")) {
+            requireExactKeys(exit, new Set(["edge", "range", "targetMapId", "entryId"]), label);
+            if (typeof exit.entryId !== "string" || exit.entryId.length === 0) {
+                throw new Error(`${label}.entryId must be a non-empty string.`);
+            }
+            return;
+        }
+
+        if (Object.hasOwn(exit, "targetPosition")) {
+            requireExactKeys(
+                exit,
+                new Set(["edge", "range", "targetMapId", "targetPosition"]),
+                label,
+            );
+            requireExactKeys(
+                exit.targetPosition,
+                new Set(["col", "row", "facing"]),
+                `${label}.targetPosition`,
+            );
+            this.validateEntry(exit.targetPosition, `${label}.targetPosition`);
+            return;
+        }
+
+        requireExactKeys(
+            exit,
+            new Set([
+                "edge",
+                "range",
+                "targetMapId",
+                "targetEdge",
+                "preserveAxis",
+                "offset",
+            ]),
+            label,
+        );
+
+        if (exit.preserveAxis !== true) {
+            throw new Error(`${label}.preserveAxis must be true.`);
+        }
+
+        if (!edges.has(exit.targetEdge)) {
+            throw new Error(`${label}.targetEdge must be north, south, east, or west.`);
+        }
+
+        const horizontalSource = exit.edge === "east" || exit.edge === "west";
+        const horizontalTarget = exit.targetEdge === "east" || exit.targetEdge === "west";
+        if (horizontalSource !== horizontalTarget) {
+            throw new Error(`${label}.targetEdge must preserve the same movement axis.`);
+        }
+
+        if (!Number.isInteger(exit.offset)) {
+            throw new Error(`${label}.offset must be an integer.`);
+        }
+    }
+
+    validateExitReferences(map) {
+        map.exits.forEach((exit, index) => {
+            const label = `Exit ${index} in "${map.id}"`;
+            const targetMap = this.mapsById.get(exit.targetMapId);
+            if (!targetMap) {
+                throw new Error(`${label} references missing map "${exit.targetMapId}".`);
+            }
+
+            if (Object.hasOwn(exit, "entryId")) {
+                this.validateEntryReference(exit.targetMapId, exit.entryId, label);
+                return;
+            }
+
+            if (Object.hasOwn(exit, "targetPosition")) {
+                this.validateMapPosition(
+                    exit.targetMapId,
+                    exit.targetPosition.col,
+                    exit.targetPosition.row,
+                    `${label}.targetPosition`,
+                );
+                return;
+            }
+
+            const targetAxisLimit =
+                exit.targetEdge === "east" || exit.targetEdge === "west"
+                    ? targetMap.gridSize.height
+                    : targetMap.gridSize.width;
+            const firstTargetAxis = exit.range[0] + exit.offset;
+            const lastTargetAxis = exit.range[1] + exit.offset;
+            if (firstTargetAxis < 0 || lastTargetAxis >= targetAxisLimit) {
+                throw new Error(`${label} preserves its axis outside "${exit.targetMapId}".`);
+            }
+        });
+    }
+
+    validateTransitionCell(spatialData, col, row, label) {
+        const key = `${col},${row}`;
+        if (!spatialData.walkable.has(key)) {
+            throw new Error(`${label} is not on the walkable base.`);
+        }
+        if (spatialData.collision.has(key)) {
+            throw new Error(`${label} is blocked by collision.`);
+        }
+    }
+
+    getEdgePosition(map, edge, axis) {
+        if (edge === "west") return { col: 0, row: axis };
+        if (edge === "east") return { col: map.gridSize.width - 1, row: axis };
+        if (edge === "north") return { col: axis, row: 0 };
+        return { col: axis, row: map.gridSize.height - 1 };
+    }
+
+    getPreservedExitPosition(exit, sourceAxis) {
+        const targetMap = this.mapsById.get(exit.targetMapId);
+        const targetAxis = sourceAxis + exit.offset;
+        const position = this.getEdgePosition(targetMap, exit.targetEdge, targetAxis);
+        this.validateMapPosition(
+            exit.targetMapId,
+            position.col,
+            position.row,
+            `Preserved exit target`,
+        );
+        return position;
     }
 
     validateTile(tileId, tile, mapId) {
@@ -858,26 +1018,65 @@ export class Game {
         this.dialogueBox.advance();
     }
 
-    transitionTo({ mapId, entryId }) {
+    transitionTo(transition) {
         if (this.mode === "dialogue") {
             throw new Error("Cannot transition while dialogue is open.");
         }
 
-        this.validateEntryReference(mapId, entryId, "Transition");
+        if (!transition || typeof transition !== "object" || Array.isArray(transition)) {
+            throw new Error("Transition must be an object.");
+        }
 
+        const usesEntry = Object.hasOwn(transition, "entryId");
+        const usesPosition = Object.hasOwn(transition, "position");
+        if (usesEntry === usesPosition) {
+            throw new Error("Transition must define exactly one of entryId or position.");
+        }
+
+        const mapId = transition.mapId;
         const map = this.mapsById.get(mapId);
-        const entry = map.entries[entryId];
+        if (!map) {
+            throw new Error(`Transition references missing map "${String(mapId)}".`);
+        }
+
+        let position;
+        let statusTarget;
+
+        if (usesEntry) {
+            requireExactKeys(transition, new Set(["mapId", "entryId"]), "Transition");
+            this.validateEntryReference(mapId, transition.entryId, "Transition");
+            position = map.entries[transition.entryId];
+            statusTarget = `Entry: ${transition.entryId}`;
+        } else {
+            requireExactKeys(transition, new Set(["mapId", "position"]), "Transition");
+            requireExactKeys(
+                transition.position,
+                new Set(["col", "row", "facing"]),
+                "Transition position",
+            );
+            this.validateEntry(transition.position, "Transition position");
+            this.validateMapPosition(
+                mapId,
+                transition.position.col,
+                transition.position.row,
+                "Transition position",
+            );
+            position = transition.position;
+            statusTarget = `Position: ${position.col},${position.row}`;
+        }
+
+        const spatialData = this.buildSpatialData(map);
+        this.validateTransitionCell(spatialData, position.col, position.row, "Transition position");
 
         this.inventoryPanel.hide();
         this.mode = "world";
         this.state.player.mapId = mapId;
-        this.player.setPosition(entry.col, entry.row);
-        this.player.setFacing(entry.facing.dc, entry.facing.dr);
-        this.activeSpatialData = this.buildSpatialData(map);
+        this.player.setPosition(position.col, position.row);
+        this.player.setFacing(position.facing.dc, position.facing.dr);
+        this.activeSpatialData = spatialData;
 
-        this.input.clearMovement();
         this.updateCamera();
-        this.setStatus(`Map: ${mapId} -- Entry: ${entryId}`);
+        this.setStatus(`Map: ${mapId} -- ${statusTarget}`);
     }
 
     rebuildActiveSpatialData() {
@@ -1108,6 +1307,80 @@ export class Game {
         );
     }
 
+    attemptPlayerMovement(dc, dr) {
+        if (this.mode !== "world" || this.player.isMoving) return false;
+
+        this.player.setFacing(dc, dr);
+
+        const targetCol = this.player.col + dc;
+        const targetRow = this.player.row + dr;
+
+        if (this.canPlayerEnter(targetCol, targetRow)) {
+            this.player.startMove(targetCol, targetRow);
+            return true;
+        }
+
+        const exitAttempt = this.getExitAttempt(targetCol, targetRow, dc, dr);
+        if (!exitAttempt) return false;
+
+        const exit = this.activeMap.exits.find(
+            (candidate) =>
+                candidate.edge === exitAttempt.edge &&
+                exitAttempt.axis >= candidate.range[0] &&
+                exitAttempt.axis <= candidate.range[1],
+        );
+        if (!exit) return false;
+
+        this.executeEdgeExit(exit, exitAttempt.axis, { dc, dr });
+        return true;
+    }
+
+    getExitAttempt(targetCol, targetRow, dc, dr) {
+        const { width, height } = this.activeMap.gridSize;
+        const outside = targetCol < 0 || targetCol >= width || targetRow < 0 || targetRow >= height;
+
+        if (!outside) {
+            const targetKey = `${targetCol},${targetRow}`;
+            if (this.activeSpatialData.walkable.has(targetKey)) return null;
+
+            const targetsBoundary =
+                (dc === -1 && targetCol === 0) ||
+                (dc === 1 && targetCol === width - 1) ||
+                (dr === -1 && targetRow === 0) ||
+                (dr === 1 && targetRow === height - 1);
+            if (!targetsBoundary) return null;
+        }
+
+        if (dc === -1) return { edge: "west", axis: targetRow };
+        if (dc === 1) return { edge: "east", axis: targetRow };
+        if (dr === -1) return { edge: "north", axis: targetCol };
+        return { edge: "south", axis: targetCol };
+    }
+
+    executeEdgeExit(exit, sourceAxis, movementDirection) {
+        if (Object.hasOwn(exit, "entryId")) {
+            this.transitionTo({ mapId: exit.targetMapId, entryId: exit.entryId });
+            return;
+        }
+
+        if (Object.hasOwn(exit, "targetPosition")) {
+            this.transitionTo({
+                mapId: exit.targetMapId,
+                position: structuredClone(exit.targetPosition),
+            });
+            return;
+        }
+
+        const position = this.getPreservedExitPosition(exit, sourceAxis);
+        this.transitionTo({
+            mapId: exit.targetMapId,
+            position: {
+                ...position,
+                facing: { ...movementDirection },
+            },
+        });
+    }
+
     handleActionInteraction() {
         if (this.mode !== "world") return false;
 
@@ -1176,9 +1449,7 @@ export class Game {
             const direction = this.input.getActiveMovementDirection();
 
             if (direction) {
-                this.player.tryMove(direction.dc, direction.dr, (col, row) =>
-                    this.canPlayerEnter(col, row),
-                );
+                this.attemptPlayerMovement(direction.dc, direction.dr);
             }
         }
 

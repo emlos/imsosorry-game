@@ -44,27 +44,20 @@ export class Player {
         this.state.facing = { dc, dr };
     }
 
-    tryMove(dc, dr, canEnter) {
-        if (this.isMoving) return false;
-
-        this.setFacing(dc, dr);
-
-        const nextCol = this.col + dc;
-        const nextRow = this.row + dr;
-
-        if (!canEnter(nextCol, nextRow)) return false;
+    startMove(col, row) {
+        if (this.isMoving) {
+            throw new Error("Cannot start a player move while another move is active.");
+        }
 
         this.fromX = this.x;
         this.fromY = this.y;
-        this.toX = nextCol * this.tileSize;
-        this.toY = nextRow * this.tileSize;
+        this.toX = col * this.tileSize;
+        this.toY = row * this.tileSize;
 
-        this.state.col = nextCol;
-        this.state.row = nextRow;
+        this.state.col = col;
+        this.state.row = row;
         this.moveProgress = 0;
         this.isMoving = true;
-
-        return true;
     }
 
     update(deltaMs) {

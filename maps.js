@@ -29,6 +29,17 @@ export const MAPS = [
             },
         },
 
+        exits: [
+            {
+                edge: "west",
+                range: [1, 4],
+                targetMapId: "room-05",
+                targetEdge: "east",
+                preserveAxis: true,
+                offset: 0,
+            },
+        ],
+
         tiles: {},
 
         entities: [
@@ -156,6 +167,8 @@ export const MAPS = [
             },
         },
 
+        exits: [],
+
         tiles: {},
 
         entities: [
@@ -212,6 +225,8 @@ export const MAPS = [
                 facing: { dc: 0, dr: 1 },
             },
         },
+
+        exits: [],
 
         tiles: {},
 
@@ -328,6 +343,8 @@ export const MAPS = [
                 facing: { dc: 0, dr: -1 },
             },
         },
+
+        exits: [],
 
         tiles: {},
 
@@ -450,6 +467,47 @@ export const MAPS = [
                 [WALL, E, WALL, E, E, E, WALL, E, WALL],
                 [WALL, E, E, E, E, E, E, E, WALL],
                 [WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL],
+            ],
+        },
+    },
+
+    {
+        id: "room-05",
+
+        entries: {},
+
+        exits: [
+            {
+                edge: "east",
+                range: [1, 4],
+                targetMapId: "room-01",
+                targetEdge: "west",
+                preserveAxis: true,
+                offset: 0,
+            },
+        ],
+
+        tiles: {},
+
+        entities: [],
+
+        layers: {
+            base: [
+                [FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR],
+                [FLOOR, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR],
+                [FLOOR, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR],
+                [FLOOR, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR],
+                [FLOOR, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR_ALT, FLOOR],
+                [FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR],
+            ],
+
+            obstacles: [
+                [WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL],
+                [WALL, E, E, E, E, E, E, E],
+                [WALL, E, E, WALL, E, E, E, E],
+                [WALL, E, E, E, E, WALL, E, E],
+                [WALL, E, WALL, E, E, E, E, E],
+                [WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL],
             ],
         },
     },

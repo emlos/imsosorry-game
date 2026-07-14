@@ -94,9 +94,7 @@ export const INTERACTIONS = {
                     "A voice beneath the static says: The glass remembers who listened.",
                     "Then the signal cuts out.",
                 ],
-                afterClose: [
-                    { type: "setFlag", flag: "room04.receiverUsed", value: true },
-                ],
+                afterClose: [{ type: "setFlag", flag: "room04.receiverUsed", value: true }],
             },
         ],
     },
