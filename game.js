@@ -49,7 +49,6 @@ function createRuntimeState(maps) {
     const initialEntry = initialMap.entries[initialMap.initialEntryId];
 
     return {
-        version: SAVE_VERSION,
         player: {
             mapId: initialMap.id,
             col: initialEntry.col,
@@ -1576,10 +1575,6 @@ export class Game {
         }
 
         this.refreshInventoryPanel();
-    }
-
-    consumeItem(itemId, quantity) {
-        this.removeItem(itemId, quantity);
     }
 
     hasItem(itemId) {

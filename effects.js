@@ -156,22 +156,6 @@ const EFFECT_HANDLERS = new Map([
         },
     ],
     [
-        "consumeItem",
-        {
-            validateDefinition({ effect, label }) {
-                requireExactKeys(effect, effectKeys("itemId", "quantity"), label);
-                requireString(effect.itemId, `${label}.itemId`);
-                requirePositiveInteger(effect.quantity, `${label}.quantity`);
-            },
-            validateReferences({ game, effect, label }) {
-                game.validateItemReference(effect.itemId, label);
-            },
-            execute({ game, effect }) {
-                game.consumeItem(effect.itemId, effect.quantity);
-            },
-        },
-    ],
-    [
         "setPlayerSprite",
         {
             validateDefinition({ effect, label }) {
