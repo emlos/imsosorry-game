@@ -67,30 +67,39 @@ export function validateCondition(condition, label) {
     });
 }
 
-export function evaluateCondition(game, condition) {
+function hasFlag(state, flag) {
+    return state.flags[flag] === true;
+}
+
+function hasItem(state, itemId) {
+    const itemState = state.inventory[itemId];
+    return itemState !== undefined && itemState.quantity > 0;
+}
+
+export function evaluateCondition(state, condition) {
     if (Object.hasOwn(condition, "flag")) {
         if (Object.hasOwn(condition, "equals")) {
-            return Object.is(game.getFlag(condition.flag), condition.equals);
+            return Object.is(state.flags[condition.flag], condition.equals);
         }
 
-        return game.hasFlag(condition.flag);
+        return hasFlag(state, condition.flag);
     }
 
     if (Object.hasOwn(condition, "notFlag")) {
-        return !game.hasFlag(condition.notFlag);
+        return !hasFlag(state, condition.notFlag);
     }
 
     if (Object.hasOwn(condition, "hasItem")) {
-        return game.hasItem(condition.hasItem);
+        return hasItem(state, condition.hasItem);
     }
 
     if (Object.hasOwn(condition, "notItem")) {
-        return !game.hasItem(condition.notItem);
+        return !hasItem(state, condition.notItem);
     }
 
     if (Object.hasOwn(condition, "all")) {
-        return condition.all.every((child) => evaluateCondition(game, child));
+        return condition.all.every((child) => evaluateCondition(state, child));
     }
 
-    return condition.any.some((child) => evaluateCondition(game, child));
+    return condition.any.some((child) => evaluateCondition(state, child));
 }

@@ -14,6 +14,7 @@ import { Player } from "./player.js";
 import { MUSIC, SOUNDS } from "./sounds.js";
 import { PLAYER_SPRITES, SPRITES } from "./sprites.js";
 import { EMPTY_TILE_ID, TILES } from "./tiles.js";
+import { SAVE_VERSION } from "./saves.js";
 
 function cloneLayers(layers) {
     return Object.fromEntries(
@@ -44,6 +45,67 @@ function createMapState(map) {
     };
 }
 
+function createRuntimeState(maps) {
+    const initialMap = maps[0];
+    const initialEntry = initialMap.entries[initialMap.initialEntryId];
+
+    return {
+        version: SAVE_VERSION,
+        player: {
+            mapId: initialMap.id,
+            col: initialEntry.col,
+            row: initialEntry.row,
+            facing: { ...initialEntry.facing },
+            spriteId: "default",
+            movementSpeed: 4.5,
+        },
+        flags: {},
+        inventory: {},
+        maps: Object.fromEntries(maps.map((map) => [map.id, createMapState(map)])),
+    };
+}
+
+function isPlainObject(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+}
+
+function requirePlainObject(value, label) {
+    if (!isPlainObject(value)) {
+        throw new Error(`${label} must be an object.`);
+    }
+}
+
+function requireString(value, label) {
+    if (typeof value !== "string" || value.length === 0) {
+        throw new Error(`${label} must be a non-empty string.`);
+    }
+}
+
+function validateJsonValue(value, label) {
+    if (value === null || typeof value === "string" || typeof value === "boolean") return;
+    if (typeof value === "number" && Number.isFinite(value)) return;
+
+    if (Array.isArray(value)) {
+        value.forEach((child, index) => validateJsonValue(child, `${label}[${index}]`));
+        return;
+    }
+
+    if (isPlainObject(value)) {
+        for (const [key, child] of Object.entries(value)) {
+            validateJsonValue(child, `${label}.${key}`);
+        }
+        return;
+    }
+
+    throw new Error(`${label} contains a value that cannot be saved as JSON.`);
+}
+
+function valuesEqual(left, right) {
+    return JSON.stringify(left) === JSON.stringify(right);
+}
+
 function requireExactKeys(value, allowedKeys, label) {
     for (const key of Object.keys(value)) {
         if (!allowedKeys.has(key)) {
@@ -66,27 +128,7 @@ export class Game {
         this.itemDefinitions = new Map();
         this.activeSpatialData = null;
 
-        const initialMap = authoredMaps[0];
-        const initialEntry = initialMap.entries[initialMap.initialEntryId];
-
-        this.state = {
-            version: 5,
-
-            player: {
-                mapId: initialMap.id,
-                col: initialEntry.col,
-                row: initialEntry.row,
-                facing: { ...initialEntry.facing },
-                spriteId: "default",
-                movementSpeed: 4.5,
-            },
-
-            flags: {},
-
-            inventory: {},
-
-            maps: Object.fromEntries(authoredMaps.map((map) => [map.id, createMapState(map)])),
-        };
+        this.state = createRuntimeState(authoredMaps);
 
         this.images = new Map();
         this.spriteDefinitions = new Map(Object.entries(SPRITES));
@@ -369,9 +411,7 @@ export class Game {
         }
 
         const axisLimit =
-            exit.edge === "east" || exit.edge === "west"
-                ? map.gridSize.height
-                : map.gridSize.width;
+            exit.edge === "east" || exit.edge === "west" ? map.gridSize.height : map.gridSize.width;
         if (exit.range[1] >= axisLimit) {
             throw new Error(`${label}.range exceeds the ${exit.edge} edge of "${map.id}".`);
         }
@@ -405,14 +445,7 @@ export class Game {
 
         requireExactKeys(
             exit,
-            new Set([
-                "edge",
-                "range",
-                "targetMapId",
-                "targetEdge",
-                "preserveAxis",
-                "offset",
-            ]),
+            new Set(["edge", "range", "targetMapId", "targetEdge", "preserveAxis", "offset"]),
             label,
         );
 
@@ -810,12 +843,12 @@ export class Game {
         return tile.collision === true;
     }
 
-    buildSpatialData(map) {
+    buildSpatialData(map, runtimeState = this.state) {
         const walkable = new Set();
         const collision = new Set();
         const interactions = new Map();
         const visibleEntities = [];
-        const layers = this.state.maps[map.id].layers;
+        const layers = runtimeState.maps[map.id].layers;
 
         for (const [layerName, layer] of Object.entries(layers)) {
             layer.forEach((row, rowIndex) => {
@@ -823,7 +856,7 @@ export class Game {
                     if (tileId === EMPTY_TILE_ID) return;
 
                     const tile = map.tiles[tileId];
-                    if (!this.isTilePresent(tile)) return;
+                    if (!this.isTilePresent(tile, runtimeState)) return;
 
                     const anchorKey = `${colIndex},${rowIndex}`;
                     if (layerName === "base") {
@@ -833,7 +866,7 @@ export class Game {
                     const interactionActive =
                         tile.interaction &&
                         (!tile.interaction.condition ||
-                            this.evaluateCondition(tile.interaction.condition));
+                            this.evaluateCondition(tile.interaction.condition, runtimeState));
 
                     const target = interactionActive
                         ? {
@@ -862,8 +895,8 @@ export class Game {
         }
 
         for (const definition of map.entities) {
-            const state = this.getEntityState(map.id, definition.id);
-            if (!this.isEntityPresent(definition, state)) continue;
+            const state = this.getEntityState(map.id, definition.id, runtimeState);
+            if (!this.isEntityPresent(definition, state, runtimeState)) continue;
 
             visibleEntities.push({
                 mapId: map.id,
@@ -880,7 +913,8 @@ export class Game {
             const interaction = state.interaction;
             if (
                 interaction &&
-                (!interaction.condition || this.evaluateCondition(interaction.condition))
+                (!interaction.condition ||
+                    this.evaluateCondition(interaction.condition, runtimeState))
             ) {
                 interactions.set(key, {
                     kind: "entity",
@@ -906,13 +940,13 @@ export class Game {
         };
     }
 
-    isTilePresent(tile) {
-        return !tile.condition || this.evaluateCondition(tile.condition);
+    isTilePresent(tile, runtimeState = this.state) {
+        return !tile.condition || this.evaluateCondition(tile.condition, runtimeState);
     }
 
-    isEntityPresent(definition, state) {
+    isEntityPresent(definition, state, runtimeState = this.state) {
         if (!state.active) return false;
-        return !definition.condition || this.evaluateCondition(definition.condition);
+        return !definition.condition || this.evaluateCondition(definition.condition, runtimeState);
     }
 
     getOccupiedTileCells(col, row, tile) {
@@ -975,6 +1009,350 @@ export class Game {
 
             image.src = path;
         });
+    }
+
+    createSaveData() {
+        const maps = {};
+
+        for (const map of this.maps) {
+            const runtimeMap = this.state.maps[map.id];
+            const layerChanges = {};
+
+            for (const [layerName, authoredLayer] of Object.entries(map.layers)) {
+                const patches = [];
+                const runtimeLayer = runtimeMap.layers[layerName];
+
+                authoredLayer.forEach((row, rowIndex) => {
+                    row.forEach((tileId, colIndex) => {
+                        const runtimeTileId = runtimeLayer[rowIndex][colIndex];
+                        if (runtimeTileId !== tileId) {
+                            patches.push({ col: colIndex, row: rowIndex, tileId: runtimeTileId });
+                        }
+                    });
+                });
+
+                if (patches.length > 0) {
+                    layerChanges[layerName] = patches;
+                }
+            }
+
+            const entityChanges = {};
+            for (const definition of map.entities) {
+                const runtimeEntity = runtimeMap.entities[definition.id];
+                const changes = {};
+
+                if (runtimeEntity.active !== definition.active) {
+                    changes.active = runtimeEntity.active;
+                }
+                if (runtimeEntity.col !== definition.col || runtimeEntity.row !== definition.row) {
+                    changes.col = runtimeEntity.col;
+                    changes.row = runtimeEntity.row;
+                }
+                if (runtimeEntity.spriteId !== definition.spriteId) {
+                    changes.spriteId = runtimeEntity.spriteId;
+                }
+                if (runtimeEntity.collision !== definition.collision) {
+                    changes.collision = runtimeEntity.collision;
+                }
+                if (!valuesEqual(runtimeEntity.interaction, definition.interaction)) {
+                    changes.interaction = structuredClone(runtimeEntity.interaction);
+                }
+
+                if (Object.keys(changes).length > 0) {
+                    entityChanges[definition.id] = changes;
+                }
+            }
+
+            const mapChanges = {};
+            if (Object.keys(layerChanges).length > 0) mapChanges.layers = layerChanges;
+            if (Object.keys(entityChanges).length > 0) mapChanges.entities = entityChanges;
+            if (Object.keys(mapChanges).length > 0) maps[map.id] = mapChanges;
+        }
+
+        const saveData = {
+            version: SAVE_VERSION,
+            savedAt: new Date().toISOString(),
+            player: structuredClone(this.state.player),
+            flags: structuredClone(this.state.flags),
+            inventory: structuredClone(this.state.inventory),
+            maps,
+        };
+
+        this.prepareSaveData(saveData);
+        return saveData;
+    }
+
+    prepareSaveData(rawSaveData) {
+        requirePlainObject(rawSaveData, "Save data");
+        requireExactKeys(
+            rawSaveData,
+            new Set(["version", "savedAt", "player", "flags", "inventory", "maps"]),
+            "Save data",
+        );
+
+        if (rawSaveData.version !== SAVE_VERSION) {
+            throw new Error(`Unsupported save version "${String(rawSaveData.version)}".`);
+        }
+
+        requireString(rawSaveData.savedAt, "Save data.savedAt");
+        const savedDate = new Date(rawSaveData.savedAt);
+        if (Number.isNaN(savedDate.getTime()) || savedDate.toISOString() !== rawSaveData.savedAt) {
+            throw new Error("Save data.savedAt must be an ISO timestamp.");
+        }
+
+        const candidate = createRuntimeState(this.maps);
+        this.applySavedPlayer(candidate, rawSaveData.player);
+        this.applySavedFlags(candidate, rawSaveData.flags);
+        this.applySavedInventory(candidate, rawSaveData.inventory);
+        this.applySavedMaps(candidate, rawSaveData.maps);
+
+        const activeMap = this.mapsById.get(candidate.player.mapId);
+        const spatialData = this.buildSpatialData(activeMap, candidate);
+        this.validateTransitionCell(
+            spatialData,
+            candidate.player.col,
+            candidate.player.row,
+            "Saved player position",
+        );
+
+        return {
+            saveData: structuredClone(rawSaveData),
+            state: candidate,
+            spatialData,
+        };
+    }
+
+    applySavedPlayer(candidate, player) {
+        requirePlainObject(player, "Save data.player");
+        requireExactKeys(
+            player,
+            new Set(["mapId", "col", "row", "facing", "spriteId", "movementSpeed"]),
+            "Save data.player",
+        );
+        requireString(player.mapId, "Save data.player.mapId");
+
+        if (!this.mapsById.has(player.mapId)) {
+            throw new Error(`Save data.player references missing map "${player.mapId}".`);
+        }
+
+        this.validateEntry(player, "Save data.player");
+        this.validateMapPosition(player.mapId, player.col, player.row, "Save data.player position");
+        this.validatePlayerSpriteReference(player.spriteId, "Save data.player");
+
+        if (!Number.isFinite(player.movementSpeed) || player.movementSpeed <= 0) {
+            throw new Error("Save data.player.movementSpeed must be a positive number.");
+        }
+
+        candidate.player = structuredClone(player);
+    }
+
+    applySavedFlags(candidate, flags) {
+        requirePlainObject(flags, "Save data.flags");
+
+        for (const [flag, value] of Object.entries(flags)) {
+            requireString(flag, "Save flag ID");
+            validateJsonValue(value, `Save flag "${flag}"`);
+        }
+
+        candidate.flags = structuredClone(flags);
+    }
+
+    applySavedInventory(candidate, inventory) {
+        requirePlainObject(inventory, "Save data.inventory");
+
+        for (const [itemId, itemState] of Object.entries(inventory)) {
+            this.validateItemReference(itemId, "Saved inventory");
+            requirePlainObject(itemState, `Saved item "${itemId}"`);
+            requireExactKeys(itemState, new Set(["quantity", "active"]), `Saved item "${itemId}"`);
+
+            if (!Number.isInteger(itemState.quantity) || itemState.quantity <= 0) {
+                throw new Error(`Saved item "${itemId}" has an invalid quantity.`);
+            }
+            if (typeof itemState.active !== "boolean") {
+                throw new Error(`Saved item "${itemId}" has an invalid active state.`);
+            }
+        }
+
+        candidate.inventory = structuredClone(inventory);
+    }
+
+    applySavedMaps(candidate, savedMaps) {
+        requirePlainObject(savedMaps, "Save data.maps");
+
+        for (const [mapId, mapChanges] of Object.entries(savedMaps)) {
+            const map = this.mapsById.get(mapId);
+            if (!map) {
+                throw new Error(`Save data references missing map "${mapId}".`);
+            }
+
+            requirePlainObject(mapChanges, `Saved map "${mapId}"`);
+            requireExactKeys(mapChanges, new Set(["layers", "entities"]), `Saved map "${mapId}"`);
+            if (Object.keys(mapChanges).length === 0) {
+                throw new Error(`Saved map "${mapId}" contains no mutable state.`);
+            }
+
+            if (Object.hasOwn(mapChanges, "layers")) {
+                this.applySavedLayerChanges(candidate, map, mapChanges.layers);
+            }
+            if (Object.hasOwn(mapChanges, "entities")) {
+                this.applySavedEntityChanges(candidate, map, mapChanges.entities);
+            }
+        }
+    }
+
+    applySavedLayerChanges(candidate, map, layers) {
+        requirePlainObject(layers, `Saved layers for "${map.id}"`);
+        if (Object.keys(layers).length === 0) {
+            throw new Error(`Saved layers for "${map.id}" cannot be empty.`);
+        }
+
+        for (const [layerName, patches] of Object.entries(layers)) {
+            if (!Object.hasOwn(map.layers, layerName)) {
+                throw new Error(`Saved map "${map.id}" references missing layer "${layerName}".`);
+            }
+            if (!Array.isArray(patches) || patches.length === 0) {
+                throw new Error(`Saved layer "${map.id}.${layerName}" must contain tile changes.`);
+            }
+
+            const changedCells = new Set();
+            patches.forEach((patch, index) => {
+                const label = `Saved layer "${map.id}.${layerName}"[${index}]`;
+                requirePlainObject(patch, label);
+                requireExactKeys(patch, new Set(["col", "row", "tileId"]), label);
+
+                if (
+                    !Number.isInteger(patch.col) ||
+                    !Number.isInteger(patch.row) ||
+                    !Number.isInteger(patch.tileId)
+                ) {
+                    throw new Error(`${label} must define integer col, row, and tileId values.`);
+                }
+
+                this.validateTileReference(
+                    map.id,
+                    layerName,
+                    patch.col,
+                    patch.row,
+                    patch.tileId,
+                    label,
+                );
+
+                const cellKey = `${patch.col},${patch.row}`;
+                if (changedCells.has(cellKey)) {
+                    throw new Error(`${label} duplicates tile cell ${cellKey}.`);
+                }
+                changedCells.add(cellKey);
+                candidate.maps[map.id].layers[layerName][patch.row][patch.col] = patch.tileId;
+            });
+        }
+    }
+
+    applySavedEntityChanges(candidate, map, entities) {
+        requirePlainObject(entities, `Saved entities for "${map.id}"`);
+        if (Object.keys(entities).length === 0) {
+            throw new Error(`Saved entities for "${map.id}" cannot be empty.`);
+        }
+
+        for (const [entityId, changes] of Object.entries(entities)) {
+            this.validateEntityReference(map.id, entityId, `Saved map "${map.id}"`);
+            requirePlainObject(changes, `Saved entity "${map.id}.${entityId}"`);
+            requireExactKeys(
+                changes,
+                new Set(["active", "col", "row", "spriteId", "collision", "interaction"]),
+                `Saved entity "${map.id}.${entityId}"`,
+            );
+            if (Object.keys(changes).length === 0) {
+                throw new Error(`Saved entity "${map.id}.${entityId}" contains no changes.`);
+            }
+
+            const hasCol = Object.hasOwn(changes, "col");
+            const hasRow = Object.hasOwn(changes, "row");
+            if (hasCol !== hasRow) {
+                throw new Error(
+                    `Saved entity "${map.id}.${entityId}" must save col and row together.`,
+                );
+            }
+
+            const runtimeEntity = candidate.maps[map.id].entities[entityId];
+
+            if (Object.hasOwn(changes, "active")) {
+                if (typeof changes.active !== "boolean") {
+                    throw new Error(
+                        `Saved entity "${map.id}.${entityId}" has invalid active state.`,
+                    );
+                }
+                runtimeEntity.active = changes.active;
+            }
+
+            if (hasCol) {
+                this.validateMapPosition(
+                    map.id,
+                    changes.col,
+                    changes.row,
+                    `Saved entity "${map.id}.${entityId}" position`,
+                );
+                runtimeEntity.col = changes.col;
+                runtimeEntity.row = changes.row;
+            }
+
+            if (Object.hasOwn(changes, "spriteId")) {
+                this.validateSpriteReference(
+                    changes.spriteId,
+                    `Saved entity "${map.id}.${entityId}"`,
+                );
+                runtimeEntity.spriteId = changes.spriteId;
+            }
+
+            if (Object.hasOwn(changes, "collision")) {
+                if (typeof changes.collision !== "boolean") {
+                    throw new Error(`Saved entity "${map.id}.${entityId}" has invalid collision.`);
+                }
+                runtimeEntity.collision = changes.collision;
+            }
+
+            if (Object.hasOwn(changes, "interaction")) {
+                if (changes.interaction !== null) {
+                    const label = `Saved interaction for "${map.id}.${entityId}"`;
+                    validateInteractionDefinition(changes.interaction, label);
+                    validateInteractionReferences(this, changes.interaction, map.id, label);
+                }
+                runtimeEntity.interaction = structuredClone(changes.interaction);
+            }
+
+            if (
+                runtimeEntity.collision &&
+                runtimeEntity.interaction &&
+                (runtimeEntity.interaction.trigger === "touch" ||
+                    runtimeEntity.interaction.trigger === "both")
+            ) {
+                throw new Error(
+                    `Saved entity "${map.id}.${entityId}" cannot combine collision with ` +
+                        `${runtimeEntity.interaction.trigger} interaction.`,
+                );
+            }
+        }
+    }
+
+    applyPreparedSave(prepared) {
+        if (!prepared || !prepared.state || !prepared.spatialData) {
+            throw new Error("Prepared save data is invalid.");
+        }
+
+        this.dialogueBox.reset();
+        this.inventoryPanel.hide();
+        this.audio.stopMusic();
+        this.input.clearMovement();
+
+        this.state = prepared.state;
+        this.player = new Player(DEFAULT_TILE_SIZE, this.state.player);
+        this.activeSpatialData = prepared.spatialData;
+        this.selectedItemId = Object.keys(this.state.inventory)[0] ?? null;
+        this.mode = "world";
+        this.eventLogElement.textContent = "";
+
+        this.refreshInventoryPanel();
+        this.updateCamera();
+        this.setStatus(`Map: ${this.state.player.mapId} -- Save loaded`);
     }
 
     playSound(soundId) {
@@ -1234,8 +1612,8 @@ export class Game {
         this.inventoryPanel.render(this.state.inventory, this.itemDefinitions, this.selectedItemId);
     }
 
-    evaluateCondition(condition) {
-        return evaluateCondition(this, condition);
+    evaluateCondition(condition, runtimeState = this.state) {
+        return evaluateCondition(runtimeState, condition);
     }
 
     runEffects(effects, { mapId }) {
@@ -1258,8 +1636,8 @@ export class Game {
         this.state.player.movementSpeed = tilesPerSecond;
     }
 
-    getEntityState(mapId, entityId) {
-        return this.state.maps[mapId].entities[entityId];
+    getEntityState(mapId, entityId, runtimeState = this.state) {
+        return runtimeState.maps[mapId].entities[entityId];
     }
 
     setEntityActive(mapId, entityId, active) {

@@ -259,3 +259,40 @@ h1 {
         min-height: 90%;
     }
 }
+
+.save-controls {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid #3a4050;
+}
+
+.save-controls h2 {
+    margin: 0 0 10px;
+    font-size: 0.95rem;
+}
+
+.save-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.save-actions button {
+    min-height: 38px;
+    padding: 7px 9px;
+}
+
+.save-actions button:last-child {
+    grid-column: 1 / -1;
+}
+
+.save-status {
+    min-height: 2.8em;
+    margin: 10px 0 0;
+    color: #b8c0d2;
+    font-size: 0.86rem;
+}
+
+.save-status[data-error="true"] {
+    color: #ffb8b8;
+}

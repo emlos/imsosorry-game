@@ -9,9 +9,6 @@ export class DialogueBox {
         this.textElement = rootElement.querySelector("[data-dialogue-text]");
         this.promptElement = rootElement.querySelector("[data-dialogue-prompt]");
 
-        if (!this.speakerElement || !this.textElement || !this.promptElement) {
-            throw new Error("Dialogue overlay is missing required elements.");
-        }
 
         this.pages = [];
         this.pageIndex = 0;
@@ -49,7 +46,11 @@ export class DialogueBox {
 
     close() {
         const onClose = this.onClose;
+        this.reset();
+        onClose();
+    }
 
+    reset() {
         this.rootElement.hidden = true;
         this.speakerElement.hidden = true;
         this.speakerElement.textContent = "";
@@ -59,8 +60,6 @@ export class DialogueBox {
         this.pageIndex = 0;
         this.speaker = null;
         this.onClose = null;
-
-        onClose();
     }
 
     renderPage() {
