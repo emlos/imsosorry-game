@@ -67,6 +67,26 @@ export function validateCondition(condition, label) {
     });
 }
 
+export function validateConditionReferences(game, condition, label) {
+    if (Object.hasOwn(condition, "hasItem")) {
+        game.validateItemReference(condition.hasItem, `${label}.hasItem`);
+        return;
+    }
+
+    if (Object.hasOwn(condition, "notItem")) {
+        game.validateItemReference(condition.notItem, `${label}.notItem`);
+        return;
+    }
+
+    const children = condition.all ?? condition.any;
+    if (!children) return;
+
+    const operator = Object.hasOwn(condition, "all") ? "all" : "any";
+    children.forEach((child, index) => {
+        validateConditionReferences(game, child, `${label}.${operator}[${index}]`);
+    });
+}
+
 function hasFlag(state, flag) {
     return state.flags[flag] === true;
 }

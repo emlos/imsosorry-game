@@ -1,4 +1,4 @@
-import { validateCondition } from "./conditions.js";
+import { validateCondition, validateConditionReferences } from "./conditions.js";
 
 function requireEffectObject(effect, label) {
     if (!effect || typeof effect !== "object" || Array.isArray(effect)) {
@@ -56,6 +56,14 @@ function validatePages(pages, label) {
     pages.forEach((page, index) => {
         requireString(page, `${label}[${index}]`);
     });
+}
+
+function getEffectMapId(effect, sourceMapId, label) {
+    const effectMapId = effect.mapId ?? sourceMapId;
+    if (effectMapId === null || effectMapId === undefined) {
+        throw new Error(`${label}.mapId is required for map-local inventory effects.`);
+    }
+    return effectMapId;
 }
 
 const EFFECT_HANDLERS = new Map([
@@ -171,36 +179,48 @@ const EFFECT_HANDLERS = new Map([
     [
         "setEntityActive",
         {
-            rebuild: "sourceMap",
+            rebuild: "effectMap",
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, effectKeys("entityId", "active"), label);
+                requireExactKeys(effect, effectKeys("mapId", "entityId", "active"), label);
+                if (effect.mapId !== undefined) requireString(effect.mapId, `${label}.mapId`);
                 requireString(effect.entityId, `${label}.entityId`);
                 requireBoolean(effect.active, `${label}.active`);
             },
             validateReferences({ game, effect, mapId, label }) {
-                game.validateEntityReference(mapId, effect.entityId, label);
+                game.validateEntityReference(
+                    getEffectMapId(effect, mapId, label),
+                    effect.entityId,
+                    label,
+                );
             },
             execute({ game, effect, mapId }) {
-                game.setEntityActive(mapId, effect.entityId, effect.active);
+                game.setEntityActive(effect.mapId ?? mapId, effect.entityId, effect.active);
             },
         },
     ],
     [
         "setEntityPosition",
         {
-            rebuild: "sourceMap",
+            rebuild: "effectMap",
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, effectKeys("entityId", "col", "row"), label);
+                requireExactKeys(effect, effectKeys("mapId", "entityId", "col", "row"), label);
+                if (effect.mapId !== undefined) requireString(effect.mapId, `${label}.mapId`);
                 requireString(effect.entityId, `${label}.entityId`);
                 requireInteger(effect.col, `${label}.col`);
                 requireInteger(effect.row, `${label}.row`);
             },
             validateReferences({ game, effect, mapId, label }) {
-                game.validateEntityReference(mapId, effect.entityId, label);
-                game.validateMapPosition(mapId, effect.col, effect.row, label);
+                const effectMapId = getEffectMapId(effect, mapId, label);
+                game.validateEntityReference(effectMapId, effect.entityId, label);
+                game.validateMapPosition(effectMapId, effect.col, effect.row, label);
             },
             execute({ game, effect, mapId }) {
-                game.setEntityPosition(mapId, effect.entityId, effect.col, effect.row);
+                game.setEntityPosition(
+                    effect.mapId ?? mapId,
+                    effect.entityId,
+                    effect.col,
+                    effect.row,
+                );
             },
         },
     ],
@@ -209,42 +229,57 @@ const EFFECT_HANDLERS = new Map([
         {
             rebuild: false,
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, effectKeys("entityId", "spriteId"), label);
+                requireExactKeys(effect, effectKeys("mapId", "entityId", "spriteId"), label);
+                if (effect.mapId !== undefined) requireString(effect.mapId, `${label}.mapId`);
                 requireString(effect.entityId, `${label}.entityId`);
                 requireString(effect.spriteId, `${label}.spriteId`);
             },
             validateReferences({ game, effect, mapId, label }) {
-                game.validateEntityReference(mapId, effect.entityId, label);
+                game.validateEntityReference(
+                    getEffectMapId(effect, mapId, label),
+                    effect.entityId,
+                    label,
+                );
                 game.validateSpriteReference(effect.spriteId, label);
             },
             execute({ game, effect, mapId }) {
-                game.setEntitySprite(mapId, effect.entityId, effect.spriteId);
+                game.setEntitySprite(effect.mapId ?? mapId, effect.entityId, effect.spriteId);
             },
         },
     ],
     [
         "setEntityCollision",
         {
-            rebuild: "sourceMap",
+            rebuild: "effectMap",
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, effectKeys("entityId", "collision"), label);
+                requireExactKeys(effect, effectKeys("mapId", "entityId", "collision"), label);
+                if (effect.mapId !== undefined) requireString(effect.mapId, `${label}.mapId`);
                 requireString(effect.entityId, `${label}.entityId`);
                 requireBoolean(effect.collision, `${label}.collision`);
             },
             validateReferences({ game, effect, mapId, label }) {
-                game.validateEntityReference(mapId, effect.entityId, label);
+                game.validateEntityReference(
+                    getEffectMapId(effect, mapId, label),
+                    effect.entityId,
+                    label,
+                );
             },
             execute({ game, effect, mapId }) {
-                game.setEntityCollision(mapId, effect.entityId, effect.collision);
+                game.setEntityCollision(effect.mapId ?? mapId, effect.entityId, effect.collision);
             },
         },
     ],
     [
         "setTile",
         {
-            rebuild: "sourceMap",
+            rebuild: "effectMap",
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, effectKeys("layer", "col", "row", "tileId"), label);
+                requireExactKeys(
+                    effect,
+                    effectKeys("mapId", "layer", "col", "row", "tileId"),
+                    label,
+                );
+                if (effect.mapId !== undefined) requireString(effect.mapId, `${label}.mapId`);
                 requireString(effect.layer, `${label}.layer`);
                 requireInteger(effect.col, `${label}.col`);
                 requireInteger(effect.row, `${label}.row`);
@@ -254,8 +289,9 @@ const EFFECT_HANDLERS = new Map([
             },
 
             validateReferences({ game, effect, mapId, label }) {
+                const effectMapId = getEffectMapId(effect, mapId, label);
                 game.validateTileReference(
-                    mapId,
+                    effectMapId,
                     effect.layer,
                     effect.col,
                     effect.row,
@@ -264,7 +300,13 @@ const EFFECT_HANDLERS = new Map([
                 );
             },
             execute({ game, effect, mapId }) {
-                game.setTile(mapId, effect.layer, effect.col, effect.row, effect.tileId);
+                game.setTile(
+                    effect.mapId ?? mapId,
+                    effect.layer,
+                    effect.col,
+                    effect.row,
+                    effect.tileId,
+                );
             },
         },
     ],
@@ -392,22 +434,24 @@ export function validateEffectsDefinition(effects, label) {
 
 export function validateEffectsReferences(game, effects, mapId, label) {
     effects.forEach((effect, index) => {
+        const effectLabel = `${label}[${index}]`;
+        if (effect.condition !== undefined) {
+            validateConditionReferences(game, effect.condition, `${effectLabel}.condition`);
+        }
+
         const handler = EFFECT_HANDLERS.get(effect.type);
         handler.validateReferences?.({
             game,
             effect,
             mapId,
-            label: `${label}[${index}]`,
+            label: effectLabel,
         });
     });
 }
 
 export function runEffects(game, effects, mapId) {
-    validateEffectsDefinition(effects, "Effects");
-    validateEffectsReferences(game, effects, mapId, "Effects");
-
     let rebuildActive = false;
-    let rebuildSourceMap = false;
+    const rebuildMapIds = new Set();
 
     for (const effect of effects) {
         if (effect.condition && !game.evaluateCondition(effect.condition)) {
@@ -419,12 +463,12 @@ export function runEffects(game, effects, mapId) {
 
         if (handler.rebuild === "active") {
             rebuildActive = true;
-        } else if (handler.rebuild === "sourceMap") {
-            rebuildSourceMap = true;
+        } else if (handler.rebuild === "effectMap") {
+            rebuildMapIds.add(effect.mapId ?? mapId);
         }
     }
 
-    if (rebuildActive || (rebuildSourceMap && game.state.player.mapId === mapId)) {
+    if (rebuildActive || rebuildMapIds.has(game.state.player.mapId)) {
         game.rebuildActiveSpatialData();
     }
 }

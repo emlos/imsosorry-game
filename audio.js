@@ -55,10 +55,6 @@ export class AudioSystem {
     }
 
     playMusic(musicId) {
-        if (!this.hasMusic(musicId)) {
-            throw new Error(`Missing music "${musicId}".`);
-        }
-
         if (this.currentMusicId === musicId && this.currentMusic) {
             return;
         }

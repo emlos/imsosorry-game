@@ -1,4 +1,4 @@
-import { validateCondition } from "./conditions.js";
+import { validateCondition, validateConditionReferences } from "./conditions.js";
 import { validateEffectsDefinition, validateEffectsReferences } from "./effects.js";
 
 export const INTERACTION_TRIGGERS = new Set(["action", "touch", "both"]); //TODO: remove 'both', make the trigger property into triggers: []
@@ -234,6 +234,10 @@ export function validateInteractionDefinition(interaction, label) {
 }
 
 export function validateInteractionReferences(game, interaction, sourceMapId, label) {
+    if (interaction.condition) {
+        validateConditionReferences(game, interaction.condition, `Condition for ${label}`);
+    }
+
     const handler = INTERACTION_HANDLERS.get(interaction.handler);
     handler.validateReferences?.({ game, interaction, sourceMapId, label });
 }

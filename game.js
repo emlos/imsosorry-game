@@ -1,7 +1,7 @@
 import { AudioSystem } from "./audio.js";
-import { evaluateCondition, validateCondition } from "./conditions.js";
+import { evaluateCondition, validateCondition, validateConditionReferences } from "./conditions.js";
 import { DialogueBox } from "./dialogue.js";
-import { runEffects, validateEffectsDefinition } from "./effects.js";
+import { runEffects, validateEffectsDefinition, validateEffectsReferences } from "./effects.js";
 import { InputController } from "./input.js";
 import { InventoryPanel } from "./inventory.js";
 import { DEFAULT_TILE_SIZE } from "./maps.js";
@@ -202,11 +202,19 @@ export class Game {
             );
         });
 
+        this.validateItemReferences();
+
         for (const map of this.maps) {
-            this.validateMapInteractionReferences(map);
-            const spatialData = this.buildSpatialData(map);
-            this.validateEntries(map, spatialData);
-            this.validateExitReferences(map);
+            this.validateMapReferences(map);
+        }
+
+        const initialSpatialDataByMap = new Map(
+            this.maps.map((map) => [map.id, this.buildSpatialData(map)]),
+        );
+
+        for (const map of this.maps) {
+            this.validateEntries(map, initialSpatialDataByMap.get(map.id));
+            this.validateExitReferences(map, initialSpatialDataByMap);
         }
     }
 
@@ -265,6 +273,13 @@ export class Game {
             }
 
             this.itemDefinitions.set(itemId, item);
+        }
+    }
+
+    validateItemReferences() {
+        for (const [itemId, item] of this.itemDefinitions) {
+            if (!item.usable) continue;
+            validateEffectsReferences(this, item.effects, null, `Effects for Item "${itemId}"`);
         }
     }
 
@@ -468,7 +483,7 @@ export class Game {
         }
     }
 
-    validateExitReferences(map) {
+    validateExitReferences(map, initialSpatialDataByMap) {
         map.exits.forEach((exit, index) => {
             const label = `Exit ${index} in "${map.id}"`;
             const targetMap = this.mapsById.get(exit.targetMapId);
@@ -488,6 +503,12 @@ export class Game {
                     exit.targetPosition.row,
                     `${label}.targetPosition`,
                 );
+                this.validateTransitionCell(
+                    initialSpatialDataByMap.get(exit.targetMapId),
+                    exit.targetPosition.col,
+                    exit.targetPosition.row,
+                    `${label}.targetPosition`,
+                );
                 return;
             }
 
@@ -499,6 +520,17 @@ export class Game {
             const lastTargetAxis = exit.range[1] + exit.offset;
             if (firstTargetAxis < 0 || lastTargetAxis >= targetAxisLimit) {
                 throw new Error(`${label} preserves its axis outside "${exit.targetMapId}".`);
+            }
+
+            const targetSpatialData = initialSpatialDataByMap.get(exit.targetMapId);
+            for (let sourceAxis = exit.range[0]; sourceAxis <= exit.range[1]; sourceAxis += 1) {
+                const targetPosition = this.getPreservedExitPosition(exit, sourceAxis);
+                this.validateTransitionCell(
+                    targetSpatialData,
+                    targetPosition.col,
+                    targetPosition.row,
+                    `${label} destination for source axis ${sourceAxis}`,
+                );
             }
         });
     }
@@ -622,7 +654,7 @@ export class Game {
         }
     }
 
-    validateMapInteractionReferences(map) {
+    validateMapReferences(map) {
         const validatedTileIds = new Set();
 
         for (const layer of Object.values(map.layers)) {
@@ -632,6 +664,15 @@ export class Game {
                     validatedTileIds.add(tileId);
 
                     const interaction = map.tiles[tileId].interaction;
+                    const condition = map.tiles[tileId].condition;
+                    if (condition) {
+                        validateConditionReferences(
+                            this,
+                            condition,
+                            `Condition for tile ${String(tileId)} in "${map.id}"`,
+                        );
+                    }
+
                     if (interaction) {
                         validateInteractionReferences(
                             this,
@@ -645,6 +686,14 @@ export class Game {
         }
 
         for (const entity of map.entities) {
+            if (entity.condition) {
+                validateConditionReferences(
+                    this,
+                    entity.condition,
+                    `Condition for entity "${entity.id}" in "${map.id}"`,
+                );
+            }
+
             if (!entity.interaction) continue;
 
             validateInteractionReferences(
@@ -1401,47 +1450,13 @@ export class Game {
             throw new Error("Cannot transition while dialogue is open.");
         }
 
-        if (!transition || typeof transition !== "object" || Array.isArray(transition)) {
-            throw new Error("Transition must be an object.");
-        }
-
-        const usesEntry = Object.hasOwn(transition, "entryId");
-        const usesPosition = Object.hasOwn(transition, "position");
-        if (usesEntry === usesPosition) {
-            throw new Error("Transition must define exactly one of entryId or position.");
-        }
-
         const mapId = transition.mapId;
         const map = this.mapsById.get(mapId);
-        if (!map) {
-            throw new Error(`Transition references missing map "${String(mapId)}".`);
-        }
-
-        let position;
-        let statusTarget;
-
-        if (usesEntry) {
-            requireExactKeys(transition, new Set(["mapId", "entryId"]), "Transition");
-            this.validateEntryReference(mapId, transition.entryId, "Transition");
-            position = map.entries[transition.entryId];
-            statusTarget = `Entry: ${transition.entryId}`;
-        } else {
-            requireExactKeys(transition, new Set(["mapId", "position"]), "Transition");
-            requireExactKeys(
-                transition.position,
-                new Set(["col", "row", "facing"]),
-                "Transition position",
-            );
-            this.validateEntry(transition.position, "Transition position");
-            this.validateMapPosition(
-                mapId,
-                transition.position.col,
-                transition.position.row,
-                "Transition position",
-            );
-            position = transition.position;
-            statusTarget = `Position: ${position.col},${position.row}`;
-        }
+        const usesEntry = Object.hasOwn(transition, "entryId");
+        const position = usesEntry ? map.entries[transition.entryId] : transition.position;
+        const statusTarget = usesEntry
+            ? `Entry: ${transition.entryId}`
+            : `Position: ${position.col},${position.row}`;
 
         const spatialData = this.buildSpatialData(map);
         this.validateTransitionCell(spatialData, position.col, position.row, "Transition position");
@@ -1470,16 +1485,10 @@ export class Game {
     }
 
     setFlag(flag, value) {
-        if (typeof flag !== "string" || flag.length === 0) {
-            throw new Error("Flag ID must be a non-empty string.");
-        }
         this.state.flags[flag] = value;
     }
 
     toggleFlag(flag) {
-        if (typeof flag !== "string" || flag.length === 0) {
-            throw new Error("Flag ID must be a non-empty string.");
-        }
         this.state.flags[flag] = !this.hasFlag(flag);
     }
 
@@ -1492,11 +1501,6 @@ export class Game {
     }
 
     addItem(itemId, quantity) {
-        this.validateItemReference(itemId, "Add item");
-        if (!Number.isInteger(quantity) || quantity <= 0) {
-            throw new Error("Item quantity must be a positive integer.");
-        }
-
         const itemState = this.state.inventory[itemId];
         if (itemState) {
             itemState.quantity += quantity;
@@ -1511,10 +1515,6 @@ export class Game {
     }
 
     removeItem(itemId, quantity) {
-        this.validateItemReference(itemId, "Remove item");
-        if (!Number.isInteger(quantity) || quantity <= 0) {
-            throw new Error("Item quantity must be a positive integer.");
-        }
         const itemState = this.state.inventory[itemId];
 
         if (!itemState || itemState.quantity < quantity) {
@@ -1617,22 +1617,14 @@ export class Game {
     }
 
     runEffects(effects, { mapId }) {
-        if (!this.mapsById.has(mapId)) {
-            throw new Error(`Effects reference missing map "${mapId}".`);
-        }
-
         runEffects(this, effects, mapId);
     }
 
     setPlayerSprite(spriteId) {
-        this.validatePlayerSpriteReference(spriteId, "Set player sprite");
         this.state.player.spriteId = spriteId;
     }
 
     setPlayerMoveSpeed(tilesPerSecond) {
-        if (!Number.isFinite(tilesPerSecond) || tilesPerSecond <= 0) {
-            throw new Error("Player movement speed must be a positive number.");
-        }
         this.state.player.movementSpeed = tilesPerSecond;
     }
 
