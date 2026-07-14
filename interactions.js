@@ -9,7 +9,7 @@ export const INTERACTIONS = {
         handler: "effects",
         trigger: "both",
         effects: [
-            { type: "addItem", itemId: "pink-orb" },
+            { type: "addItem", itemId: "pink-orb", quantity: 1 },
             { type: "playSound", soundId: "orb-collect" },
             { type: "setEntityActive", entityId: "pink-orb", active: false },
         ],
@@ -74,7 +74,7 @@ export const INTERACTIONS = {
         trigger: "both",
         effects: [
             { type: "setFlag", flag: "room03.orbCollected", value: true },
-            { type: "addItem", itemId: "blue-orb" },
+            { type: "addItem", itemId: "blue-orb", quantity: 1 },
             { type: "playSound", soundId: "orb-collect" },
             { type: "setTile", layer: "obstacles", col: 4, row: 3, tileId: -1 },
             { type: "setEntityActive", entityId: "blue-orb", active: false },

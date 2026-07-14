@@ -1,7 +1,9 @@
 import { AudioSystem } from "./audio.js";
 import { evaluateCondition, validateCondition } from "./conditions.js";
 import { DialogueBox } from "./dialogue.js";
-import { runEffects } from "./effects.js";
+import { runEffects, validateEffectsDefinition } from "./effects.js";
+import { InputController } from "./input.js";
+import { InventoryPanel } from "./inventory.js";
 import { DEFAULT_TILE_SIZE } from "./maps.js";
 import {
     INTERACTION_HANDLERS,
@@ -10,7 +12,7 @@ import {
 } from "./interactions.js";
 import { Player } from "./player.js";
 import { MUSIC, SOUNDS } from "./sounds.js";
-import { SPRITES } from "./sprites.js";
+import { PLAYER_SPRITES, SPRITES } from "./sprites.js";
 import { EMPTY_TILE_ID, TILES } from "./tiles.js";
 
 function cloneLayers(layers) {
@@ -51,22 +53,24 @@ function requireExactKeys(value, allowedKeys, label) {
 }
 
 export class Game {
-    constructor(canvas, authoredMaps) {
+    constructor(canvas, authoredMaps, authoredItems) {
         this.canvas = canvas;
         this.ctx = canvas.getContext("2d");
         this.ctx.imageSmoothingEnabled = false;
 
         this.authoredMaps = authoredMaps;
+        this.authoredItems = authoredItems;
         this.maps = [];
         this.mapsById = new Map();
         this.entityDefinitionsByMap = new Map();
+        this.itemDefinitions = new Map();
         this.activeSpatialData = null;
 
         const initialMap = authoredMaps[0];
         const initialEntry = initialMap.entries[initialMap.initialEntryId];
 
         this.state = {
-            version: 3,
+            version: 4,
 
             player: {
                 mapId: initialMap.id,
@@ -74,41 +78,38 @@ export class Game {
                 row: initialEntry.row,
                 facing: { ...initialEntry.facing },
                 spriteId: "default",
+                movementSpeed: 4.5,
             },
 
             flags: {},
 
-            inventory: [],
+            inventory: {},
 
             maps: Object.fromEntries(authoredMaps.map((map) => [map.id, createMapState(map)])),
         };
 
         this.images = new Map();
         this.spriteDefinitions = new Map(Object.entries(SPRITES));
+        this.playerSpriteDefinitions = new Map(Object.entries(PLAYER_SPRITES));
         this.audio = new AudioSystem(SOUNDS, MUSIC);
         this.dialogueBox = new DialogueBox(document.querySelector("#dialogue"));
-        this.uiMode = "exploration";
+        this.mode = "world";
+        this.selectedItemId = null;
         this.camera = { x: 0, y: 0 };
         this.player = new Player(DEFAULT_TILE_SIZE, this.state.player);
-
-        this.movementDirections = new Map([
-            ["ArrowUp", { dc: 0, dr: -1 }],
-            ["KeyW", { dc: 0, dr: -1 }],
-            ["ArrowDown", { dc: 0, dr: 1 }],
-            ["KeyS", { dc: 0, dr: 1 }],
-            ["ArrowLeft", { dc: -1, dr: 0 }],
-            ["KeyA", { dc: -1, dr: 0 }],
-            ["ArrowRight", { dc: 1, dr: 0 }],
-            ["KeyD", { dc: 1, dr: 0 }],
-        ]);
-        this.keysPressed = new Set();
-        this.movementKeyOrder = [];
         this.lastTime = performance.now();
 
         this.statusElement = document.querySelector("#status");
         this.eventLogElement = document.querySelector("#event-log");
-
-        this.bindInput();
+        this.inventoryPanel = new InventoryPanel({
+            rootElement: document.querySelector("#inventory"),
+            openButton: document.querySelector("#open-inventory"),
+            onOpen: () => this.openInventory(),
+            onClose: () => this.closeInventory(),
+            onUse: () => this.useSelectedItem(),
+            onSelect: (itemId) => this.selectInventoryItem(itemId),
+        });
+        this.input = new InputController(this);
     }
 
     async start() {
@@ -131,6 +132,8 @@ export class Game {
         }
 
         this.validateSpriteDefinitions();
+        this.validatePlayerSpriteDefinitions();
+        this.prepareItems();
 
         this.maps = this.authoredMaps.map((map) => ({
             ...map,
@@ -175,6 +178,51 @@ export class Game {
         }
 
         return tiles;
+    }
+
+    prepareItems() {
+        if (
+            !this.authoredItems ||
+            typeof this.authoredItems !== "object" ||
+            Array.isArray(this.authoredItems)
+        ) {
+            throw new Error("Item definitions must be an object.");
+        }
+
+        for (const [itemId, item] of Object.entries(this.authoredItems)) {
+            const label = `Item "${itemId}"`;
+            if (itemId.length === 0) {
+                throw new Error("Item definitions contain an empty ID.");
+            }
+
+            if (!item || typeof item !== "object" || Array.isArray(item)) {
+                throw new Error(`${label} must be an object.`);
+            }
+
+            requireExactKeys(
+                item,
+                new Set(["name", "icon", "description", "usable", "effects"]),
+                label,
+            );
+
+            for (const property of ["name", "icon", "description"]) {
+                if (typeof item[property] !== "string" || item[property].length === 0) {
+                    throw new Error(`${label}.${property} must be a non-empty string.`);
+                }
+            }
+
+            if (typeof item.usable !== "boolean") {
+                throw new Error(`${label}.usable must be a boolean.`);
+            }
+
+            if (item.usable) {
+                validateEffectsDefinition(item.effects, `Effects for ${label}`);
+            } else if (Object.hasOwn(item, "effects")) {
+                throw new Error(`${label} cannot define effects while usable is false.`);
+            }
+
+            this.itemDefinitions.set(itemId, item);
+        }
     }
 
     validateMap(map, isInitialMap) {
@@ -442,6 +490,40 @@ export class Game {
         }
     }
 
+    validatePlayerSpriteDefinitions() {
+        for (const [spriteId, sprite] of this.playerSpriteDefinitions) {
+            const label = `Player sprite "${spriteId}"`;
+            if (!sprite || typeof sprite !== "object" || Array.isArray(sprite)) {
+                throw new Error(`${label} is invalid.`);
+            }
+
+            if (sprite.kind === "shape") {
+                requireExactKeys(sprite, new Set(["kind", "fillStyle", "strokeStyle"]), label);
+
+                if (
+                    typeof sprite.fillStyle !== "string" ||
+                    sprite.fillStyle.length === 0 ||
+                    typeof sprite.strokeStyle !== "string" ||
+                    sprite.strokeStyle.length === 0
+                ) {
+                    throw new Error(`${label} must define fillStyle and strokeStyle.`);
+                }
+                continue;
+            }
+
+            if (sprite.kind === "image") {
+                requireExactKeys(sprite, new Set(["kind", "path", "size"]), label);
+                if (typeof sprite.path !== "string" || sprite.path.length === 0) {
+                    throw new Error(`${label} has no image path.`);
+                }
+                this.validateSize(sprite.size, label);
+                continue;
+            }
+
+            throw new Error(`${label} has unsupported kind "${String(sprite.kind)}".`);
+        }
+    }
+
     validateEntry(entry, label) {
         const validPosition =
             entry &&
@@ -517,6 +599,18 @@ export class Game {
     validateSpriteReference(spriteId, label) {
         if (typeof spriteId !== "string" || !this.spriteDefinitions.has(spriteId)) {
             throw new Error(`${label} references missing sprite "${String(spriteId)}".`);
+        }
+    }
+
+    validatePlayerSpriteReference(spriteId, label) {
+        if (typeof spriteId !== "string" || !this.playerSpriteDefinitions.has(spriteId)) {
+            throw new Error(`${label} references missing player sprite "${String(spriteId)}".`);
+        }
+    }
+
+    validateItemReference(itemId, label) {
+        if (typeof itemId !== "string" || !this.itemDefinitions.has(itemId)) {
+            throw new Error(`${label} references missing item "${String(itemId)}".`);
         }
     }
 
@@ -689,6 +783,16 @@ export class Game {
             paths.add(sprite.path);
         }
 
+        for (const sprite of this.playerSpriteDefinitions.values()) {
+            if (sprite.kind === "image") {
+                paths.add(sprite.path);
+            }
+        }
+
+        for (const item of this.itemDefinitions.values()) {
+            paths.add(item.icon);
+        }
+
         await Promise.all([...paths].map((path) => this.loadImage(path)));
     }
 
@@ -726,18 +830,18 @@ export class Game {
     }
 
     showText({ pages, speaker, afterClose, mapId }) {
-        if (this.uiMode !== "exploration") {
-            throw new Error(`Cannot open dialogue while UI mode is "${this.uiMode}".`);
+        if (this.mode !== "world") {
+            throw new Error(`Cannot open dialogue while game mode is "${this.mode}".`);
         }
 
-        this.uiMode = "dialogue";
-        this.clearMovementInput();
+        this.mode = "dialogue";
+        this.input.clearMovement();
 
         this.dialogueBox.open({
             pages: [...pages],
             speaker,
             onClose: () => {
-                this.uiMode = "exploration";
+                this.mode = "world";
 
                 if (afterClose !== null) {
                     this.runEffects(afterClose, { mapId });
@@ -747,7 +851,7 @@ export class Game {
     }
 
     advanceDialogue() {
-        if (this.uiMode !== "dialogue") {
+        if (this.mode !== "dialogue") {
             throw new Error("Cannot advance dialogue while dialogue mode is inactive.");
         }
 
@@ -755,17 +859,23 @@ export class Game {
     }
 
     transitionTo({ mapId, entryId }) {
+        if (this.mode === "dialogue") {
+            throw new Error("Cannot transition while dialogue is open.");
+        }
+
         this.validateEntryReference(mapId, entryId, "Transition");
 
         const map = this.mapsById.get(mapId);
         const entry = map.entries[entryId];
 
+        this.inventoryPanel.hide();
+        this.mode = "world";
         this.state.player.mapId = mapId;
         this.player.setPosition(entry.col, entry.row);
         this.player.setFacing(entry.facing.dc, entry.facing.dr);
         this.activeSpatialData = this.buildSpatialData(map);
 
-        this.clearMovementInput();
+        this.input.clearMovement();
         this.updateCamera();
         this.setStatus(`Map: ${mapId} -- Entry: ${entryId}`);
     }
@@ -783,7 +893,17 @@ export class Game {
     }
 
     setFlag(flag, value) {
+        if (typeof flag !== "string" || flag.length === 0) {
+            throw new Error("Flag ID must be a non-empty string.");
+        }
         this.state.flags[flag] = value;
+    }
+
+    toggleFlag(flag) {
+        if (typeof flag !== "string" || flag.length === 0) {
+            throw new Error("Flag ID must be a non-empty string.");
+        }
+        this.state.flags[flag] = !this.hasFlag(flag);
     }
 
     getFlag(flag) {
@@ -794,20 +914,125 @@ export class Game {
         return this.getFlag(flag) === true;
     }
 
-    addItem(itemId) {
-        if (!this.hasItem(itemId)) {
-            this.state.inventory.push(itemId);
+    addItem(itemId, quantity) {
+        this.validateItemReference(itemId, "Add item");
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+            throw new Error("Item quantity must be a positive integer.");
         }
+
+        const itemState = this.state.inventory[itemId];
+        if (itemState) {
+            itemState.quantity += quantity;
+        } else {
+            this.state.inventory[itemId] = {
+                quantity,
+                active: false,
+            };
+        }
+
+        this.refreshInventoryPanel();
     }
 
-    removeItem(itemId) {
-        this.state.inventory = this.state.inventory.filter(
-            (storedItemId) => storedItemId !== itemId,
-        );
+    removeItem(itemId, quantity) {
+        this.validateItemReference(itemId, "Remove item");
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+            throw new Error("Item quantity must be a positive integer.");
+        }
+        const itemState = this.state.inventory[itemId];
+
+        if (!itemState || itemState.quantity < quantity) {
+            throw new Error(`Cannot remove ${quantity} of item "${itemId}".`);
+        }
+
+        itemState.quantity -= quantity;
+        if (itemState.quantity === 0) {
+            delete this.state.inventory[itemId];
+            if (this.selectedItemId === itemId) {
+                this.selectedItemId = Object.keys(this.state.inventory)[0] ?? null;
+            }
+        }
+
+        this.refreshInventoryPanel();
+    }
+
+    consumeItem(itemId, quantity) {
+        this.removeItem(itemId, quantity);
     }
 
     hasItem(itemId) {
-        return this.state.inventory.includes(itemId);
+        const itemState = this.state.inventory[itemId];
+        return itemState !== undefined && itemState.quantity > 0;
+    }
+
+    setItemActive(itemId, active) {
+        this.validateItemReference(itemId, "Set item active");
+        if (typeof active !== "boolean") {
+            throw new Error("Item active state must be a boolean.");
+        }
+        const itemState = this.state.inventory[itemId];
+        if (!itemState) {
+            throw new Error(`Cannot set inactive inventory item "${itemId}".`);
+        }
+        itemState.active = active;
+        this.refreshInventoryPanel();
+    }
+
+    openInventory() {
+        if (this.mode !== "world") return false;
+
+        const ownedItemIds = Object.keys(this.state.inventory);
+        if (this.selectedItemId === null || !this.hasItem(this.selectedItemId)) {
+            this.selectedItemId = ownedItemIds[0] ?? null;
+        }
+
+        this.mode = "inventory";
+        this.input.clearMovement();
+        this.refreshInventoryPanel();
+        this.inventoryPanel.show();
+        return true;
+    }
+
+    closeInventory() {
+        if (this.mode !== "inventory") return false;
+
+        this.inventoryPanel.hide();
+        this.mode = "world";
+        this.input.clearMovement();
+        return true;
+    }
+
+    selectInventoryItem(itemId) {
+        if (this.mode !== "inventory" || !this.hasItem(itemId)) return false;
+        this.selectedItemId = itemId;
+        this.refreshInventoryPanel();
+        return true;
+    }
+
+    moveInventorySelection(step) {
+        const itemIds = Object.keys(this.state.inventory);
+        if (itemIds.length === 0) return false;
+
+        const currentIndex = Math.max(0, itemIds.indexOf(this.selectedItemId));
+        const nextIndex = (currentIndex + Math.sign(step) + itemIds.length) % itemIds.length;
+        this.selectedItemId = itemIds[nextIndex];
+        this.refreshInventoryPanel();
+        return true;
+    }
+
+    useSelectedItem() {
+        if (this.mode !== "inventory" || this.selectedItemId === null) return false;
+
+        const item = this.itemDefinitions.get(this.selectedItemId);
+        if (!item.usable) return false;
+
+        const sourceMapId = this.state.player.mapId;
+        this.closeInventory();
+        this.runEffects(item.effects, { mapId: sourceMapId });
+        return true;
+    }
+
+    refreshInventoryPanel() {
+        this.inventoryPanel.render(this.state.inventory, this.itemDefinitions, this.selectedItemId);
     }
 
     evaluateCondition(condition) {
@@ -820,6 +1045,18 @@ export class Game {
         }
 
         runEffects(this, effects, mapId);
+    }
+
+    setPlayerSprite(spriteId) {
+        this.validatePlayerSpriteReference(spriteId, "Set player sprite");
+        this.state.player.spriteId = spriteId;
+    }
+
+    setPlayerMoveSpeed(tilesPerSecond) {
+        if (!Number.isFinite(tilesPerSecond) || tilesPerSecond <= 0) {
+            throw new Error("Player movement speed must be a positive number.");
+        }
+        this.state.player.movementSpeed = tilesPerSecond;
     }
 
     getEntityState(mapId, entityId) {
@@ -864,68 +1101,6 @@ export class Game {
         this.state.maps[mapId].layers[layerName][row][col] = tileId;
     }
 
-    bindInput() {
-        window.addEventListener("keydown", (event) => {
-            if (this.movementDirections.has(event.code)) {
-                event.preventDefault();
-
-                if (this.uiMode !== "exploration") {
-                    return;
-                }
-
-                if (!event.repeat && !this.keysPressed.has(event.code)) {
-                    this.keysPressed.add(event.code);
-                    this.movementKeyOrder = this.movementKeyOrder.filter(
-                        (code) => code !== event.code,
-                    );
-                    this.movementKeyOrder.push(event.code);
-                }
-
-                return;
-            }
-
-            const isInteractionKey =
-                event.code === "KeyZ" || event.code === "Enter" || event.code === "NumpadEnter";
-
-            if (!isInteractionKey || event.repeat) return;
-
-            event.preventDefault();
-
-            if (this.uiMode === "dialogue") {
-                this.advanceDialogue();
-                return;
-            }
-
-            this.handleActionInteraction();
-        });
-
-        window.addEventListener("keyup", (event) => {
-            if (!this.movementDirections.has(event.code)) return;
-
-            this.keysPressed.delete(event.code);
-            this.movementKeyOrder = this.movementKeyOrder.filter((code) => code !== event.code);
-        });
-
-        window.addEventListener("blur", () => this.clearMovementInput());
-    }
-
-    clearMovementInput() {
-        this.keysPressed.clear();
-        this.movementKeyOrder.length = 0;
-    }
-
-    getActiveMovementDirection() {
-        for (let index = this.movementKeyOrder.length - 1; index >= 0; index -= 1) {
-            const code = this.movementKeyOrder[index];
-
-            if (this.keysPressed.has(code)) {
-                return this.movementDirections.get(code);
-            }
-        }
-
-        return null;
-    }
-
     canPlayerEnter(col, row) {
         const key = `${col},${row}`;
         return (
@@ -934,7 +1109,7 @@ export class Game {
     }
 
     handleActionInteraction() {
-        if (this.uiMode !== "exploration") return false;
+        if (this.mode !== "world") return false;
 
         const target = this.player.getInteraction(this.activeSpatialData.interactions, "action");
 
@@ -947,7 +1122,7 @@ export class Game {
     }
 
     handleTouchInteraction() {
-        if (this.uiMode !== "exploration") return false;
+        if (this.mode !== "world") return false;
 
         const target = this.player.getInteraction(this.activeSpatialData.interactions, "touch");
         if (!target) return false;
@@ -997,8 +1172,8 @@ export class Game {
             this.handleTouchInteraction();
         }
 
-        if (this.uiMode === "exploration" && !this.player.isMoving) {
-            const direction = this.getActiveMovementDirection();
+        if (this.mode === "world" && !this.player.isMoving) {
+            const direction = this.input.getActiveMovementDirection();
 
             if (direction) {
                 this.player.tryMove(direction.dc, direction.dr, (col, row) =>
@@ -1029,7 +1204,11 @@ export class Game {
         }
 
         this.renderEntities();
-        this.player.render(this.ctx, this.camera);
+
+        const playerSprite = this.playerSpriteDefinitions.get(this.state.player.spriteId);
+        const playerImage =
+            playerSprite.kind === "image" ? this.images.get(playerSprite.path) : null;
+        this.player.render(this.ctx, this.camera, playerSprite, playerImage);
     }
 
     renderLayer(layer) {

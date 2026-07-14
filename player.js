@@ -12,10 +12,6 @@ export class Player {
 
         this.isMoving = false;
         this.moveProgress = 1;
-        this.moveDurationMs = 220;
-
-        this.fillStyle = "#f2f4ff";
-        this.strokeStyle = "#141821";
     }
 
     get col() {
@@ -74,7 +70,8 @@ export class Player {
     update(deltaMs) {
         if (!this.isMoving) return false;
 
-        this.moveProgress += deltaMs / this.moveDurationMs;
+        const moveDurationMs = 1000 / this.state.movementSpeed;
+        this.moveProgress += deltaMs / moveDurationMs;
         const t = Math.min(this.moveProgress, 1);
         const eased = t * t * (3 - 2 * t);
 
@@ -124,21 +121,30 @@ export class Player {
         ];
     }
 
-    render(ctx, camera) {
+    render(ctx, camera, sprite, image) {
+        const drawX = Math.round(this.x - camera.x);
+        const drawY = Math.round(this.y - camera.y);
+
+        if (sprite.kind === "image") {
+            const [width, height] = sprite.size;
+            ctx.drawImage(image, drawX, drawY, width, height);
+            return;
+        }
+
         const inset = Math.round(this.tileSize * 0.18);
         const size = this.tileSize - inset * 2;
-        const drawX = Math.round(this.x - camera.x + inset);
-        const drawY = Math.round(this.y - camera.y + inset);
+        const shapeX = drawX + inset;
+        const shapeY = drawY + inset;
 
-        ctx.fillStyle = this.fillStyle;
-        ctx.fillRect(drawX, drawY, size, size);
+        ctx.fillStyle = sprite.fillStyle;
+        ctx.fillRect(shapeX, shapeY, size, size);
 
-        ctx.strokeStyle = this.strokeStyle;
+        ctx.strokeStyle = sprite.strokeStyle;
         ctx.lineWidth = 3;
-        ctx.strokeRect(drawX, drawY, size, size);
+        ctx.strokeRect(shapeX, shapeY, size, size);
 
-        const centerX = drawX + size / 2;
-        const centerY = drawY + size / 2;
+        const centerX = shapeX + size / 2;
+        const centerY = shapeY + size / 2;
         const length = size * 0.35;
 
         ctx.beginPath();

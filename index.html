@@ -11,10 +11,37 @@
     <section>
       <div class="game-viewport">
         <canvas id="game" width="960" height="640" aria-label="Game canvas"></canvas>
+
         <div id="dialogue" class="dialogue" role="dialog" aria-live="polite" hidden>
           <div class="dialogue-speaker" data-dialogue-speaker hidden></div>
           <div class="dialogue-text" data-dialogue-text></div>
           <div class="dialogue-prompt" data-dialogue-prompt></div>
+        </div>
+
+        <div id="inventory" class="inventory" role="dialog" aria-modal="true" aria-labelledby="inventory-title" hidden>
+          <section class="inventory-window">
+            <header class="inventory-header">
+              <h2 id="inventory-title">Inventory</h2>
+              <button type="button" data-inventory-close>Close</button>
+            </header>
+
+            <div class="inventory-content">
+              <div class="inventory-list-panel">
+                <div class="inventory-list" data-inventory-list></div>
+                <p class="inventory-empty" data-inventory-empty>Inventory is empty.</p>
+              </div>
+
+              <section class="inventory-details" aria-live="polite">
+                <img class="inventory-details-icon" data-inventory-icon alt="" hidden>
+                <h3 data-inventory-name>No item selected</h3>
+                <p class="inventory-quantity" data-inventory-quantity></p>
+                <p data-inventory-description>Select an item to inspect it.</p>
+                <button type="button" data-inventory-use disabled>Use</button>
+              </section>
+            </div>
+
+            <p class="inventory-help">Arrow keys / WASD: select · Z / Enter: use · Escape / I: close</p>
+          </section>
         </div>
       </div>
     </section>
@@ -23,6 +50,8 @@
       <h1>Exploration Prototype</h1>
       <p>Move: Arrow keys or WASD</p>
       <p>Interact / advance text: Z or Enter</p>
+      <p>Inventory: I or Escape</p>
+      <button id="open-inventory" type="button" aria-controls="inventory" aria-expanded="false">Open inventory</button>
       <p id="status">Loading…</p>
       <pre id="event-log" aria-live="polite"></pre>
     </aside>

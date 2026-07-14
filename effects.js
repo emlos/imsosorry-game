@@ -18,6 +18,18 @@ function requireInteger(value, label) {
     }
 }
 
+function requirePositiveInteger(value, label) {
+    if (!Number.isInteger(value) || value <= 0) {
+        throw new Error(`${label} must be a positive integer.`);
+    }
+}
+
+function requirePositiveNumber(value, label) {
+    if (!Number.isFinite(value) || value <= 0) {
+        throw new Error(`${label} must be a positive number.`);
+    }
+}
+
 function requireBoolean(value, label) {
     if (typeof value !== "boolean") {
         throw new Error(`${label} must be a boolean.`);
@@ -51,18 +63,28 @@ const EFFECT_HANDLERS = new Map([
         "setFlag",
         {
             rebuild: "active",
-
             validateDefinition({ effect, label }) {
                 requireExactKeys(effect, effectKeys("flag", "value"), label);
                 requireString(effect.flag, `${label}.flag`);
-
                 if (!Object.hasOwn(effect, "value")) {
                     throw new Error(`${label} must define value.`);
                 }
             },
-
             execute({ game, effect }) {
                 game.setFlag(effect.flag, effect.value);
+            },
+        },
+    ],
+    [
+        "toggleFlag",
+        {
+            rebuild: "active",
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, effectKeys("flag"), label);
+                requireString(effect.flag, `${label}.flag`);
+            },
+            execute({ game, effect }) {
+                game.toggleFlag(effect.flag);
             },
         },
     ],
@@ -70,14 +92,16 @@ const EFFECT_HANDLERS = new Map([
         "addItem",
         {
             rebuild: "active",
-
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, effectKeys("itemId"), label);
+                requireExactKeys(effect, effectKeys("itemId", "quantity"), label);
                 requireString(effect.itemId, `${label}.itemId`);
+                requirePositiveInteger(effect.quantity, `${label}.quantity`);
             },
-
+            validateReferences({ game, effect, label }) {
+                game.validateItemReference(effect.itemId, label);
+            },
             execute({ game, effect }) {
-                game.addItem(effect.itemId);
+                game.addItem(effect.itemId, effect.quantity);
             },
         },
     ],
@@ -85,14 +109,62 @@ const EFFECT_HANDLERS = new Map([
         "removeItem",
         {
             rebuild: "active",
-
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, effectKeys("itemId"), label);
+                requireExactKeys(effect, effectKeys("itemId", "quantity"), label);
                 requireString(effect.itemId, `${label}.itemId`);
+                requirePositiveInteger(effect.quantity, `${label}.quantity`);
             },
-
+            validateReferences({ game, effect, label }) {
+                game.validateItemReference(effect.itemId, label);
+            },
             execute({ game, effect }) {
-                game.removeItem(effect.itemId);
+                game.removeItem(effect.itemId, effect.quantity);
+            },
+        },
+    ],
+    [
+        "consumeItem",
+        {
+            rebuild: "active",
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, effectKeys("itemId", "quantity"), label);
+                requireString(effect.itemId, `${label}.itemId`);
+                requirePositiveInteger(effect.quantity, `${label}.quantity`);
+            },
+            validateReferences({ game, effect, label }) {
+                game.validateItemReference(effect.itemId, label);
+            },
+            execute({ game, effect }) {
+                game.consumeItem(effect.itemId, effect.quantity);
+            },
+        },
+    ],
+    [
+        "setPlayerSprite",
+        {
+            rebuild: false,
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, effectKeys("spriteId"), label);
+                requireString(effect.spriteId, `${label}.spriteId`);
+            },
+            validateReferences({ game, effect, label }) {
+                game.validatePlayerSpriteReference(effect.spriteId, label);
+            },
+            execute({ game, effect }) {
+                game.setPlayerSprite(effect.spriteId);
+            },
+        },
+    ],
+    [
+        "setPlayerMoveSpeed",
+        {
+            rebuild: false,
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, effectKeys("tilesPerSecond"), label);
+                requirePositiveNumber(effect.tilesPerSecond, `${label}.tilesPerSecond`);
+            },
+            execute({ game, effect }) {
+                game.setPlayerMoveSpeed(effect.tilesPerSecond);
             },
         },
     ],
@@ -100,17 +172,14 @@ const EFFECT_HANDLERS = new Map([
         "setEntityActive",
         {
             rebuild: "sourceMap",
-
             validateDefinition({ effect, label }) {
                 requireExactKeys(effect, effectKeys("entityId", "active"), label);
                 requireString(effect.entityId, `${label}.entityId`);
                 requireBoolean(effect.active, `${label}.active`);
             },
-
             validateReferences({ game, effect, mapId, label }) {
                 game.validateEntityReference(mapId, effect.entityId, label);
             },
-
             execute({ game, effect, mapId }) {
                 game.setEntityActive(mapId, effect.entityId, effect.active);
             },
@@ -120,19 +189,16 @@ const EFFECT_HANDLERS = new Map([
         "setEntityPosition",
         {
             rebuild: "sourceMap",
-
             validateDefinition({ effect, label }) {
                 requireExactKeys(effect, effectKeys("entityId", "col", "row"), label);
                 requireString(effect.entityId, `${label}.entityId`);
                 requireInteger(effect.col, `${label}.col`);
                 requireInteger(effect.row, `${label}.row`);
             },
-
             validateReferences({ game, effect, mapId, label }) {
                 game.validateEntityReference(mapId, effect.entityId, label);
                 game.validateMapPosition(mapId, effect.col, effect.row, label);
             },
-
             execute({ game, effect, mapId }) {
                 game.setEntityPosition(mapId, effect.entityId, effect.col, effect.row);
             },
@@ -142,18 +208,15 @@ const EFFECT_HANDLERS = new Map([
         "setEntitySprite",
         {
             rebuild: false,
-
             validateDefinition({ effect, label }) {
                 requireExactKeys(effect, effectKeys("entityId", "spriteId"), label);
                 requireString(effect.entityId, `${label}.entityId`);
                 requireString(effect.spriteId, `${label}.spriteId`);
             },
-
             validateReferences({ game, effect, mapId, label }) {
                 game.validateEntityReference(mapId, effect.entityId, label);
                 game.validateSpriteReference(effect.spriteId, label);
             },
-
             execute({ game, effect, mapId }) {
                 game.setEntitySprite(mapId, effect.entityId, effect.spriteId);
             },
@@ -163,17 +226,14 @@ const EFFECT_HANDLERS = new Map([
         "setEntityCollision",
         {
             rebuild: "sourceMap",
-
             validateDefinition({ effect, label }) {
                 requireExactKeys(effect, effectKeys("entityId", "collision"), label);
                 requireString(effect.entityId, `${label}.entityId`);
                 requireBoolean(effect.collision, `${label}.collision`);
             },
-
             validateReferences({ game, effect, mapId, label }) {
                 game.validateEntityReference(mapId, effect.entityId, label);
             },
-
             execute({ game, effect, mapId }) {
                 game.setEntityCollision(mapId, effect.entityId, effect.collision);
             },
@@ -183,13 +243,11 @@ const EFFECT_HANDLERS = new Map([
         "setTile",
         {
             rebuild: "sourceMap",
-
             validateDefinition({ effect, label }) {
                 requireExactKeys(effect, effectKeys("layer", "col", "row", "tileId"), label);
                 requireString(effect.layer, `${label}.layer`);
                 requireInteger(effect.col, `${label}.col`);
                 requireInteger(effect.row, `${label}.row`);
-
                 if (!Number.isInteger(effect.tileId)) {
                     throw new Error(`${label}.tileId must be an integer.`);
                 }
@@ -205,9 +263,25 @@ const EFFECT_HANDLERS = new Map([
                     label,
                 );
             },
-
             execute({ game, effect, mapId }) {
                 game.setTile(mapId, effect.layer, effect.col, effect.row, effect.tileId);
+            },
+        },
+    ],
+    [
+        "teleport",
+        {
+            rebuild: false,
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, effectKeys("mapId", "entryId"), label);
+                requireString(effect.mapId, `${label}.mapId`);
+                requireString(effect.entryId, `${label}.entryId`);
+            },
+            validateReferences({ game, effect, label }) {
+                game.validateEntryReference(effect.mapId, effect.entryId, label);
+            },
+            execute({ game, effect }) {
+                game.transitionTo({ mapId: effect.mapId, entryId: effect.entryId });
             },
         },
     ],
@@ -215,18 +289,43 @@ const EFFECT_HANDLERS = new Map([
         "playSound",
         {
             rebuild: false,
-
             validateDefinition({ effect, label }) {
                 requireExactKeys(effect, effectKeys("soundId"), label);
                 requireString(effect.soundId, `${label}.soundId`);
             },
-
             validateReferences({ game, effect, label }) {
                 game.validateSoundReference(effect.soundId, label);
             },
-
             execute({ game, effect }) {
                 game.playSound(effect.soundId);
+            },
+        },
+    ],
+    [
+        "playMusic",
+        {
+            rebuild: false,
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, effectKeys("musicId"), label);
+                requireString(effect.musicId, `${label}.musicId`);
+            },
+            validateReferences({ game, effect, label }) {
+                game.validateMusicReference(effect.musicId, label);
+            },
+            execute({ game, effect }) {
+                game.playMusic(effect.musicId);
+            },
+        },
+    ],
+    [
+        "stopMusic",
+        {
+            rebuild: false,
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, effectKeys(), label);
+            },
+            execute({ game }) {
+                game.stopMusic();
             },
         },
     ],
@@ -234,7 +333,6 @@ const EFFECT_HANDLERS = new Map([
         "showText",
         {
             rebuild: false,
-
             validateDefinition({ effect, label }) {
                 requireExactKeys(effect, effectKeys("pages", "speaker", "afterClose"), label);
                 validatePages(effect.pages, `${label}.pages`);
@@ -247,7 +345,6 @@ const EFFECT_HANDLERS = new Map([
                     validateEffectsDefinition(effect.afterClose, `${label}.afterClose`);
                 }
             },
-
             validateReferences({ game, effect, mapId, label }) {
                 if (effect.afterClose !== undefined) {
                     validateEffectsReferences(
@@ -258,7 +355,6 @@ const EFFECT_HANDLERS = new Map([
                     );
                 }
             },
-
             execute({ game, effect, mapId }) {
                 game.showText({
                     pages: effect.pages,
