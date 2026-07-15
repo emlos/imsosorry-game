@@ -15,7 +15,7 @@ The editor works on a `structuredClone()` of `MAPS`. It never edits `Game.maps` 
 - CSS-only canvas zoom from 50% to 400%, with buttons and Ctrl/Cmd-wheel cursor anchoring.
 - Entity presets, placement, dragging, deletion, and basic property editing.
 - Entry placement, facing, renaming, reference display, and deletion.
-- Exit range display, entry-target form editing, and raw JSON editing for advanced forms.
+- Exit range display, entry-target form editing, reciprocal opposite-edge room connections, and raw JSON editing for advanced forms.
 - Full-document undo/redo snapshots grouped by completed action.
 - Generated JavaScript and JSON export, import, local recovery, and pre-import backup.
 - Real-game playtesting with the editor document and validation result reporting.
@@ -23,6 +23,5 @@ The editor works on a `structuredClone()` of `MAPS`. It never edits `Game.maps` 
 editor does not create tile or sprite assets, edit atlas coordinates, edit animation clips, visually construct conditions/effect sequences, simulate runtime mutations, or modify live save data.
 
 ## TODO
-- convenience for building maps: auto connect two rooms by edge, should only work for edges with the same col, graphical editor? map graph? simple - just for overview
 - map grouping, at least visually in the editor
 - connected to TODO in sprite/tile.js - button to set whether current tile/entity should be mirrored

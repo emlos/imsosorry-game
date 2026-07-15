@@ -22,6 +22,114 @@ export function getMapSize(map) {
     };
 }
 
+export const OPPOSITE_EDGE = {
+    north: "south",
+    south: "north",
+    east: "west",
+    west: "east",
+};
+
+export function getEdgeAxisLength(map, edge) {
+    if (!Object.hasOwn(OPPOSITE_EDGE, edge)) {
+        throw new Error(`Unknown map edge "${String(edge)}".`);
+    }
+
+    const { width, height } = getMapSize(map);
+    return edge === "east" || edge === "west" ? height : width;
+}
+
+export function rangesOverlap(first, second) {
+    return first[0] <= second[1] && second[0] <= first[1];
+}
+
+function validateConnectionRange(range) {
+    if (
+        !Array.isArray(range) ||
+        range.length !== 2 ||
+        !range.every(Number.isInteger) ||
+        range[0] < 0 ||
+        range[1] < range[0]
+    ) {
+        throw new Error("Connection range must contain two ordered non-negative integers.");
+    }
+}
+
+function assertNoOverlappingExit(map, edge, range) {
+    const overlappingIndex = (map.exits ?? []).findIndex(
+        (exit) =>
+            exit?.edge === edge &&
+            Array.isArray(exit.range) &&
+            exit.range.length === 2 &&
+            rangesOverlap(exit.range, range),
+    );
+
+    if (overlappingIndex >= 0) {
+        throw new Error(
+            `The ${edge} edge of "${map.id}" already has an overlapping exit at index ${overlappingIndex}.`,
+        );
+    }
+}
+
+export function createReciprocalEdgeConnection(
+    sourceMap,
+    targetMap,
+    sourceEdge,
+    targetEdge,
+    range,
+) {
+    if (!sourceMap || !targetMap || sourceMap === targetMap || sourceMap.id === targetMap.id) {
+        throw new Error("Source and target maps must be different.");
+    }
+
+    if (!Object.hasOwn(OPPOSITE_EDGE, sourceEdge)) {
+        throw new Error(`Unknown source edge "${String(sourceEdge)}".`);
+    }
+
+    const requiredTargetEdge = OPPOSITE_EDGE[sourceEdge];
+    if (targetEdge !== requiredTargetEdge) {
+        throw new Error(
+            `Target edge must be the opposite edge (${sourceEdge} to ${requiredTargetEdge}).`,
+        );
+    }
+
+    validateConnectionRange(range);
+
+    const sourceLimit = getEdgeAxisLength(sourceMap, sourceEdge);
+    const targetLimit = getEdgeAxisLength(targetMap, targetEdge);
+    if (range[1] >= sourceLimit) {
+        throw new Error(
+            `Connection range ${range[0]}–${range[1]} exceeds the ${sourceEdge} edge of "${sourceMap.id}".`,
+        );
+    }
+    if (range[1] >= targetLimit) {
+        throw new Error(
+            `Connection range ${range[0]}–${range[1]} exceeds the ${targetEdge} edge of "${targetMap.id}".`,
+        );
+    }
+
+    assertNoOverlappingExit(sourceMap, sourceEdge, range);
+    assertNoOverlappingExit(targetMap, targetEdge, range);
+
+    return {
+        sourceExit: {
+            edge: sourceEdge,
+            range: [...range],
+            targetMapId: targetMap.id,
+            targetEdge,
+            preserveAxis: true,
+            offset: 0,
+        },
+        targetExit: {
+            edge: targetEdge,
+            range: [...range],
+            targetMapId: sourceMap.id,
+            targetEdge: sourceEdge,
+            preserveAxis: true,
+            offset: 0,
+        },
+    };
+}
+
 export function createMap(id, width = 10, height = 8) {
     return {
         id,

@@ -10,12 +10,15 @@ import {
     canPlaceTile,
     cloneData,
     createMap,
+    createReciprocalEdgeConnection,
     fillRectangle,
     floodFill,
+    getEdgeAxisLength,
     getMapSize,
     ensureLayer,
     makeUniqueId,
     mergeTileDefinitions,
+    OPPOSITE_EDGE,
     parseImportedMaps,
     renameEntity,
     renameEntry,
@@ -304,6 +307,15 @@ export class MapEditor {
             (event) => (this.selectedEntityPreset = event.target.value),
         );
         byId("add-exit").addEventListener("click", () => this.addExit());
+        byId("connection-source-edge").addEventListener("change", () =>
+            this.renderConnectionControls(),
+        );
+        byId("connection-target-map").addEventListener("change", () =>
+            this.renderConnectionControls(),
+        );
+        byId("create-reciprocal-connection").addEventListener("click", () =>
+            this.createReciprocalConnection(),
+        );
 
         this.canvas.addEventListener("pointerdown", (event) => this.onPointerDown(event));
         this.canvas.addEventListener("pointermove", (event) => this.onPointerMove(event));
@@ -468,6 +480,7 @@ export class MapEditor {
             ...Object.keys(this.currentMap.entries).map((entryId) => new Option(entryId, entryId)),
         );
         initialSelect.value = this.currentMap.initialEntryId ?? "";
+        this.renderConnectionControls();
     }
 
     updateModeUI() {
@@ -571,6 +584,116 @@ export class MapEditor {
             });
             root.append(button);
         });
+    }
+
+    renderConnectionControls() {
+        const sourceMap = this.currentMap;
+        if (!sourceMap) return;
+
+        const sourceMapInput = byId("connection-source-map");
+        const sourceChanged = sourceMapInput.value !== sourceMap.id;
+        sourceMapInput.value = sourceMap.id;
+
+        const sourceEdgeSelect = byId("connection-source-edge");
+        const sourceEdge = Object.hasOwn(OPPOSITE_EDGE, sourceEdgeSelect.value)
+            ? sourceEdgeSelect.value
+            : "north";
+        sourceEdgeSelect.value = sourceEdge;
+
+        const targetMapSelect = byId("connection-target-map");
+        const previousTargetId = targetMapSelect.value;
+        const targetMaps = this.maps.filter((map) => map.id !== sourceMap.id);
+        targetMapSelect.replaceChildren(
+            ...targetMaps.map((map) => new Option(map.id, map.id)),
+        );
+
+        if (targetMaps.some((map) => map.id === previousTargetId)) {
+            targetMapSelect.value = previousTargetId;
+        } else if (targetMaps.length > 0) {
+            targetMapSelect.value = targetMaps[0].id;
+        }
+
+        const targetEdge = OPPOSITE_EDGE[sourceEdge];
+        byId("connection-target-edge").value = targetEdge;
+
+        const targetMap = targetMaps.find((map) => map.id === targetMapSelect.value) ?? null;
+        const maximumAxis = targetMap
+            ? Math.min(
+                  getEdgeAxisLength(sourceMap, sourceEdge),
+                  getEdgeAxisLength(targetMap, targetEdge),
+              ) - 1
+            : -1;
+
+        const startInput = byId("connection-range-start");
+        const endInput = byId("connection-range-end");
+        const button = byId("create-reciprocal-connection");
+        const disabled = maximumAxis < 0;
+
+        startInput.disabled = disabled;
+        endInput.disabled = disabled;
+        button.disabled = disabled;
+        targetMapSelect.disabled = targetMaps.length === 0;
+        startInput.max = String(Math.max(0, maximumAxis));
+        endInput.max = String(Math.max(0, maximumAxis));
+
+        const currentStart = Number(startInput.value);
+        const currentEnd = Number(endInput.value);
+        if (sourceChanged || !Number.isInteger(currentStart) || currentStart < 0) {
+            startInput.value = "0";
+        } else if (currentStart > maximumAxis) {
+            startInput.value = String(Math.max(0, maximumAxis));
+        }
+
+        const normalizedStart = Number(startInput.value);
+        if (
+            sourceChanged ||
+            !Number.isInteger(currentEnd) ||
+            currentEnd < normalizedStart ||
+            currentEnd > maximumAxis
+        ) {
+            endInput.value = String(Math.max(normalizedStart, maximumAxis));
+        }
+    }
+
+    async createReciprocalConnection() {
+        try {
+            const sourceMap = this.currentMap;
+            const targetMapId = byId("connection-target-map").value;
+            const targetMap = this.maps.find((map) => map.id === targetMapId);
+            if (!targetMap) throw new Error("Choose a target map.");
+
+            const sourceEdge = byId("connection-source-edge").value;
+            const targetEdge = byId("connection-target-edge").value;
+            const range = [
+                Number(byId("connection-range-start").value),
+                Number(byId("connection-range-end").value),
+            ];
+            const { sourceExit, targetExit } = createReciprocalEdgeConnection(
+                sourceMap,
+                targetMap,
+                sourceEdge,
+                targetEdge,
+                range,
+            );
+            const sourceExitIndex = sourceMap.exits.length;
+
+            this.commitMutation("Create reciprocal connection", () => {
+                sourceMap.exits.push(sourceExit);
+                targetMap.exits.push(targetExit);
+            });
+
+            this.selectedExitIndex = sourceExitIndex;
+            this.selectedEntityId = null;
+            this.selectedEntryId = null;
+            this.mode = "exits";
+            await this.refreshAfterMutation();
+            this.updateModeUI();
+            this.setStatus(
+                `Connected "${sourceMap.id}" ${sourceEdge} to "${targetMap.id}" ${targetEdge}. Unsaved editor changes.`,
+            );
+        } catch (error) {
+            this.setStatus(error.message, true);
+        }
     }
 
     onCanvasWheel(event) {

@@ -307,6 +307,19 @@ p {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.connection-panel {
+    margin-top: 0.85rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid #3b3d48;
+}
+.connection-panel h3 {
+    margin: 0 0 0.65rem;
+    font-size: 0.86rem;
+    color: #d6d8e0;
+}
+.connection-panel > button {
+    width: 100%;
+}
 .reference-list {
     font-size: 0.8rem;
     color: #aeb1bd;

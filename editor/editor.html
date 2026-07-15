@@ -101,6 +101,27 @@
                 <h2>Exit ranges</h2>
                 <button id="add-exit" type="button">Add exit</button>
                 <div id="exit-list" class="compact-list"></div>
+
+                <div class="connection-panel">
+                    <h3>Connect rooms</h3>
+                    <label>Source map<input id="connection-source-map" type="text" readonly></label>
+                    <label>Source edge<select id="connection-source-edge">
+                            <option value="north">North</option>
+                            <option value="south">South</option>
+                            <option value="west">West</option>
+                            <option value="east">East</option>
+                        </select></label>
+                    <div class="field-pair">
+                        <label>Range start<input id="connection-range-start" type="number" min="0" step="1"></label>
+                        <label>Range end<input id="connection-range-end" type="number" min="0" step="1"></label>
+                    </div>
+                    <label>Target map<select id="connection-target-map"></select></label>
+                    <label>Target edge<input id="connection-target-edge" type="text" readonly></label>
+                    <button id="create-reciprocal-connection" type="button">
+                        Create reciprocal connection
+                    </button>
+                    <p class="hint">Creates zero-offset preserved-axis exits on opposite edges.</p>
+                </div>
             </section>
 
             <section id="palette-section">
