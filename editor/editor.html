@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Yume Map Editor</title>
+    <link rel="stylesheet" href="./editor.css">
+</head>
+
+<body>
+    <header class="topbar">
+        <div>
+            <h1>Yume Map Editor</h1>
+            <p id="document-status">Loaded project maps.</p>
+        </div>
+        <div class="top-actions">
+            <button id="undo" type="button">Undo</button>
+            <button id="redo" type="button">Redo</button>
+            <button id="save-recovery" type="button">Save recovery</button>
+            <button id="restore-recovery" type="button">Restore recovery</button>
+            <button id="restore-backup" type="button">Restore pre-import backup</button>
+            <button id="export-js" type="button">Export maps.generated.js</button>
+            <button id="export-json" type="button">Export JSON</button>
+            <label class="file-button">Import<input id="import-file" type="file"
+                    accept=".js,.json,application/json,text/javascript"></label>
+            <button id="playtest" type="button" class="primary">Playtest</button>
+            <a href="../index.html">Game</a>
+        </div>
+    </header>
+
+    <main class="workspace">
+        <aside class="panel left-panel">
+            <section>
+                <h2>Map</h2>
+                <label>Current map<select id="map-select"></select></label>
+                <div class="button-row">
+                    <button id="new-map" type="button">New</button>
+                    <button id="duplicate-map" type="button">Duplicate</button>
+                    <button id="delete-map" type="button">Delete</button>
+                </div>
+                <label>Map ID<input id="map-id" type="text"></label>
+                <div class="field-pair">
+                    <label>Width<input id="map-width" type="number" min="1" step="1"></label>
+                    <label>Height<input id="map-height" type="number" min="1" step="1"></label>
+                </div>
+                <button id="resize-map" type="button">Resize from top-left</button>
+                <label>Initial entry<select id="initial-entry"></select></label>
+            </section>
+
+            <section>
+                <h2>Mode</h2>
+                <div id="mode-buttons" class="segmented">
+                    <button data-mode="tiles" class="selected" type="button">Tiles</button>
+                    <button data-mode="entities" type="button">Entities</button>
+                    <button data-mode="entries" type="button">Entries</button>
+                    <button data-mode="exits" type="button">Exits</button>
+                </div>
+            </section>
+
+            <section id="tile-tools-section">
+                <h2>Tile tools</h2>
+                <label>Active layer<select id="active-layer">
+                        <option value="base">Base</option>
+                        <option value="obstacles" selected>Obstacles</option>
+                        <option value="foreground">Foreground</option>
+                    </select></label>
+                <div id="tool-buttons" class="tool-grid">
+                    <button data-tool="pencil" class="selected" type="button">Pencil</button>
+                    <button data-tool="eraser" type="button">Eraser</button>
+                    <button data-tool="rectangle" type="button">Rectangle</button>
+                    <button data-tool="fill" type="button">Fill</button>
+                    <button data-tool="eyedropper" type="button">Eyedropper</button>
+                </div>
+                <fieldset>
+                    <legend>Visible layers</legend>
+                    <label class="check"><input data-layer-visible="base" type="checkbox" checked> Base</label>
+                    <label class="check"><input data-layer-visible="obstacles" type="checkbox" checked>
+                        Obstacles</label>
+                    <label class="check"><input data-layer-visible="foreground" type="checkbox" checked>
+                        Foreground</label>
+                </fieldset>
+                <div class="check-grid">
+                    <label class="check"><input id="show-grid" type="checkbox" checked> Grid</label>
+                    <label class="check"><input id="show-collision" type="checkbox"> Collision</label>
+                    <label class="check"><input id="show-footprints" type="checkbox"> Footprints</label>
+                </div>
+            </section>
+
+            <section id="entity-tools-section" hidden>
+                <h2>Entity placement</h2>
+                <label>Preset<select id="entity-preset"></select></label>
+                <p class="hint">Click an empty cell to place. Drag an existing entity to move it.</p>
+            </section>
+
+            <section id="entry-tools-section" hidden>
+                <h2>Entry placement</h2>
+                <p class="hint">Click an existing marker to select it. Click an empty cell to place a new entry.</p>
+            </section>
+
+            <section id="exit-tools-section" hidden>
+                <h2>Exit ranges</h2>
+                <button id="add-exit" type="button">Add exit</button>
+                <div id="exit-list" class="compact-list"></div>
+            </section>
+
+            <section id="palette-section">
+                <h2>Tile palette</h2>
+                <div id="tile-palette" class="palette"></div>
+            </section>
+        </aside>
+
+        <section class="canvas-column">
+            <div id="canvas-scroll" class="canvas-scroll">
+                <canvas id="editor-canvas" width="320" height="256"></canvas>
+            </div>
+            <div class="canvas-status">
+                <span id="cursor-position">Cell: —</span>
+                <span id="selection-status">No selection</span>
+            </div>
+            <section class="validation-panel">
+                <h2>Structural validation</h2>
+                <div id="validation-output"></div>
+                <div id="playtest-output" class="playtest-result">Full game validation has not run for this edit.</div>
+            </section>
+        </section>
+
+        <aside class="panel right-panel">
+            <section id="map-inspector">
+                <h2>Inspector</h2>
+                <p>Select an entity, entry, or exit to edit it.</p>
+            </section>
+
+            <section id="entity-inspector" hidden>
+                <h2>Entity</h2>
+                <label>ID<input id="entity-id" type="text"></label>
+                <label>Sprite<select id="entity-sprite"></select></label>
+                <div class="field-pair">
+                    <label>Column<input id="entity-col" type="number" min="0"></label>
+                    <label>Row<input id="entity-row" type="number" min="0"></label>
+                </div>
+                <label class="check"><input id="entity-active" type="checkbox"> Active</label>
+                <label class="check"><input id="entity-collision" type="checkbox"> Collision</label>
+                <label>Interaction JSON<textarea id="entity-interaction" rows="12"
+                        spellcheck="false"></textarea></label>
+                <div class="button-row">
+                    <button id="apply-entity" type="button">Apply</button>
+                    <button id="delete-entity" type="button" class="danger">Delete</button>
+                </div>
+            </section>
+
+            <section id="entry-inspector" hidden>
+                <h2>Entry</h2>
+                <label>ID<input id="entry-id" type="text"></label>
+                <div class="field-pair">
+                    <label>Column<input id="entry-col" type="number" min="0"></label>
+                    <label>Row<input id="entry-row" type="number" min="0"></label>
+                </div>
+                <label>Facing<select id="entry-facing">
+                        <option value="up">Up</option>
+                        <option value="down">Down</option>
+                        <option value="left">Left</option>
+                        <option value="right">Right</option>
+                    </select></label>
+                <label class="check"><input id="entry-initial" type="checkbox"> Initial entry</label>
+                <div id="entry-references" class="reference-list"></div>
+                <div class="button-row">
+                    <button id="apply-entry" type="button">Apply</button>
+                    <button id="delete-entry" type="button" class="danger">Delete</button>
+                </div>
+            </section>
+
+            <section id="exit-inspector" hidden>
+                <h2>Exit</h2>
+                <label>Edge<select id="exit-edge">
+                        <option value="north">North</option>
+                        <option value="south">South</option>
+                        <option value="west">West</option>
+                        <option value="east">East</option>
+                    </select></label>
+                <div class="field-pair">
+                    <label>Range start<input id="exit-range-start" type="number" min="0"></label>
+                    <label>Range end<input id="exit-range-end" type="number" min="0"></label>
+                </div>
+                <label>Target map<select id="exit-target-map"></select></label>
+                <label>Target entry<select id="exit-target-entry"></select></label>
+                <details>
+                    <summary>Advanced raw exit JSON</summary>
+                    <textarea id="exit-json" rows="12" spellcheck="false"></textarea>
+                </details>
+                <div class="button-row">
+                    <button id="apply-exit" type="button">Apply</button>
+                    <button id="delete-exit" type="button" class="danger">Delete</button>
+                </div>
+            </section>
+
+            <section>
+                <h2>Import pasted data</h2>
+                <textarea id="import-text" rows="10" spellcheck="false"
+                    placeholder="Paste JSON or generated maps.generated.js here"></textarea>
+                <button id="import-text-button" type="button">Replace document</button>
+            </section>
+        </aside>
+    </main>
+
+    <script type="module" src="./editor.js"></script>
+</body>
+
+</html>

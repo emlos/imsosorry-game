@@ -309,3 +309,15 @@ h1 {
 .save-status[data-error="true"] {
     color: #ffb8b8;
 }
+
+.editor-link {
+    display: inline-block;
+    margin-top: 0.75rem;
+    color: inherit;
+}
+
+.start-actions {
+    display: grid;
+    justify-items: center;
+    gap: 0.75rem;
+}
