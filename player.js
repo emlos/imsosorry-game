@@ -1,3 +1,5 @@
+import { drawImageVisual } from "./animation.js";
+
 export class Player {
     constructor(tileSize, state) {
         this.tileSize = tileSize;
@@ -43,6 +45,8 @@ export class Player {
     setFacing(dc, dr) {
         this.state.facing = { dc, dr };
     }
+
+    //TODO: less tile-to-tile movement, more continuous movement, no ease out/in, keep it liniear
 
     startMove(col, row) {
         if (this.isMoving) {
@@ -104,14 +108,12 @@ export class Player {
         return [{ col: this.col + dc, row: this.row + dr }];
     }
 
-    render(ctx, camera, sprite, image) {
+    render(ctx, camera, sprite, image, frame) {
         if (sprite.kind === "image") {
             const [width, height] = sprite.size;
-            const drawX = Math.round(
-                this.x + (this.tileSize - width) / 2 - camera.x,
-            );
+            const drawX = Math.round(this.x + (this.tileSize - width) / 2 - camera.x);
             const drawY = Math.round(this.y + this.tileSize - height - camera.y);
-            ctx.drawImage(image, drawX, drawY, width, height);
+            drawImageVisual(ctx, image, sprite, frame, drawX, drawY);
             return;
         }
 

@@ -24,4 +24,12 @@ export const ITEMS = {
         description: "A test collectible whose current inventory ownership is authoritative.",
         usable: false,
     },
+
+    //TODO: future; allow animated icons in inventory
+    "animation-test-token": {
+        name: "Animation Test Token",
+        icon: "./assets/items/orb_gold.png",
+        description: "A bright token used to keep the animation-test inventory available.",
+        usable: false,
+    },
 };
