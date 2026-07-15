@@ -13,6 +13,7 @@ import {
     fillRectangle,
     floodFill,
     getMapSize,
+    ensureLayer,
     makeUniqueId,
     mergeTileDefinitions,
     parseImportedMaps,
@@ -225,6 +226,25 @@ export class MapEditor {
         byId("active-layer").addEventListener("change", (event) => {
             this.activeLayer = event.target.value;
             this.renderPalette();
+        });
+        byId("clear-layer").addEventListener("click", () => {
+            const layerName = this.activeLayer;
+            const warning =
+                layerName === "base"
+                    ? "Clearing the base layer will make the map unplayable until floor tiles are added. Clear every cell in the base layer?"
+                    : `Clear every cell in the ${layerName} layer?`;
+
+            if (!confirm(warning)) return;
+
+            this.commitMutation("Clear layer", () => {
+                const layer = ensureLayer(this.currentMap, layerName);
+
+                for (const row of layer) {
+                    row.fill(EMPTY_TILE_ID);
+                }
+            });
+
+            this.refreshAfterMutation();
         });
         document.querySelectorAll("[data-layer-visible]").forEach((input) => {
             input.addEventListener("change", () => {

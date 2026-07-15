@@ -324,6 +324,9 @@ export function validateEditorDocument(maps) {
 
         const width = base[0].length;
         const height = base.length;
+        if (!base.some((row) => row.some((tileId) => tileId !== EMPTY_TILE_ID))) {
+            errors.push(`Map "${map.id}" has no walkable base cells.`);
+        }
         const tiles = mergeTileDefinitions(map);
         for (const [layerName, layer] of Object.entries(map.layers)) {
             if (!allowedLayers.has(layerName)) {

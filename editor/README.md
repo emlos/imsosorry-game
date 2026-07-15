@@ -9,7 +9,7 @@ The editor works on a `structuredClone()` of `MAPS`. It never edits `Game.maps` 
 - Map creation, duplication, renaming, top-left resize, deletion, and initial-entry selection.
 - Base and obstacle layer editing.
 - Existing foreground layers are preserved and previewed, but are not currently editable.
-- Pencil, eraser, rectangle, flood-fill, and eyedropper tools.
+- Pencil, eraser, rectangle, flood-fill, eyedropper, and active-layer clearing tools.
 - Atlas-aware static and animated previews.
 - Grid, layer visibility, collision, footprint, entry, and exit overlays.
 - Entity presets, placement, dragging, deletion, and basic property editing.
@@ -24,8 +24,6 @@ editor does not create tile or sprite assets, edit atlas coordinates, edit anima
 ## TODO
 - convenience for building maps: auto connect two rooms by edge, should only work for edges with the same col, graphical editor? map graph? simple - just for overview
 - zoom in/out via scrollwheel/buttons in the #canvas-scroll
-- clear layer button for convenience
-
 - map grouping, at least visually in the editor
 - allow to paint empty tiles too, just liek any other tile type
 - connected to TODO in sprite/tile.js - button to set whether current tile/entity should be mirrored
