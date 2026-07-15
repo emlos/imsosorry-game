@@ -9,6 +9,27 @@ export const TILE_EDITOR_META = {
     [TILE_IDS.TREE]: { label: "Tree", category: "Nature" },
     [TILE_IDS.GLITTERING_CRYSTAL]: { label: "Glittering crystal", category: "Interactables" },
     [TILE_IDS.PLACEHOLDER_OBSTACLE]: { label: "Placeholder obstacle", category: "Debug" },
+
+    [TILE_IDS.FOREST_FLOOR_MOSS]: { label: "Forest floor", category: "Ground" },
+    [TILE_IDS.FOREST_FLOOR_CHECKER]: { label: "Checker floor", category: "Ground" },
+    [TILE_IDS.STONE_CRACK_FLOOR]: { label: "Cracked stone floor", category: "Ground" },
+    [TILE_IDS.PETAL_FLOOR]: { label: "Petal floor", category: "Ground" },
+    [TILE_IDS.STONE_BRICK_WALL]: { label: "Stone brick wall", category: "Architecture" },
+    [TILE_IDS.ROUND_BUSH]: { label: "Round bush", category: "Nature" },
+    [TILE_IDS.WIDE_HEDGE]: { label: "Wide hedge", category: "Nature" },
+    [TILE_IDS.CYPRESS_TREE]: { label: "Cypress tree", category: "Nature" },
+    [TILE_IDS.RUIN_SHRINE]: { label: "Ruin shrine", category: "Architecture" },
+    [TILE_IDS.CRYSTAL_TOTEM]: { label: "Crystal totem", category: "Interactables" },
+    [TILE_IDS.DARK_TILE_FLOOR]: { label: "Dark tile floor", category: "Ground" },
+    [TILE_IDS.METAL_GRATE_FLOOR]: { label: "Metal grate floor", category: "Ground" },
+    [TILE_IDS.RED_CARPET_FLOOR]: { label: "Red carpet floor", category: "Ground" },
+    [TILE_IDS.SAND_FLOOR]: { label: "Sand floor", category: "Ground" },
+    [TILE_IDS.WOODEN_CRATE]: { label: "Wooden crate", category: "Architecture" },
+    [TILE_IDS.SPIKE_TRAP]: { label: "Spike trap", category: "Hazards" },
+    [TILE_IDS.BOOKSHELF_WIDE]: { label: "Wide bookshelf", category: "Architecture" },
+    [TILE_IDS.GIANT_MUSHROOM]: { label: "Giant mushroom", category: "Nature" },
+    [TILE_IDS.STONE_FOUNTAIN]: { label: "Stone fountain", category: "Architecture" },
+    [TILE_IDS.ARCANE_VAT]: { label: "Arcane vat", category: "Interactables" },
 };
 
 export const SPRITE_EDITOR_META = {
@@ -20,6 +41,15 @@ export const SPRITE_EDITOR_META = {
     "animated-save-point": { label: "Animated save point", category: "Interactables" },
     "glass-figure": { label: "Glass figure", category: "Characters" },
     placeholder: { label: "Placeholder", category: "Debug" },
+
+    "forest-sign": { label: "Forest sign", category: "Decor" },
+    "glowing-flower": { label: "Glowing flower", category: "Decor" },
+    "stone-statue": { label: "Stone statue", category: "Characters" },
+    lantern: { label: "Lantern", category: "Interactables" },
+    "control-console": { label: "Control console", category: "Interactables" },
+    "violet-orb": { label: "Violet orb", category: "Collectibles" },
+    "robed-figure": { label: "Robed figure", category: "Characters" },
+    "signal-beacon": { label: "Signal beacon", category: "Interactables" },
 };
 
 export const ENTITY_PRESETS = {
@@ -57,6 +87,43 @@ export const ENTITY_PRESETS = {
             spriteId: "animated-save-point",
             collision: true,
             interaction: COMMON_INTERACTIONS.SAVE_POINT,
+        },
+    },
+
+    forestSign: {
+        label: "Forest sign",
+        entity: {
+            active: true,
+            spriteId: "forest-sign",
+            collision: true,
+            interaction: null,
+        },
+    },
+    lantern: {
+        label: "Lantern",
+        entity: {
+            active: true,
+            spriteId: "lantern",
+            collision: true,
+            interaction: null,
+        },
+    },
+    console: {
+        label: "Control console",
+        entity: {
+            active: true,
+            spriteId: "control-console",
+            collision: true,
+            interaction: null,
+        },
+    },
+    signalBeacon: {
+        label: "Signal beacon",
+        entity: {
+            active: true,
+            spriteId: "signal-beacon",
+            collision: true,
+            interaction: null,
         },
     },
 };

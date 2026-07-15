@@ -710,6 +710,14 @@ export const MAPS = [
                     dr: -1,
                 },
             },
+            fromAtlasTest: {
+                col: 1,
+                row: 8,
+                facing: {
+                    dc: 0,
+                    dr: -1,
+                },
+            },
         },
         exits: [],
         tiles: {},
@@ -827,6 +835,23 @@ export const MAPS = [
                     message: "The test token can now keep the inventory open.",
                 },
             },
+            {
+                id: "atlas-test-door",
+                active: true,
+                col: 1,
+                row: 9,
+                spriteId: "door",
+                collision: true,
+                interaction: {
+                    handler: "teleport",
+                    triggers: ["action"],
+                    params: {
+                        mapId: "room-atlas-test",
+                        entryId: "fromAnimationTest",
+                    },
+                    message: "The door opens into the atlas test gallery.",
+                },
+            },
         ],
         layers: {
             base: [
@@ -851,7 +876,216 @@ export const MAPS = [
                 [2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 2],
                 [2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 2],
                 [2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 2],
-                [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+                [2, -1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+            ],
+        },
+    },
+
+    {
+        id: "room-atlas-test",
+        initialEntryId: "fromAnimationTest",
+        entries: {
+            fromAnimationTest: {
+                col: 6,
+                row: 8,
+                facing: {
+                    dc: 0,
+                    dr: -1,
+                },
+            },
+        },
+        exits: [],
+        tiles: {},
+        entities: [
+            {
+                id: "return-door",
+                active: true,
+                col: 6,
+                row: 9,
+                spriteId: "door",
+                collision: true,
+                interaction: {
+                    handler: "teleport",
+                    triggers: ["action"],
+                    params: {
+                        mapId: "room-animation-test",
+                        entryId: "fromAtlasTest",
+                    },
+                    message: "You return to the animation test room.",
+                },
+            },
+            {
+                id: "forest-sign",
+                active: true,
+                col: 3,
+                row: 4,
+                spriteId: "forest-sign",
+                collision: true,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            pages: [
+                                "Atlas A occupies the upper half of this room.",
+                                "Atlas B occupies the lower half.",
+                            ],
+                        },
+                    ],
+                },
+            },
+            {
+                id: "glowing-flower",
+                active: true,
+                col: 4,
+                row: 4,
+                spriteId: "glowing-flower",
+                collision: false,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            pages: ["The small flower is a static atlas-backed entity."],
+                        },
+                    ],
+                },
+            },
+            {
+                id: "stone-statue",
+                active: true,
+                col: 7,
+                row: 4,
+                spriteId: "stone-statue",
+                collision: true,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            pages: ["The statue is 32\u00d764 but occupies one logical cell."],
+                        },
+                    ],
+                },
+            },
+            {
+                id: "lantern",
+                active: true,
+                col: 10,
+                row: 4,
+                spriteId: "lantern",
+                collision: false,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            pages: ["The lantern continues animating while this dialogue is open."],
+                        },
+                    ],
+                },
+            },
+            {
+                id: "control-console",
+                active: true,
+                col: 2,
+                row: 7,
+                spriteId: "control-console",
+                collision: true,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            pages: ["The console is a static region from Atlas B."],
+                        },
+                    ],
+                },
+            },
+            {
+                id: "violet-orb",
+                active: true,
+                col: 5,
+                row: 7,
+                spriteId: "violet-orb",
+                collision: false,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            pages: ["A violet orb used only as an atlas-backed sprite test."],
+                        },
+                    ],
+                },
+            },
+            {
+                id: "robed-figure",
+                active: true,
+                col: 7,
+                row: 7,
+                spriteId: "robed-figure",
+                collision: true,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            pages: ["The robed figure is another 32\u00d764 entity sprite."],
+                        },
+                    ],
+                },
+            },
+            {
+                id: "signal-beacon",
+                active: true,
+                col: 9,
+                row: 7,
+                spriteId: "signal-beacon",
+                collision: false,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            pages: ["The signal beacon blinks from a horizontal atlas strip."],
+                        },
+                    ],
+                },
+            },
+        ],
+        layers: {
+            base: [
+                [7, 7, 8, 8, 9, 9, 10, 10, 7, 7, 8, 8, 9, 9],
+                [7, 8, 7, 8, 9, 10, 9, 10, 7, 8, 7, 8, 9, 10],
+                [8, 8, 7, 7, 10, 10, 9, 9, 8, 8, 7, 7, 10, 10],
+                [7, 7, 8, 8, 9, 9, 10, 10, 7, 7, 8, 8, 9, 9],
+                [10, 9, 8, 7, 10, 9, 8, 7, 10, 9, 8, 7, 10, 9],
+                [17, 17, 18, 18, 19, 19, 20, 20, 17, 17, 18, 18, 19, 19],
+                [17, 18, 17, 18, 19, 20, 19, 20, 17, 18, 17, 18, 19, 20],
+                [18, 18, 17, 17, 20, 20, 19, 19, 18, 18, 17, 17, 20, 20],
+                [17, 17, 18, 18, 19, 19, 20, 20, 17, 17, 18, 18, 19, 19],
+                [20, 19, 18, 17, 20, 19, 18, 17, 20, 19, 18, 17, 20, 19],
+            ],
+            obstacles: [
+                [11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11],
+                [11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 11],
+                [11, -1, 13, -1, -1, -1, -1, -1, 15, -1, -1, -1, -1, 11],
+                [11, -1, -1, -1, -1, 14, -1, -1, -1, -1, -1, 16, -1, 11],
+                [11, -1, 26, -1, -1, -1, -1, -1, -1, -1, -1, -1, 12, 11],
+                [11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 11],
+                [11, -1, 21, -1, 22, -1, 23, -1, -1, 24, 25, -1, -1, 11],
+                [11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 11],
+                [11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 11],
+                [11, 11, 11, 11, 11, 11, -1, 11, 11, 11, 11, 11, 11, 11],
             ],
         },
     },

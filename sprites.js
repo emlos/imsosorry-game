@@ -1,5 +1,7 @@
-import { WORLD_ATLAS_PATH } from "./tiles.js";
+//TODO: once all atlaseses are within a list, remove the need to import them one by one
+import { EDITOR_TEST_ATLAS_A_PATH, EDITOR_TEST_ATLAS_B_PATH, WORLD_ATLAS_PATH } from "./tiles.js";
 
+//TODO: keep sprites in atlases instead of individual images - remove the ability to use individual images for sprites, no backwards compatibility needed
 export const SPRITES = {
     door: {
         path: WORLD_ATLAS_PATH,
@@ -46,6 +48,74 @@ export const SPRITES = {
     placeholder: {
         path: "./assets/debug/placeholder.png",
         size: [32, 32],
+    },
+    "forest-sign": {
+        path: EDITOR_TEST_ATLAS_A_PATH,
+        source: [192, 0, 32, 32],
+        size: [32, 32],
+    },
+    "glowing-flower": {
+        path: EDITOR_TEST_ATLAS_A_PATH,
+        source: [224, 0, 32, 32],
+        size: [32, 32],
+    },
+    "stone-statue": {
+        path: EDITOR_TEST_ATLAS_A_PATH,
+        source: [160, 32, 32, 64],
+        size: [32, 64],
+    },
+    lantern: {
+        path: EDITOR_TEST_ATLAS_A_PATH,
+        source: [128, 96, 32, 32],
+        size: [32, 32],
+        defaultAnimation: "glow",
+        animations: {
+            glow: {
+                fps: 6,
+                frames: [
+                    [0, 0],
+                    [1, 0],
+                    [2, 0],
+                    [3, 0],
+                    [2, 0],
+                    [1, 0],
+                ],
+            },
+        },
+    },
+    "control-console": {
+        path: EDITOR_TEST_ATLAS_B_PATH,
+        source: [192, 0, 32, 32],
+        size: [32, 32],
+    },
+    "violet-orb": {
+        path: EDITOR_TEST_ATLAS_B_PATH,
+        source: [224, 0, 32, 32],
+        size: [32, 32],
+    },
+    "robed-figure": {
+        path: EDITOR_TEST_ATLAS_B_PATH,
+        source: [160, 32, 32, 64],
+        size: [32, 64],
+    },
+    "signal-beacon": {
+        path: EDITOR_TEST_ATLAS_B_PATH,
+        source: [128, 96, 32, 32],
+        size: [32, 32],
+        defaultAnimation: "blink",
+        animations: {
+            blink: {
+                fps: 7,
+                frames: [
+                    [0, 0],
+                    [1, 0],
+                    [2, 0],
+                    [3, 0],
+                    [2, 0],
+                    [1, 0],
+                ],
+            },
+        },
     },
 };
 
