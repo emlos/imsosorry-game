@@ -129,10 +129,7 @@ export class Game {
 
     async start() {
         this.prepareMaps();
-        await Promise.all([
-            this.audio.prepare(),
-            this.preloadAllImages(),
-        ]);
+        await Promise.all([this.audio.prepare(), this.preloadAllImages()]);
 
         const initialMap = this.maps[0];
         this.transitionTo({
@@ -289,8 +286,7 @@ export class Game {
                 }
 
                 row.forEach((tileId, colIndex) => {
-                    const cellLabel =
-                        `Tile cell ${colIndex},${rowIndex} in layer "${layerName}" of map "${map.id}"`;
+                    const cellLabel = `Tile cell ${colIndex},${rowIndex} in layer "${layerName}" of map "${map.id}"`;
                     requireInteger(tileId, cellLabel);
                     if (tileId === EMPTY_TILE_ID) return;
 
@@ -416,7 +412,11 @@ export class Game {
         for (let firstIndex = 0; firstIndex < map.exits.length; firstIndex += 1) {
             const first = map.exits[firstIndex];
 
-            for (let secondIndex = firstIndex + 1; secondIndex < map.exits.length; secondIndex += 1) {
+            for (
+                let secondIndex = firstIndex + 1;
+                secondIndex < map.exits.length;
+                secondIndex += 1
+            ) {
                 const second = map.exits[secondIndex];
                 if (first.edge !== second.edge) continue;
 
@@ -978,9 +978,7 @@ export class Game {
     }
 
     collectUsedTileIdsByMap() {
-        const usedTileIdsByMap = new Map(
-            this.maps.map((map) => [map.id, new Set()]),
-        );
+        const usedTileIdsByMap = new Map(this.maps.map((map) => [map.id, new Set()]));
 
         for (const map of this.maps) {
             const usedTileIds = usedTileIdsByMap.get(map.id);
@@ -1013,9 +1011,7 @@ export class Game {
             }
         }
 
-        const scannedTilesByMap = new Map(
-            this.maps.map((map) => [map.id, new Set()]),
-        );
+        const scannedTilesByMap = new Map(this.maps.map((map) => [map.id, new Set()]));
         let foundUnscannedTile = true;
         while (foundUnscannedTile) {
             foundUnscannedTile = false;
@@ -1994,10 +1990,11 @@ export class Game {
         const deltaMs = Math.min(time - this.lastTime, 50);
         this.lastTime = time;
 
+        // Keep the loop alive even if the current update or render throws.
+        requestAnimationFrame((nextTime) => this.loop(nextTime));
+
         this.update(deltaMs);
         this.render();
-
-        requestAnimationFrame((nextTime) => this.loop(nextTime));
     }
 
     setStatus(text) {
