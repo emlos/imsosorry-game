@@ -186,6 +186,7 @@ export class MapEditor {
             this.selectedMapId = id;
             await this.refreshDocumentUI();
         });
+        byId("copy-current-map").addEventListener("click", () => this.copyCurrentMap());
         byId("delete-map").addEventListener("click", async () => {
             if (this.maps.length <= 1)
                 return this.setStatus("The document must keep at least one map.", true);
@@ -1160,6 +1161,17 @@ export class MapEditor {
         this.setStatus(
             "Imported map data. The previous document was stored as a pre-import backup.",
         );
+    }
+
+    async copyCurrentMap() {
+        const text = JSON.stringify(this.currentMap, null, 4);
+
+        try {
+            await navigator.clipboard.writeText(text);
+            this.setStatus(`Copied map "${this.currentMap.id}".`);
+        } catch {
+            this.setStatus("The browser did not allow clipboard access.", true);
+        }
     }
 
     playtest() {

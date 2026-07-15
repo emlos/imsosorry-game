@@ -127,8 +127,8 @@ p {
 }
 
 .workspace {
-    display: grid;
-    grid-template-columns: 280px minmax(520px, 1fr) 310px;
+    display: flex;
+    flex-direction: row;
     height: calc(100vh - 68px);
 }
 .panel {
@@ -187,6 +187,7 @@ p {
     display: grid;
     grid-template-rows: minmax(0, 1fr) auto auto;
     background: #0d0e13;
+    flex-grow: 1;
 }
 .canvas-scroll {
     overflow: auto;

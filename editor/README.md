@@ -6,7 +6,7 @@ The editor works on a `structuredClone()` of `MAPS`. It never edits `Game.maps` 
 
 ## Implemented
 
-- Map creation, duplication, renaming, top-left resize, deletion, and initial-entry selection.
+- Map creation, duplication, selected-map clipboard copying, renaming, top-left resize, deletion, and initial-entry selection.
 - Base and obstacle layer editing.
 - Existing foreground layers are preserved and previewed, but are not currently editable.
 - Pencil, eraser, rectangle, flood-fill, eyedropper, Empty palette selection, and active-layer clearing tools.
