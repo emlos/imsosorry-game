@@ -38,6 +38,14 @@ export const MAPS = [
                 preserveAxis: true,
                 offset: 0,
             },
+            {
+                edge: "south",
+                range: [1, 8],
+                targetMapId: "room-01-east",
+                targetEdge: "north",
+                preserveAxis: true,
+                offset: 0,
+            },
         ],
         tiles: {},
         entities: [
@@ -880,7 +888,6 @@ export const MAPS = [
             ],
         },
     },
-
     {
         id: "room-atlas-test",
         initialEntryId: "fromAnimationTest",
@@ -966,7 +973,7 @@ export const MAPS = [
                     effects: [
                         {
                             type: "showText",
-                            pages: ["The statue is 32\u00d764 but occupies one logical cell."],
+                            pages: ["The statue is 32×64 but occupies one logical cell."],
                         },
                     ],
                 },
@@ -1038,7 +1045,7 @@ export const MAPS = [
                     effects: [
                         {
                             type: "showText",
-                            pages: ["The robed figure is another 32\u00d764 entity sprite."],
+                            pages: ["The robed figure is another 32×64 entity sprite."],
                         },
                     ],
                 },
@@ -1086,6 +1093,82 @@ export const MAPS = [
                 [11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 11],
                 [11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 11],
                 [11, 11, 11, 11, 11, 11, -1, 11, 11, 11, 11, 11, 11, 11],
+            ],
+        },
+    },
+    {
+        id: "room-01-east",
+        initialEntryId: "start",
+        entries: {
+            start: {
+                col: 1,
+                row: 1,
+                facing: {
+                    dc: 0,
+                    dr: 1,
+                },
+            },
+        },
+        exits: [
+            {
+                edge: "north",
+                range: [1, 8],
+                targetMapId: "room-01",
+                targetEdge: "south",
+                preserveAxis: true,
+                offset: 0,
+            },
+        ],
+        tiles: {},
+        entities: [
+            {
+                id: "animatedSavePoint",
+                active: true,
+                spriteId: "animated-save-point",
+                collision: true,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            speaker: "Save Point",
+                            pages: [
+                                "A small light holds perfectly still inside the glass.",
+                                "For a moment, the shape of the dream becomes easy to remember.",
+                            ],
+                            afterClose: [
+                                {
+                                    type: "saveGame",
+                                },
+                            ],
+                        },
+                    ],
+                },
+                col: 5,
+                row: 4,
+            },
+        ],
+        layers: {
+            base: [
+                [9, 20, 20, 20, 20, 20, 20, 20, 9, 9],
+                [9, 20, 20, 20, 20, 20, 20, 20, 9, 9],
+                [9, 20, 20, 20, 20, 20, 20, 20, 9, 9],
+                [9, 20, 20, 20, 20, 20, 20, 20, 9, 9],
+                [9, 20, 20, 20, 20, 20, 20, 20, 9, 9],
+                [9, 20, 20, 20, 20, 20, 20, 20, 9, 9],
+                [9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+                [9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+            ],
+            obstacles: [
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, 24, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, 24, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, 24, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, 16, -1, -1, -1, -1, -1, 16, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
             ],
         },
     },

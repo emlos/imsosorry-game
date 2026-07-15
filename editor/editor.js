@@ -255,7 +255,10 @@ export class MapEditor {
         this.canvas.addEventListener("pointerup", (event) => this.onPointerUp(event));
         this.canvas.addEventListener("pointercancel", (event) => this.onPointerUp(event));
         this.canvas.addEventListener("pointerleave", () => {
-            if (!this.pointerAction) byId("cursor-position").textContent = "Cell: —";
+            if (this.pointerAction?.kind === "brush") {
+                this.pointerAction.lastKey = null;
+            }
+            byId("cursor-position").textContent = "Cell: —";
         });
         this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
@@ -545,8 +548,17 @@ export class MapEditor {
 
     onPointerMove(event) {
         const cell = this.getCell(event);
-        byId("cursor-position").textContent = cell ? `Cell: ${cell.col}, ${cell.row}` : "Cell: —";
-        if (!cell || !this.pointerAction) return;
+        if (!cell) {
+            if (this.pointerAction?.kind === "brush") {
+                this.pointerAction.lastKey = null;
+            }
+
+            byId("cursor-position").textContent = "Cell: —";
+            return;
+        }
+
+        byId("cursor-position").textContent = `Cell: ${cell.col}, ${cell.row}`;
+        if (!this.pointerAction) return;
 
         if (this.pointerAction.kind === "brush") {
             this.paintCell(cell);
@@ -640,15 +652,19 @@ export class MapEditor {
     paintCell(cell) {
         const key = `${cell.col},${cell.row}`;
         if (this.pointerAction.lastKey === key) return;
+
         this.pointerAction.lastKey = key;
+
         const tileId = this.pointerAction.erase ? EMPTY_TILE_ID : this.selectedTileId;
-        if (!setTile(this.currentMap, this.activeLayer, cell.col, cell.row, tileId)) {
-            if (tileId !== EMPTY_TILE_ID)
-                this.setStatus(
-                    "Placement rejected: invalid layer or footprint outside the map.",
-                    true,
-                );
+
+        if (!canPlaceTile(this.currentMap, this.activeLayer, tileId, cell.col, cell.row)) {
+            this.setStatus("Placement rejected: invalid layer or footprint outside the map.", true);
+            return;
         }
+
+        setTile(this.currentMap, this.activeLayer, cell.col, cell.row, tileId);
+
+        this.setStatus("Painting. Unsaved editor changes.");
     }
 
     startEntityAction(cell) {

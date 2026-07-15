@@ -1,6 +1,8 @@
 const ACTION_KEYS = new Set(["KeyZ", "Enter", "NumpadEnter"]);
 const INVENTORY_KEYS = new Set(["KeyI", "Escape"]);
 
+//TODO: allow diagnoal movement
+//TODO: dont adhere player strictly to the grid, allow for some movement in between tiles - lest say movement on an invisible grid of 1/4 tile increments, and allow for movement in between tiles?
 export class InputController {
     constructor(game) {
         this.game = game;

@@ -10,6 +10,7 @@ import {
 export const INTERACTION_TRIGGERS = new Set(["action", "touch"]);
 
 export const COMMON_INTERACTIONS = {
+    //TODO for common interactions with text: allow for passing of custom text in editor/entity settings
     SAVE_POINT: {
         handler: "effects",
         triggers: ["action"],
