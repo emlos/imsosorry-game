@@ -51,6 +51,29 @@ function downloadText(filename, text, type) {
     URL.revokeObjectURL(url);
 }
 
+function renderEmptyPreview(ctx) {
+    const { width, height } = ctx.canvas;
+    const cellSize = 8;
+
+    ctx.clearRect(0, 0, width, height);
+
+    for (let row = 0; row < Math.ceil(height / cellSize); row += 1) {
+        for (let col = 0; col < Math.ceil(width / cellSize); col += 1) {
+            ctx.fillStyle = (row + col) % 2 === 0 ? "#20232b" : "#2c303a";
+            ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+        }
+    }
+
+    ctx.strokeStyle = "#8c929f";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(8, 8);
+    ctx.lineTo(width - 8, height - 8);
+    ctx.moveTo(width - 8, 8);
+    ctx.lineTo(8, height - 8);
+    ctx.stroke();
+}
+
 export class MapEditor {
     constructor() {
         this.maps = cloneData(MAPS);
@@ -456,7 +479,18 @@ export class MapEditor {
         this.palettePreviews = [];
         const merged = mergeTileDefinitions(this.currentMap);
         const localIds = new Set(Object.keys(this.currentMap.tiles ?? {}).map(String));
-        const categories = new Map();
+        const categories = new Map([
+            [
+                "Utility",
+                [
+                    {
+                        tileId: EMPTY_TILE_ID,
+                        tile: null,
+                        label: "Empty",
+                    },
+                ],
+            ],
+        ]);
 
         for (const [rawId, tile] of Object.entries(merged)) {
             const tileId = Number(rawId);
@@ -494,7 +528,12 @@ export class MapEditor {
                     this.renderPalette();
                 });
                 list.append(button);
-                this.palettePreviews.push({ ctx: canvas.getContext("2d"), visual: item.tile });
+                const previewContext = canvas.getContext("2d");
+                if (item.tile === null) {
+                    renderEmptyPreview(previewContext);
+                } else {
+                    this.palettePreviews.push({ ctx: previewContext, visual: item.tile });
+                }
             }
             section.append(title, list);
             root.append(section);
@@ -635,12 +674,10 @@ export class MapEditor {
         if (this.tool === "eyedropper") {
             if (!layer) return;
             const tileId = layer[cell.row][cell.col];
-            if (tileId !== EMPTY_TILE_ID) {
-                this.selectedTileId = tileId;
-                this.tool = "pencil";
-                this.updateButtonSelection("#tool-buttons button", "tool", this.tool);
-                this.renderPalette();
-            }
+            this.selectedTileId = tileId;
+            this.tool = "pencil";
+            this.updateButtonSelection("#tool-buttons button", "tool", this.tool);
+            this.renderPalette();
             return;
         }
         if (this.tool === "fill") {
