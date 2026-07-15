@@ -1,3 +1,4 @@
+export const DEFAULT_TILE_SIZE = 32;
 export const EMPTY_TILE_ID = -1;
 
 export const TILE_IDS = {
@@ -6,8 +7,6 @@ export const TILE_IDS = {
     WALL: 2,
     WIDE_WALL: 3,
 };
-//TODO: move tile size to here from maps.js
-
 //TODO: allow collission independently of size, e.g for a tree, a 2x1 tile, where only the bottom has collission, and the top is just a visual.
 //This will require a new property for tiles, and specify whether the 'walkable' part of the tile is to be rendered above or below the player
 export const TILES = {

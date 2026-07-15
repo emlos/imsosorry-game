@@ -8,7 +8,6 @@ import {
     requireBoolean,
     requireExactKeys,
     requireInteger,
-    requireJsonValue,
     requireNonEmptyArray,
     requireNonNegativeInteger,
     requireObject,
@@ -47,7 +46,7 @@ const EFFECT_HANDLERS = new Map([
                 if (!Object.hasOwn(effect, "value")) {
                     throw new Error(`${label} must define value.`);
                 }
-                requireJsonValue(effect.value, `${label}.value`);
+                requireBoolean(effect.value, `${label}.value`);
             },
             execute({ game, effect }) {
                 game.setFlag(effect.flag, effect.value);
@@ -408,6 +407,15 @@ export function validateEffectsReferences(game, effects, mapId, label) {
             label: effectLabel,
         });
     });
+}
+
+export function visitEffects(effects, visitor) {
+    for (const effect of effects) {
+        visitor(effect);
+        if (effect.type === "showText" && effect.afterClose !== undefined) {
+            visitEffects(effect.afterClose, visitor);
+        }
+    }
 }
 
 export function runEffects(game, effects, mapId) {

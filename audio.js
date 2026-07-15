@@ -19,6 +19,7 @@ export class AudioSystem {
         this.soundTemplates = new Map();
         this.currentMusicId = null;
         this.currentMusic = null;
+        this.musicRequestId = 0;
     }
 
     prepare() {
@@ -49,26 +50,46 @@ export class AudioSystem {
         });
     }
 
-    playMusic(musicId) {
+    async playMusic(musicId) {
         if (this.currentMusicId === musicId && this.currentMusic) {
-            return;
+            return Promise.resolve();
         }
 
         this.stopMusic();
+        const requestId = ++this.musicRequestId;
 
         const audio = new Audio(this.musicDefinitions.get(musicId));
         audio.preload = "auto";
         audio.loop = true;
-        this.currentMusicId = musicId;
-        this.currentMusic = audio;
 
-        audio.play().catch((error) => {
-            console.warn(`Could not play music "${musicId}".`, error);
-        });
+        return Promise.resolve()
+            .then(() => audio.play())
+            .then(() => {
+                if (requestId !== this.musicRequestId) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                    return;
+                }
+
+                this.currentMusicId = musicId;
+                this.currentMusic = audio;
+            })
+            .catch((error) => {
+                if (requestId === this.musicRequestId) {
+                    this.currentMusicId = null;
+                    this.currentMusic = null;
+                }
+                console.warn(`Could not play music "${musicId}".`, error);
+            });
     }
 
     stopMusic() {
-        if (!this.currentMusic) return;
+        this.musicRequestId += 1;
+
+        if (!this.currentMusic) {
+            this.currentMusicId = null;
+            return;
+        }
 
         this.currentMusic.pause();
         this.currentMusic.currentTime = 0;

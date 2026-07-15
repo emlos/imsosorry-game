@@ -8,7 +8,7 @@ const canvas = document.querySelector("#game");
 export const game = new Game(canvas, MAPS, ITEMS);
 
 canvas.addEventListener("game-interaction", (event) => {
-    console.log("Interaction signal:", event.detail);
+    console.log("Interaction completed:", event.detail);
 });
 
 try {

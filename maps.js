@@ -1,8 +1,6 @@
 import { INTERACTIONS } from "./interactions.js";
 import { EMPTY_TILE_ID, TILE_IDS } from "./tiles.js";
 
-export const DEFAULT_TILE_SIZE = 32;
-
 const E = EMPTY_TILE_ID;
 const { FLOOR, FLOOR_ALT, WALL, WIDE_WALL } = TILE_IDS;
 const ROOM_03_ORB_WALL = 4;

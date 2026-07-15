@@ -1,4 +1,5 @@
 import {
+    requireBoolean,
     requireExactKeys,
     requireNonEmptyArray,
     requireObject,
@@ -21,6 +22,9 @@ export function validateCondition(condition, label) {
     if (operator === "flag") {
         requireExactKeys(condition, new Set(["flag", "equals"]), label);
         requireString(condition.flag, `${label}.flag`);
+        if (Object.hasOwn(condition, "equals")) {
+            requireBoolean(condition.equals, `${label}.equals`);
+        }
         return;
     }
 
@@ -89,11 +93,11 @@ function cloneConditionClause(clause) {
 }
 
 function addFlagEquals(clause, flag, value) {
-    if (clause.flagEquals.has(flag) && !Object.is(clause.flagEquals.get(flag), value)) {
+    if (clause.flagEquals.has(flag) && clause.flagEquals.get(flag) !== value) {
         return false;
     }
 
-    if (Object.is(value, true) && clause.flagsNotTrue.has(flag)) {
+    if (value === true && clause.flagsNotTrue.has(flag)) {
         return false;
     }
 
@@ -102,7 +106,7 @@ function addFlagEquals(clause, flag, value) {
 }
 
 function addFlagNotTrue(clause, flag) {
-    if (clause.flagEquals.has(flag) && Object.is(clause.flagEquals.get(flag), true)) {
+    if (clause.flagEquals.has(flag) && clause.flagEquals.get(flag) === true) {
         return false;
     }
 
@@ -205,7 +209,7 @@ function hasItem(state, itemId) {
 export function evaluateCondition(state, condition) {
     if (Object.hasOwn(condition, "flag")) {
         if (Object.hasOwn(condition, "equals")) {
-            return Object.is(state.flags[condition.flag], condition.equals);
+            return state.flags[condition.flag] === condition.equals;
         }
 
         return hasFlag(state, condition.flag);

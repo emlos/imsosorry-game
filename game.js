@@ -1,10 +1,14 @@
 import { AudioSystem } from "./audio.js";
 import { evaluateCondition, validateCondition, validateConditionReferences } from "./conditions.js";
 import { DialogueBox } from "./dialogue.js";
-import { runEffects, validateEffectsDefinition, validateEffectsReferences } from "./effects.js";
+import {
+    runEffects,
+    validateEffectsDefinition,
+    validateEffectsReferences,
+    visitEffects,
+} from "./effects.js";
 import { InputController } from "./input.js";
 import { InventoryPanel } from "./inventory.js";
-import { DEFAULT_TILE_SIZE } from "./maps.js";
 import {
     INTERACTION_HANDLERS,
     validateInteractionDefinition,
@@ -13,14 +17,13 @@ import {
 import { Player } from "./player.js";
 import { MUSIC, SOUNDS } from "./sounds.js";
 import { PLAYER_SPRITES, SPRITES } from "./sprites.js";
-import { EMPTY_TILE_ID, TILES } from "./tiles.js";
+import { DEFAULT_TILE_SIZE, EMPTY_TILE_ID, TILES } from "./tiles.js";
 import { SAVE_VERSION } from "./saves.js";
 import {
     requireArray,
     requireBoolean,
     requireExactKeys,
     requireInteger,
-    requireJsonValue,
     requireNonEmptyArray,
     requireNonNegativeInteger,
     requireObject,
@@ -29,6 +32,13 @@ import {
     requirePositiveNumber,
     requireString,
 } from "./validation.js";
+
+const OPPOSITE_EDGE = {
+    north: "south",
+    south: "north",
+    east: "west",
+    west: "east",
+};
 
 function cloneLayers(layers) {
     return Object.fromEntries(
@@ -277,6 +287,9 @@ export class Game {
                 }
 
                 row.forEach((tileId, colIndex) => {
+                    const cellLabel =
+                        `Tile cell ${colIndex},${rowIndex} in layer "${layerName}" of map "${map.id}"`;
+                    requireInteger(tileId, cellLabel);
                     if (tileId === EMPTY_TILE_ID) return;
 
                     const tile = map.tiles[tileId];
@@ -292,13 +305,11 @@ export class Game {
                         validatedTileIds.add(tileId);
                     }
 
-                    this.validateTileLayerCompatibility(
-                        map,
-                        layerName,
-                        tileId,
+                    const placementLabel =
                         `Tile ${String(tileId)} at ${colIndex},${rowIndex} in layer ` +
-                            `"${layerName}" of map "${map.id}"`,
-                    );
+                        `"${layerName}" of map "${map.id}"`;
+                    this.validateTileLayerCompatibility(map, layerName, tileId, placementLabel);
+                    this.validateTileFootprint(map, colIndex, rowIndex, tile, placementLabel);
 
                     if (layerName === "base") {
                         walkableBaseCells += 1;
@@ -323,6 +334,7 @@ export class Game {
         }
 
         map.exits.forEach((exit, index) => this.validateExitDefinition(exit, map, index));
+        this.validateExitRangeOverlaps(map);
     }
 
     validateExitDefinition(exit, map, index) {
@@ -388,13 +400,34 @@ export class Game {
             throw new Error(`${label}.targetEdge must be north, south, east, or west.`);
         }
 
-        const horizontalSource = exit.edge === "east" || exit.edge === "west";
-        const horizontalTarget = exit.targetEdge === "east" || exit.targetEdge === "west";
-        if (horizontalSource !== horizontalTarget) {
-            throw new Error(`${label}.targetEdge must preserve the same movement axis.`);
+        if (exit.targetEdge !== OPPOSITE_EDGE[exit.edge]) {
+            throw new Error(
+                `${label}.targetEdge must be the opposite edge (${exit.edge} to ` +
+                    `${OPPOSITE_EDGE[exit.edge]}).`,
+            );
         }
 
         requireInteger(exit.offset, `${label}.offset`);
+    }
+
+    validateExitRangeOverlaps(map) {
+        for (let firstIndex = 0; firstIndex < map.exits.length; firstIndex += 1) {
+            const first = map.exits[firstIndex];
+
+            for (let secondIndex = firstIndex + 1; secondIndex < map.exits.length; secondIndex += 1) {
+                const second = map.exits[secondIndex];
+                if (first.edge !== second.edge) continue;
+
+                const overlaps =
+                    first.range[0] <= second.range[1] && second.range[0] <= first.range[1];
+                if (!overlaps) continue;
+
+                throw new Error(
+                    `Exit ${secondIndex} in "${map.id}" overlaps exit ${firstIndex} on the ` +
+                        `${first.edge} edge.`,
+                );
+            }
+        }
     }
 
     validateExitReferences(map, initialSpatialDataByMap) {
@@ -746,12 +779,29 @@ export class Game {
         }
 
         this.validateMapPosition(mapId, col, row, label);
+        requireInteger(tileId, `${label}.tileId`);
 
         if (tileId !== EMPTY_TILE_ID && !map.tiles[tileId]) {
             throw new Error(`${label} references unknown tile ID ${String(tileId)} in "${mapId}".`);
         }
 
         this.validateTileLayerCompatibility(map, layerName, tileId, label);
+        if (tileId !== EMPTY_TILE_ID) {
+            this.validateTileFootprint(map, col, row, map.tiles[tileId], label);
+        }
+    }
+
+    validateTileFootprint(map, col, row, tile, label) {
+        for (const occupied of this.getOccupiedTileCells(col, row, tile)) {
+            if (
+                occupied.col < 0 ||
+                occupied.row < 0 ||
+                occupied.col >= map.gridSize.width ||
+                occupied.row >= map.gridSize.height
+            ) {
+                throw new Error(`${label} extends outside map "${map.id}".`);
+            }
+        }
     }
 
     validateTileLayerCompatibility(map, layerName, tileId, label) {
@@ -925,12 +975,74 @@ export class Game {
         return cells;
     }
 
-    async preloadAllImages() {
-        const paths = new Set();
+    collectUsedTileIdsByMap() {
+        const usedTileIdsByMap = new Map(
+            this.maps.map((map) => [map.id, new Set()]),
+        );
 
         for (const map of this.maps) {
-            for (const tile of Object.values(map.tiles)) {
-                paths.add(tile.path);
+            const usedTileIds = usedTileIdsByMap.get(map.id);
+            for (const layer of Object.values(map.layers)) {
+                for (const row of layer) {
+                    for (const tileId of row) {
+                        if (tileId !== EMPTY_TILE_ID) usedTileIds.add(tileId);
+                    }
+                }
+            }
+        }
+
+        const collectSetTileReferences = (effects, sourceMapId) => {
+            visitEffects(effects, (effect) => {
+                if (effect.type !== "setTile" || effect.tileId === EMPTY_TILE_ID) return;
+                const targetMapId = effect.mapId ?? sourceMapId;
+                usedTileIdsByMap.get(targetMapId).add(effect.tileId);
+            });
+        };
+
+        for (const item of this.itemDefinitions.values()) {
+            if (item.usable) collectSetTileReferences(item.effects, null);
+        }
+
+        for (const map of this.maps) {
+            for (const entity of map.entities) {
+                if (entity.interaction?.handler === "effects") {
+                    collectSetTileReferences(entity.interaction.effects, map.id);
+                }
+            }
+        }
+
+        const scannedTilesByMap = new Map(
+            this.maps.map((map) => [map.id, new Set()]),
+        );
+        let foundUnscannedTile = true;
+        while (foundUnscannedTile) {
+            foundUnscannedTile = false;
+
+            for (const map of this.maps) {
+                const scannedTileIds = scannedTilesByMap.get(map.id);
+                for (const tileId of usedTileIdsByMap.get(map.id)) {
+                    if (scannedTileIds.has(tileId)) continue;
+                    scannedTileIds.add(tileId);
+                    foundUnscannedTile = true;
+
+                    const interaction = map.tiles[tileId].interaction;
+                    if (interaction?.handler === "effects") {
+                        collectSetTileReferences(interaction.effects, map.id);
+                    }
+                }
+            }
+        }
+
+        return usedTileIdsByMap;
+    }
+
+    async preloadAllImages() {
+        const paths = new Set();
+        const usedTileIdsByMap = this.collectUsedTileIdsByMap();
+
+        for (const map of this.maps) {
+            for (const tileId of usedTileIdsByMap.get(map.id)) {
+                paths.add(map.tiles[tileId].path);
             }
         }
 
@@ -1109,7 +1221,7 @@ export class Game {
 
         for (const [flag, value] of Object.entries(flags)) {
             requireString(flag, "Save flag ID");
-            requireJsonValue(value, `Save flag "${flag}"`);
+            requireBoolean(value, `Save flag "${flag}"`);
         }
 
         candidate.flags = structuredClone(flags);
@@ -1286,8 +1398,8 @@ export class Game {
         this.audio.playSound(soundId);
     }
 
-    playMusic(musicId) {
-        this.audio.playMusic(musicId);
+    async playMusic(musicId) {
+        return this.audio.playMusic(musicId);
     }
 
     stopMusic() {
@@ -1375,21 +1487,36 @@ export class Game {
         return this.state.maps[this.state.player.mapId];
     }
 
-    setFlag(flag, value) {
-        const hadFlag = Object.hasOwn(this.state.flags, flag);
-        const previousValue = this.state.flags[flag];
-        this.state.flags[flag] = value;
-
+    applySpatialMutation(mapId, label, mutate, rollback) {
         try {
-            this.refreshSpatialDataAfterMutation(this.state.player.mapId, `Setting flag "${flag}"`);
+            mutate();
+            this.refreshSpatialDataAfterMutation(mapId, label);
         } catch (error) {
-            if (hadFlag) {
-                this.state.flags[flag] = previousValue;
-            } else {
-                delete this.state.flags[flag];
-            }
+            rollback();
             throw error;
         }
+    }
+
+    setFlag(flag, value) {
+        requireString(flag, "Flag ID");
+        requireBoolean(value, `Flag "${flag}" value`);
+
+        const hadFlag = Object.hasOwn(this.state.flags, flag);
+        const previousValue = this.state.flags[flag];
+        this.applySpatialMutation(
+            this.state.player.mapId,
+            `Setting flag "${flag}"`,
+            () => {
+                this.state.flags[flag] = value;
+            },
+            () => {
+                if (hadFlag) {
+                    this.state.flags[flag] = previousValue;
+                } else {
+                    delete this.state.flags[flag];
+                }
+            },
+        );
     }
 
     toggleFlag(flag) {
@@ -1405,60 +1532,63 @@ export class Game {
     }
 
     addItem(itemId, quantity) {
+        this.validateItemReference(itemId, "Adding item");
+        requirePositiveInteger(quantity, `Item "${itemId}" quantity`);
+
         const previousItemState = this.state.inventory[itemId]
             ? { ...this.state.inventory[itemId] }
             : null;
-        const itemState = this.state.inventory[itemId];
-        if (itemState) {
-            itemState.quantity += quantity;
-        } else {
-            this.state.inventory[itemId] = { quantity };
-        }
-
-        try {
-            this.refreshSpatialDataAfterMutation(
-                this.state.player.mapId,
-                `Adding item "${itemId}"`,
-            );
-        } catch (error) {
-            if (previousItemState) {
-                this.state.inventory[itemId] = previousItemState;
-            } else {
-                delete this.state.inventory[itemId];
-            }
-            throw error;
-        }
+        this.applySpatialMutation(
+            this.state.player.mapId,
+            `Adding item "${itemId}"`,
+            () => {
+                const itemState = this.state.inventory[itemId];
+                if (itemState) {
+                    itemState.quantity += quantity;
+                } else {
+                    this.state.inventory[itemId] = { quantity };
+                }
+            },
+            () => {
+                if (previousItemState) {
+                    this.state.inventory[itemId] = previousItemState;
+                } else {
+                    delete this.state.inventory[itemId];
+                }
+            },
+        );
 
         this.refreshInventoryPanel();
     }
 
     removeItem(itemId, quantity) {
-        const itemState = this.state.inventory[itemId];
+        this.validateItemReference(itemId, "Removing item");
+        requirePositiveInteger(quantity, `Item "${itemId}" quantity`);
 
+        const itemState = this.state.inventory[itemId];
         if (!itemState || itemState.quantity < quantity) {
             throw new Error(`Cannot remove ${quantity} of item "${itemId}".`);
         }
 
         const previousItemState = { ...itemState };
         const previousSelectedItemId = this.selectedItemId;
-        itemState.quantity -= quantity;
-        if (itemState.quantity === 0) {
-            delete this.state.inventory[itemId];
-            if (this.selectedItemId === itemId) {
-                this.selectedItemId = Object.keys(this.state.inventory)[0] ?? null;
-            }
-        }
-
-        try {
-            this.refreshSpatialDataAfterMutation(
-                this.state.player.mapId,
-                `Removing item "${itemId}"`,
-            );
-        } catch (error) {
-            this.state.inventory[itemId] = previousItemState;
-            this.selectedItemId = previousSelectedItemId;
-            throw error;
-        }
+        this.applySpatialMutation(
+            this.state.player.mapId,
+            `Removing item "${itemId}"`,
+            () => {
+                itemState.quantity -= quantity;
+                if (itemState.quantity === 0) {
+                    delete this.state.inventory[itemId];
+                    if (this.selectedItemId === itemId) {
+                        this.selectedItemId = Object.keys(this.state.inventory)[0] ?? null;
+                    }
+                }
+            },
+            () => {
+                this.state.inventory[itemId] = previousItemState;
+                this.selectedItemId = previousSelectedItemId;
+            },
+        );
 
         this.refreshInventoryPanel();
     }
@@ -1535,10 +1665,12 @@ export class Game {
     }
 
     setPlayerSprite(spriteId) {
+        this.validatePlayerSpriteReference(spriteId, "Setting player sprite");
         this.state.player.spriteId = spriteId;
     }
 
     setPlayerMoveSpeed(tilesPerSecond) {
+        requirePositiveNumber(tilesPerSecond, "Player movement speed");
         this.state.player.movementSpeed = tilesPerSecond;
     }
 
@@ -1547,44 +1679,53 @@ export class Game {
     }
 
     setEntityActive(mapId, entityId, active) {
+        this.validateEntityReference(mapId, entityId, "Setting entity active state");
+        requireBoolean(active, `Entity "${entityId}" active state`);
+
         const state = this.getEntityState(mapId, entityId);
         const previousActive = state.active;
-        state.active = active;
-
-        try {
-            this.refreshSpatialDataAfterMutation(
-                mapId,
-                `Changing active state for entity "${entityId}" in "${mapId}"`,
-            );
-        } catch (error) {
-            state.active = previousActive;
-            throw error;
-        }
+        this.applySpatialMutation(
+            mapId,
+            `Changing active state for entity "${entityId}" in "${mapId}"`,
+            () => {
+                state.active = active;
+            },
+            () => {
+                state.active = previousActive;
+            },
+        );
     }
 
     setEntityPosition(mapId, entityId, col, row) {
+        this.validateEntityReference(mapId, entityId, "Moving entity");
+        this.validateMapPosition(mapId, col, row, `Entity "${entityId}" position`);
+
         const state = this.getEntityState(mapId, entityId);
         const previousPosition = { col: state.col, row: state.row };
-        state.col = col;
-        state.row = row;
-
-        try {
-            this.refreshSpatialDataAfterMutation(
-                mapId,
-                `Moving entity "${entityId}" in "${mapId}"`,
-            );
-        } catch (error) {
-            state.col = previousPosition.col;
-            state.row = previousPosition.row;
-            throw error;
-        }
+        this.applySpatialMutation(
+            mapId,
+            `Moving entity "${entityId}" in "${mapId}"`,
+            () => {
+                state.col = col;
+                state.row = row;
+            },
+            () => {
+                state.col = previousPosition.col;
+                state.row = previousPosition.row;
+            },
+        );
     }
 
     setEntitySprite(mapId, entityId, spriteId) {
+        this.validateEntityReference(mapId, entityId, "Setting entity sprite");
+        this.validateSpriteReference(spriteId, `Entity "${entityId}"`);
         this.getEntityState(mapId, entityId).spriteId = spriteId;
     }
 
     setEntityCollision(mapId, entityId, collision) {
+        this.validateEntityReference(mapId, entityId, "Setting entity collision");
+        requireBoolean(collision, `Entity "${entityId}" collision`);
+
         const state = this.getEntityState(mapId, entityId);
         const definition = this.entityDefinitionsByMap.get(mapId).get(entityId);
         this.validateEntityCollisionInteraction(
@@ -1594,31 +1735,34 @@ export class Game {
         );
 
         const previousCollision = state.collision;
-        state.collision = collision;
-
-        try {
-            this.refreshSpatialDataAfterMutation(
-                mapId,
-                `Changing collision for entity "${entityId}" in "${mapId}"`,
-            );
-        } catch (error) {
-            state.collision = previousCollision;
-            throw error;
-        }
+        this.applySpatialMutation(
+            mapId,
+            `Changing collision for entity "${entityId}" in "${mapId}"`,
+            () => {
+                state.collision = collision;
+            },
+            () => {
+                state.collision = previousCollision;
+            },
+        );
     }
 
     setTile(mapId, layerName, col, row, tileId) {
         const label = `Tile update at ${col},${row} in layer "${layerName}" of "${mapId}"`;
+        this.validateTileReference(mapId, layerName, col, row, tileId, label);
+
         const layer = this.state.maps[mapId].layers[layerName];
         const previousTileId = layer[row][col];
-        layer[row][col] = tileId;
-
-        try {
-            this.refreshSpatialDataAfterMutation(mapId, label);
-        } catch (error) {
-            layer[row][col] = previousTileId;
-            throw error;
-        }
+        this.applySpatialMutation(
+            mapId,
+            label,
+            () => {
+                layer[row][col] = tileId;
+            },
+            () => {
+                layer[row][col] = previousTileId;
+            },
+        );
     }
 
     canPlayerEnter(col, row) {
@@ -1735,16 +1879,6 @@ export class Game {
 
         const handler = INTERACTION_HANDLERS.get(interaction.handler);
 
-        this.canvas.dispatchEvent(
-            new CustomEvent("game-interaction", {
-                detail: {
-                    mapId: sourceMapId,
-                    triggerSource,
-                    ...target,
-                },
-            }),
-        );
-
         if (interaction.message) {
             this.logEvent(interaction.message);
         }
@@ -1755,6 +1889,23 @@ export class Game {
             sourceMapId,
             triggerSource,
         });
+
+        const detail = {
+            mapId: sourceMapId,
+            triggerSource,
+            kind: target.kind,
+        };
+        if (target.kind === "entity") {
+            detail.entityId = target.entityId;
+        } else {
+            detail.tileId = target.tileId;
+        }
+
+        this.canvas.dispatchEvent(
+            new CustomEvent("game-interaction", {
+                detail: Object.freeze(detail),
+            }),
+        );
 
         return true;
     }

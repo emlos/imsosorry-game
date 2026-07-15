@@ -71,22 +71,3 @@ export function requireExactKeys(value, allowedKeys, label) {
         }
     }
 }
-
-export function requireJsonValue(value, label) {
-    if (value === null || typeof value === "string" || typeof value === "boolean") return;
-    if (typeof value === "number" && Number.isFinite(value)) return;
-
-    if (Array.isArray(value)) {
-        value.forEach((child, index) => requireJsonValue(child, `${label}[${index}]`));
-        return;
-    }
-
-    if (isPlainObject(value)) {
-        for (const [key, child] of Object.entries(value)) {
-            requireJsonValue(child, `${label}.${key}`);
-        }
-        return;
-    }
-
-    throw new Error(`${label} must contain only JSON-compatible values.`);
-}
