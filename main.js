@@ -5,20 +5,32 @@ import { SaveControls } from "./save-ui.js";
 import { SaveStore } from "./saves.js";
 
 const canvas = document.querySelector("#game");
-export const game = new Game(canvas, MAPS, ITEMS);
+const startScreen = document.querySelector("#start-screen");
+const startButton = document.querySelector("#start-game");
+export let game = null;
 
 canvas.addEventListener("game-interaction", (event) => {
     console.log("Interaction completed:", event.detail);
 });
 
-try {
-    await game.start();
-    new SaveControls({
-        game,
-        store: new SaveStore(),
-        rootElement: document.querySelector("#save-controls"),
-    });
-} catch (error) {
-    console.error(error);
-    document.querySelector("#status").textContent = error.message;
-}
+startButton.addEventListener("click", async () => {
+    startButton.disabled = true;
+
+    try {
+        game = new Game(canvas, MAPS, ITEMS);
+        await game.audio.unlock();
+        await game.start();
+
+        new SaveControls({
+            game,
+            store: new SaveStore(),
+            rootElement: document.querySelector("#save-controls"),
+        });
+
+        startScreen.remove();
+    } catch (error) {
+        console.error(error);
+        document.querySelector("#status").textContent = error.message;
+        startButton.disabled = false;
+    }
+});

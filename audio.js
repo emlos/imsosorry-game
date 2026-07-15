@@ -25,21 +25,25 @@ export class AudioSystem {
         this.musicRequestId = 0;
 
         this.resumeSoundContext = () => {
-            if (this.soundContext.state === "running") {
-                this.flushPendingSounds();
-                return;
-            }
-
-            this.soundContext
-                .resume()
-                .then(() => this.flushPendingSounds())
-                .catch((error) => {
-                    console.warn("Could not enable game sound effects.", error);
-                });
+            this.unlock().catch((error) => {
+                console.warn("Could not enable game sound effects.", error);
+            });
         };
 
         window.addEventListener("keydown", this.resumeSoundContext, { capture: true });
         window.addEventListener("pointerdown", this.resumeSoundContext, { capture: true });
+    }
+
+    async unlock() {
+        if (this.soundContext.state !== "running") {
+            await this.soundContext.resume();
+        }
+
+        if (this.soundContext.state !== "running") {
+            throw new Error("AudioContext did not start.");
+        }
+
+        this.flushPendingSounds();
     }
 
     prepare() {
