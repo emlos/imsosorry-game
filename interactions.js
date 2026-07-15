@@ -1,14 +1,19 @@
 import { validateCondition, validateConditionReferences } from "./conditions.js";
 import { validateEffectsDefinition, validateEffectsReferences } from "./effects.js";
-import { requireExactKeys, requireObject, requireString } from "./validation.js";
+import {
+    requireExactKeys,
+    requireNonEmptyArray,
+    requireObject,
+    requireString,
+} from "./validation.js";
 
-export const INTERACTION_TRIGGERS = new Set(["action", "touch", "both"]); //TODO: remove 'both', make the trigger property into triggers: []
+export const INTERACTION_TRIGGERS = new Set(["action", "touch"]);
 
 //TODO: there has to be a better system for this
 export const INTERACTIONS = {
     PINK_ORB: {
         handler: "effects",
-        trigger: "both",
+        triggers: ["action", "touch"],
         effects: [
             { type: "addItem", itemId: "pink-orb", quantity: 1 },
             { type: "playSound", soundId: "orb-collect" },
@@ -17,7 +22,7 @@ export const INTERACTIONS = {
     },
     ROOM_01_NORTH_DOOR: {
         handler: "teleport",
-        trigger: "action",
+        triggers: ["action"],
         params: {
             mapId: "room-02",
             entryId: "fromRoom01",
@@ -26,7 +31,7 @@ export const INTERACTIONS = {
     },
     ROOM_01_EAST_DOOR: {
         handler: "teleport",
-        trigger: "action",
+        triggers: ["action"],
         params: {
             mapId: "room-04",
             entryId: "fromRoom01",
@@ -35,7 +40,7 @@ export const INTERACTIONS = {
     },
     ROOM_02_SOUTH_DOOR: {
         handler: "teleport",
-        trigger: "action",
+        triggers: ["action"],
         params: {
             mapId: "room-01",
             entryId: "fromRoom02",
@@ -44,7 +49,7 @@ export const INTERACTIONS = {
     },
     ROOM_02_NORTH_DOOR: {
         handler: "teleport",
-        trigger: "action",
+        triggers: ["action"],
         params: {
             mapId: "room-03",
             entryId: "fromRoom02",
@@ -53,7 +58,7 @@ export const INTERACTIONS = {
     },
     ROOM_03_SOUTH_DOOR: {
         handler: "teleport",
-        trigger: "action",
+        triggers: ["action"],
         params: {
             mapId: "room-02",
             entryId: "fromRoom03",
@@ -62,7 +67,7 @@ export const INTERACTIONS = {
     },
     ROOM_04_WEST_DOOR: {
         handler: "teleport",
-        trigger: "action",
+        triggers: ["action"],
         params: {
             mapId: "room-01",
             entryId: "fromRoom04",
@@ -71,7 +76,7 @@ export const INTERACTIONS = {
     },
     BLUE_ORB: {
         handler: "effects",
-        trigger: "both",
+        triggers: ["action", "touch"],
         effects: [
             { type: "setFlag", flag: "room03.orbCollected", value: true },
             { type: "playSound", soundId: "orb-collect" },
@@ -80,7 +85,7 @@ export const INTERACTIONS = {
     },
     ROOM_05_PERMANENT_COLLECTIBLE: {
         handler: "effects",
-        trigger: "both",
+        triggers: ["action", "touch"],
         effects: [
             { type: "setFlag", flag: "room05.permanentCollected", value: true },
             { type: "playSound", soundId: "orb-collect" },
@@ -89,7 +94,7 @@ export const INTERACTIONS = {
     },
     ROOM_05_POSSESSION_COLLECTIBLE: {
         handler: "effects",
-        trigger: "both",
+        triggers: ["action", "touch"],
         effects: [
             { type: "addItem", itemId: "room05-possession-collectible", quantity: 1 },
             { type: "playSound", soundId: "orb-collect" },
@@ -98,7 +103,7 @@ export const INTERACTIONS = {
     },
     ROOM_05_SPAWNED_COLLECTIBLE: {
         handler: "effects",
-        trigger: "both",
+        triggers: ["action", "touch"],
         effects: [
             { type: "setEntityActive", entityId: "spawned-collectible", active: false },
             { type: "playSound", soundId: "orb-collect" },
@@ -107,7 +112,7 @@ export const INTERACTIONS = {
     },
     RECEIVER: {
         handler: "effects",
-        trigger: "action",
+        triggers: ["action"],
         effects: [
             { type: "playSound", soundId: "receiver-chime" },
             {
@@ -124,7 +129,7 @@ export const INTERACTIONS = {
     },
     GLASS_FIGURE: {
         handler: "effects",
-        trigger: "action",
+        triggers: ["action"],
         effects: [
             {
                 type: "showText",
@@ -153,7 +158,7 @@ export const INTERACTION_HANDLERS = new Map([
     [
         "effects",
         {
-            allowedKeys: new Set(["handler", "trigger", "condition", "effects", "message"]),
+            allowedKeys: new Set(["handler", "triggers", "condition", "effects", "message"]),
 
             validateDefinition({ interaction, label }) {
                 validateEffectsDefinition(interaction.effects, `Effects for ${label}`);
@@ -178,7 +183,7 @@ export const INTERACTION_HANDLERS = new Map([
     [
         "teleport",
         {
-            allowedKeys: new Set(["handler", "trigger", "condition", "params", "message"]),
+            allowedKeys: new Set(["handler", "triggers", "condition", "params", "message"]),
 
             validateDefinition({ interaction, label }) {
                 if (!Object.hasOwn(interaction, "params")) {
@@ -208,8 +213,21 @@ export function validateInteractionDefinition(interaction, label) {
 
     requireString(interaction.handler, `${label}.handler`);
 
-    if (!INTERACTION_TRIGGERS.has(interaction.trigger)) {
-        throw new Error(`${label} must use trigger: "action", "touch", or "both".`);
+    requireNonEmptyArray(interaction.triggers, `${label}.triggers`);
+
+    const seenTriggers = new Set();
+    for (const trigger of interaction.triggers) {
+        if (!INTERACTION_TRIGGERS.has(trigger)) {
+            throw new Error(
+                `${label}.triggers contains unknown trigger ${JSON.stringify(trigger)}. ` +
+                    'Expected "action" or "touch".',
+            );
+        }
+
+        if (seenTriggers.has(trigger)) {
+            throw new Error(`${label}.triggers contains duplicate trigger "${trigger}".`);
+        }
+        seenTriggers.add(trigger);
     }
 
     if (interaction.message !== undefined && typeof interaction.message !== "string") {

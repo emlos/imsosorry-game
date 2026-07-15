@@ -90,11 +90,7 @@ export class Player {
         for (const { col, row } of candidates) {
             const target = interactionMap.get(`${col},${row}`);
 
-            if (
-                target &&
-                (target.interaction.trigger === "both" ||
-                    target.interaction.trigger === triggerType)
-            ) {
+            if (target && target.interaction.triggers.includes(triggerType)) {
                 return target;
             }
         }

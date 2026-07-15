@@ -817,24 +817,17 @@ export class Game {
         if (
             tile.interaction &&
             this.layerCreatesCollision(layerName, tile) &&
-            (tile.interaction.trigger === "touch" || tile.interaction.trigger === "both")
+            tile.interaction.triggers.includes("touch")
         ) {
             throw new Error(
-                `${label} cannot place a tile with ${tile.interaction.trigger} interaction ` +
-                    "on a colliding layer.",
+                `${label} cannot place a tile with a touch interaction on a colliding layer.`,
             );
         }
     }
 
     validateEntityCollisionInteraction(collision, interaction, label) {
-        if (
-            collision &&
-            interaction &&
-            (interaction.trigger === "touch" || interaction.trigger === "both")
-        ) {
-            throw new Error(
-                `${label} cannot combine collision with ${interaction.trigger} interaction.`,
-            );
+        if (collision && interaction && interaction.triggers.includes("touch")) {
+            throw new Error(`${label} cannot combine collision with a touch interaction.`);
         }
     }
 

@@ -1,5 +1,3 @@
-//TODO: jquery?
-
 export class InventoryPanel {
     constructor({ rootElement, openButton, onOpen, onClose, onUse, onSelect }) {
         if (!(rootElement instanceof HTMLElement)) {
