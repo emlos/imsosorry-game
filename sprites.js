@@ -1,6 +1,9 @@
+import { WORLD_ATLAS_PATH } from "./tiles.js";
+
 export const SPRITES = {
     door: {
-        path: "./assets/tiles/door.png",
+        path: WORLD_ATLAS_PATH,
+        source: [103, 5, 32, 32],
         size: [32, 32],
     },
     "pink-orb": {
@@ -20,9 +23,9 @@ export const SPRITES = {
         size: [32, 32],
     },
     "animated-save-point": {
-        path: "./assets/sprites/animated-save-point.png",
+        path: WORLD_ATLAS_PATH,
+        source: [7, 145, 32, 32],
         size: [32, 32],
-        frameSize: [32, 32],
         defaultAnimation: "pulse",
         animations: {
             pulse: {
@@ -50,8 +53,8 @@ export const PLAYER_SPRITES = {
     default: {
         kind: "image",
         path: "./assets/player/default-sheet.png",
+        source: [0, 0, 32, 64],
         size: [32, 64],
-        frameSize: [32, 64],
         defaultAnimation: "idle-down",
         animations: {
             "idle-down": {

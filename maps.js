@@ -1,5 +1,5 @@
 import { COMMON_INTERACTIONS } from "./interactions.js";
-import { EMPTY_TILE_ID, TILE_IDS } from "./tiles.js";
+import { EMPTY_TILE_ID, TILE_IDS, TILES } from "./tiles.js";
 
 const E = EMPTY_TILE_ID;
 const { FLOOR, FLOOR_ALT, WALL, WIDE_WALL, TREE, GLITTERING_CRYSTAL } = TILE_IDS;
@@ -283,7 +283,7 @@ export const MAPS = [
 
         tiles: {
             [ROOM_03_ORB_WALL]: {
-                path: "./assets/tiles/wall.png",
+                ...TILES[TILE_IDS.WALL],
                 condition: { notFlag: "room03.orbCollected" },
             },
         },

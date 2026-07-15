@@ -11,22 +11,27 @@ export function resolveAnimationId(visual, candidateIds) {
     return null;
 }
 
-export function resolveAnimationFrame(visual, animationId, elapsedMs) {
-    if (!visual.animations || animationId === null) return null;
+export function resolveVisualFrame(visual, animationId, elapsedMs) {
+    if (!visual.source) return null;
 
-    const animation = visual.animations[animationId];
-    if (!animation) {
-        throw new Error(`Unknown animation "${String(animationId)}".`);
+    const [originX, originY, frameWidth, frameHeight] = visual.source;
+    let frameCol = 0;
+    let frameRow = 0;
+
+    if (animationId !== null) {
+        const animation = visual.animations?.[animationId];
+        if (!animation) {
+            throw new Error(`Unknown animation "${String(animationId)}".`);
+        }
+
+        const frameDurationMs = 1000 / animation.fps;
+        const frameIndex = Math.floor(elapsedMs / frameDurationMs) % animation.frames.length;
+        [frameCol, frameRow] = animation.frames[frameIndex];
     }
 
-    const frameDurationMs = 1000 / animation.fps;
-    const frameIndex = Math.floor(elapsedMs / frameDurationMs) % animation.frames.length;
-    const [frameCol, frameRow] = animation.frames[frameIndex];
-    const [frameWidth, frameHeight] = visual.frameSize;
-
     return {
-        sourceX: frameCol * frameWidth,
-        sourceY: frameRow * frameHeight,
+        sourceX: originX + frameCol * frameWidth,
+        sourceY: originY + frameRow * frameHeight,
         sourceWidth: frameWidth,
         sourceHeight: frameHeight,
     };

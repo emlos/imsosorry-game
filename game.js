@@ -1,4 +1,4 @@
-import { drawImageVisual, resolveAnimationFrame, resolveAnimationId } from "./animation.js";
+import { drawImageVisual, resolveAnimationId, resolveVisualFrame } from "./animation.js";
 import { AudioSystem } from "./audio.js";
 import { evaluateCondition, validateCondition, validateConditionReferences } from "./conditions.js";
 import { DialogueBox } from "./dialogue.js";
@@ -531,7 +531,7 @@ export class Game {
             new Set([
                 "path",
                 "size",
-                "frameSize",
+                "source",
                 "defaultAnimation",
                 "animations",
                 "footprint",
@@ -555,7 +555,7 @@ export class Game {
             this.validateTileFootprintDefinition(tile.footprint, `${label}.footprint`);
         }
 
-        this.validateVisualAnimationDefinition(tile, label);
+        this.validateVisualDefinition(tile, label);
 
         if (tile.condition) {
             validateCondition(tile.condition, `Condition for tile ${String(tileId)} in "${mapId}"`);
@@ -704,12 +704,12 @@ export class Game {
             requireObject(sprite, label);
             requireExactKeys(
                 sprite,
-                new Set(["path", "size", "frameSize", "defaultAnimation", "animations"]),
+                new Set(["path", "size", "source", "defaultAnimation", "animations"]),
                 label,
             );
             requireString(sprite.path, `${label}.path`);
             this.validateSize(sprite.size, label);
-            this.validateVisualAnimationDefinition(sprite, label);
+            this.validateVisualDefinition(sprite, label);
         }
     }
 
@@ -729,19 +729,12 @@ export class Game {
             if (sprite.kind === "image") {
                 requireExactKeys(
                     sprite,
-                    new Set([
-                        "kind",
-                        "path",
-                        "size",
-                        "frameSize",
-                        "defaultAnimation",
-                        "animations",
-                    ]),
+                    new Set(["kind", "path", "size", "source", "defaultAnimation", "animations"]),
                     label,
                 );
                 requireString(sprite.path, `${label}.path`);
                 this.validateSize(sprite.size, label);
-                this.validateVisualAnimationDefinition(sprite, label);
+                this.validateVisualDefinition(sprite, label);
                 continue;
             }
 
@@ -749,24 +742,37 @@ export class Game {
         }
     }
 
-    validateVisualAnimationDefinition(visual, label) {
-        const animationKeys = ["frameSize", "defaultAnimation", "animations"];
-        const presentKeys = animationKeys.filter((key) => Object.hasOwn(visual, key));
-        if (presentKeys.length === 0) return;
+    validateVisualDefinition(visual, label) {
+        if (Object.hasOwn(visual, "source")) {
+            const source = visual.source;
+            if (!Array.isArray(source) || source.length !== 4) {
+                throw new Error(`${label}.source must contain [x, y, width, height].`);
+            }
 
-        if (presentKeys.length !== animationKeys.length) {
-            throw new Error(
-                `${label} must define frameSize, defaultAnimation, and animations together.`,
-            );
+            const [sourceX, sourceY, sourceWidth, sourceHeight] = source;
+            if (!Number.isInteger(sourceX) || !Number.isInteger(sourceY)) {
+                throw new Error(`${label}.source position must contain integers.`);
+            }
+            if (sourceX < 0 || sourceY < 0) {
+                throw new Error(`${label}.source position must be non-negative.`);
+            }
+            if (!Number.isInteger(sourceWidth) || !Number.isInteger(sourceHeight)) {
+                throw new Error(`${label}.source dimensions must contain integers.`);
+            }
+            if (sourceWidth <= 0 || sourceHeight <= 0) {
+                throw new Error(`${label}.source dimensions must be positive.`);
+            }
         }
 
-        const frameSize = visual.frameSize;
-        const validFrameSize =
-            Array.isArray(frameSize) &&
-            frameSize.length === 2 &&
-            frameSize.every((value) => Number.isInteger(value) && value > 0);
-        if (!validFrameSize) {
-            throw new Error(`${label}.frameSize must contain two positive integers.`);
+        const hasDefaultAnimation = Object.hasOwn(visual, "defaultAnimation");
+        const hasAnimations = Object.hasOwn(visual, "animations");
+        if (!hasDefaultAnimation && !hasAnimations) return;
+
+        if (hasDefaultAnimation !== hasAnimations) {
+            throw new Error(`${label} must define defaultAnimation and animations together.`);
+        }
+        if (!Object.hasOwn(visual, "source")) {
+            throw new Error(`${label} must define source when animations are present.`);
         }
 
         requireString(visual.defaultAnimation, `${label}.defaultAnimation`);
@@ -806,38 +812,47 @@ export class Game {
     }
 
     validateLoadedVisualImage(visual, label) {
-        if (!visual.animations) return;
+        if (!visual.source) return;
 
         const image = this.images.get(visual.path);
         if (!image) {
             throw new Error(`${label} image was not loaded: ${visual.path}`);
         }
 
-        const [frameWidth, frameHeight] = visual.frameSize;
-        if (image.naturalWidth % frameWidth !== 0) {
-            throw new Error(
-                `${label} spritesheet width ${image.naturalWidth} is not divisible by ` +
-                    `frame width ${frameWidth}.`,
-            );
-        }
-        if (image.naturalHeight % frameHeight !== 0) {
-            throw new Error(
-                `${label} spritesheet height ${image.naturalHeight} is not divisible by ` +
-                    `frame height ${frameHeight}.`,
-            );
-        }
+        const [originX, originY, frameWidth, frameHeight] = visual.source;
+        const textureWidth = image.naturalWidth;
+        const textureHeight = image.naturalHeight;
 
-        const columns = image.naturalWidth / frameWidth;
-        const rows = image.naturalHeight / frameHeight;
+        const validateRectangle = (sourceX, sourceY, sourceWidth, sourceHeight, context) => {
+            const inBounds =
+                sourceX >= 0 &&
+                sourceY >= 0 &&
+                sourceX + sourceWidth <= textureWidth &&
+                sourceY + sourceHeight <= textureHeight;
+            if (inBounds) return;
+
+            throw new Error(
+                `${label} ${context} uses source rectangle ` +
+                    `[${sourceX}, ${sourceY}, ${sourceWidth}, ${sourceHeight}] outside ` +
+                    `texture ${textureWidth}x${textureHeight}.`,
+            );
+        };
+
+        validateRectangle(originX, originY, frameWidth, frameHeight, "base frame");
+
+        if (!visual.animations) return;
 
         for (const [animationId, animation] of Object.entries(visual.animations)) {
             animation.frames.forEach(([frameCol, frameRow], frameIndex) => {
-                if (frameCol < columns && frameRow < rows) return;
-
-                throw new Error(
-                    `${label} animation "${animationId}" frame ${frameIndex} references ` +
-                        `out-of-bounds coordinate [${frameCol}, ${frameRow}] for a ` +
-                        `${columns}x${rows} spritesheet grid.`,
+                const sourceX = originX + frameCol * frameWidth;
+                const sourceY = originY + frameRow * frameHeight;
+                validateRectangle(
+                    sourceX,
+                    sourceY,
+                    frameWidth,
+                    frameHeight,
+                    `animation "${animationId}" frame ${frameIndex} ` +
+                        `at coordinate [${frameCol}, ${frameRow}]`,
                 );
             });
         }
@@ -2215,7 +2230,7 @@ export class Game {
         const playerSprite = this.playerSpriteDefinitions.get(this.state.player.spriteId);
         const playerImage =
             playerSprite.kind === "image" ? this.images.get(playerSprite.path) : null;
-        const playerFrame = resolveAnimationFrame(
+        const playerFrame = resolveVisualFrame(
             playerSprite,
             this.playerAnimation.animationId,
             this.playerAnimation.elapsedMs,
@@ -2235,7 +2250,7 @@ export class Game {
         const drawY = Math.round(worldBottomY - height - this.camera.y);
 
         const animationId = resolveAnimationId(tile, [tile.defaultAnimation]);
-        const frame = resolveAnimationFrame(tile, animationId, this.ambientAnimationTimeMs);
+        const frame = resolveVisualFrame(tile, animationId, this.ambientAnimationTimeMs);
         drawImageVisual(this.ctx, image, { ...tile, size: [width, height] }, frame, drawX, drawY);
     }
 
@@ -2251,7 +2266,7 @@ export class Game {
         const drawY = Math.round(worldY + TILE_SIZE - height - this.camera.y);
 
         const animationId = resolveAnimationId(sprite, [sprite.defaultAnimation]);
-        const frame = resolveAnimationFrame(sprite, animationId, this.ambientAnimationTimeMs);
+        const frame = resolveVisualFrame(sprite, animationId, this.ambientAnimationTimeMs);
         drawImageVisual(this.ctx, image, sprite, frame, drawX, drawY);
     }
 
