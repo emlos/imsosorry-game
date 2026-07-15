@@ -7,7 +7,8 @@ The editor works on a `structuredClone()` of `MAPS`. It never edits `Game.maps` 
 ## Implemented
 
 - Map creation, duplication, renaming, top-left resize, deletion, and initial-entry selection.
-- Base, obstacle, and foreground layer editing.
+- Base and obstacle layer editing.
+- Existing foreground layers are preserved and previewed, but are not currently editable.
 - Pencil, eraser, rectangle, flood-fill, and eyedropper tools.
 - Atlas-aware static and animated previews.
 - Grid, layer visibility, collision, footprint, entry, and exit overlays.
@@ -29,4 +30,3 @@ editor does not create tile or sprite assets, edit atlas coordinates, edit anima
 - allow to paint empty tiles too, just liek any other tile type
 - connected to TODO in sprite/tile.js - button to set whether current tile/entity should be mirrored
 - allow for quick copy of only the current map, for convenience, too
-- remove foreground layer option for now
