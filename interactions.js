@@ -9,146 +9,19 @@ import {
 
 export const INTERACTION_TRIGGERS = new Set(["action", "touch"]);
 
-//TODO: there has to be a better system for this
-export const INTERACTIONS = {
-    PINK_ORB: {
-        handler: "effects",
-        triggers: ["action", "touch"],
-        effects: [
-            { type: "addItem", itemId: "pink-orb", quantity: 1 },
-            { type: "playSound", soundId: "orb-collect" },
-        ],
-        message: "You found the pink orb.",
-    },
-    ROOM_01_NORTH_DOOR: {
-        handler: "teleport",
-        triggers: ["action"],
-        params: {
-            mapId: "room-02",
-            entryId: "fromRoom01",
-        },
-        message: "The door opens.",
-    },
-    ROOM_01_EAST_DOOR: {
-        handler: "teleport",
-        triggers: ["action"],
-        params: {
-            mapId: "room-04",
-            entryId: "fromRoom01",
-        },
-        message: "The side door opens.",
-    },
-    ROOM_02_SOUTH_DOOR: {
-        handler: "teleport",
-        triggers: ["action"],
-        params: {
-            mapId: "room-01",
-            entryId: "fromRoom02",
-        },
-        message: "You return through the door.",
-    },
-    ROOM_02_NORTH_DOOR: {
-        handler: "teleport",
-        triggers: ["action"],
-        params: {
-            mapId: "room-03",
-            entryId: "fromRoom02",
-        },
-        message: "The door opens into another room.",
-    },
-    ROOM_03_SOUTH_DOOR: {
-        handler: "teleport",
-        triggers: ["action"],
-        params: {
-            mapId: "room-02",
-            entryId: "fromRoom03",
-        },
-        message: "You return to the previous room.",
-    },
-    ROOM_04_WEST_DOOR: {
-        handler: "teleport",
-        triggers: ["action"],
-        params: {
-            mapId: "room-01",
-            entryId: "fromRoom04",
-        },
-        message: "You return to the main room.",
-    },
-    BLUE_ORB: {
-        handler: "effects",
-        triggers: ["action", "touch"],
-        effects: [
-            { type: "setFlag", flag: "room03.orbCollected", value: true },
-            { type: "playSound", soundId: "orb-collect" },
-        ],
-        message: "The blue orb dissolves. A section of the wall disappears.",
-    },
-    ROOM_05_PERMANENT_COLLECTIBLE: {
-        handler: "effects",
-        triggers: ["action", "touch"],
-        effects: [
-            { type: "setFlag", flag: "room05.permanentCollected", value: true },
-            { type: "playSound", soundId: "orb-collect" },
-        ],
-        message: "The permanent collectible is recorded by its flag.",
-    },
-    ROOM_05_POSSESSION_COLLECTIBLE: {
-        handler: "effects",
-        triggers: ["action", "touch"],
-        effects: [
-            { type: "addItem", itemId: "room05-possession-collectible", quantity: 1 },
-            { type: "playSound", soundId: "orb-collect" },
-        ],
-        message: "The possession collectible enters your inventory.",
-    },
-    ROOM_05_SPAWNED_COLLECTIBLE: {
-        handler: "effects",
-        triggers: ["action", "touch"],
-        effects: [
-            { type: "setEntityActive", entityId: "spawned-collectible", active: false },
-            { type: "playSound", soundId: "orb-collect" },
-        ],
-        message: "The independent spawned collectible disappears.",
-    },
-    RECEIVER: {
-        handler: "effects",
-        triggers: ["action"],
-        effects: [
-            { type: "playSound", soundId: "receiver-chime" },
-            {
-                type: "showText",
-                speaker: "Receiver",
-                pages: [
-                    "The receiver wakes with a clear two-note chime.",
-                    "A voice beneath the static says: The glass remembers who listened.",
-                    "Then the signal cuts out.",
-                ],
-                afterClose: [{ type: "setFlag", flag: "room04.receiverUsed", value: true }],
-            },
-        ],
-    },
-    GLASS_FIGURE: {
+export const COMMON_INTERACTIONS = {
+    SAVE_POINT: {
         handler: "effects",
         triggers: ["action"],
         effects: [
             {
                 type: "showText",
-                condition: { notFlag: "room04.receiverUsed" },
-                speaker: "Glass Figure",
+                speaker: "Save Point",
                 pages: [
-                    "The glass figure is cold and perfectly still.",
-                    "Its blank face is turned away from the receiver.",
+                    "A small light holds perfectly still inside the glass.",
+                    "For a moment, the shape of the dream becomes easy to remember.",
                 ],
-            },
-            {
-                type: "showText",
-                condition: { flag: "room04.receiverUsed", equals: true },
-                speaker: "Glass Figure",
-                pages: [
-                    "A faint vibration runs through the glass.",
-                    "Its face is now angled toward the receiver.",
-                    "There is no seam showing how it moved.",
-                ],
+                afterClose: [{ type: "saveGame" }],
             },
         ],
     },

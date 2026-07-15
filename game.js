@@ -1075,6 +1075,10 @@ export class Game {
         });
     }
 
+    requestSave() {
+        this.canvas.dispatchEvent(new CustomEvent("game-save-request"));
+    }
+
     createSaveData() {
         if (this.mode !== "world" || this.player.isMoving) {
             throw new Error("Cannot save or export unless the game is idle in world mode.");

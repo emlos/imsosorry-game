@@ -1,4 +1,3 @@
-//TODO: should size be a scale of the tile size instead of a fixed pixel size? (e.g. [1, 1] instead of [32, 32])
 export const SPRITES = {
     door: {
         path: "./assets/tiles/door.png",
@@ -14,6 +13,10 @@ export const SPRITES = {
     },
     receiver: {
         path: "./assets/tiles/receiver.png",
+        size: [32, 32],
+    },
+    "save-point": {
+        path: "./assets/tiles/save-point.png",
         size: [32, 32],
     },
     "glass-figure": {

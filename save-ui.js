@@ -15,12 +15,17 @@ export class SaveControls {
         const importButton = rootElement.querySelector("[data-save-import]");
         const deleteButton = rootElement.querySelector("[data-save-delete]");
 
-        saveButton.addEventListener("click", () => this.run(() => this.save()));
+        saveButton.addEventListener("click", () => this.requestSave());
+        this.game.canvas.addEventListener("game-save-request", () => this.requestSave());
         loadButton.addEventListener("click", () => this.run(() => this.load()));
         exportButton.addEventListener("click", () => this.run(() => this.export()));
         importButton.addEventListener("click", () => this.fileInput.click());
         deleteButton.addEventListener("click", () => this.run(() => this.delete()));
         this.fileInput.addEventListener("change", () => this.run(() => this.import()));
+    }
+
+    requestSave() {
+        return this.run(() => this.save());
     }
 
     async run(action) {

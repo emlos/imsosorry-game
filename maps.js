@@ -1,9 +1,9 @@
-import { INTERACTIONS } from "./interactions.js";
+import { COMMON_INTERACTIONS } from "./interactions.js";
 import { EMPTY_TILE_ID, TILE_IDS } from "./tiles.js";
 
 const E = EMPTY_TILE_ID;
 const { FLOOR, FLOOR_ALT, WALL, WIDE_WALL } = TILE_IDS;
-const ROOM_03_ORB_WALL = 4;
+const ROOM_03_ORB_WALL = 4; //TODO: move to tiles for the room-03 map. this doesnt need to be a global property
 
 export const MAPS = [
     {
@@ -49,7 +49,15 @@ export const MAPS = [
                 row: 3,
                 spriteId: "pink-orb",
                 collision: false,
-                interaction: INTERACTIONS.PINK_ORB,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action", "touch"],
+                    effects: [
+                        { type: "addItem", itemId: "pink-orb", quantity: 1 },
+                        { type: "playSound", soundId: "orb-collect" },
+                    ],
+                    message: "You found the pink orb.",
+                },
                 condition: {
                     notItem: "pink-orb",
                 },
@@ -61,7 +69,15 @@ export const MAPS = [
                 row: 0,
                 spriteId: "door",
                 collision: false,
-                interaction: INTERACTIONS.ROOM_01_NORTH_DOOR,
+                interaction: {
+                    handler: "teleport",
+                    triggers: ["action"],
+                    params: {
+                        mapId: "room-02",
+                        entryId: "fromRoom01",
+                    },
+                    message: "The door opens.",
+                },
             },
             {
                 id: "east-door",
@@ -70,7 +86,15 @@ export const MAPS = [
                 row: 5,
                 spriteId: "door",
                 collision: true,
-                interaction: INTERACTIONS.ROOM_01_EAST_DOOR,
+                interaction: {
+                    handler: "teleport",
+                    triggers: ["action"],
+                    params: {
+                        mapId: "room-04",
+                        entryId: "fromRoom01",
+                    },
+                    message: "The side door opens.",
+                },
             },
         ],
 
@@ -172,13 +196,30 @@ export const MAPS = [
 
         entities: [
             {
+                id: "save-point",
+                active: true,
+                col: 1,
+                row: 3,
+                spriteId: "save-point",
+                collision: true,
+                interaction: COMMON_INTERACTIONS.SAVE_POINT,
+            },
+            {
                 id: "south-door",
                 active: true,
                 col: 1,
                 row: 5,
                 spriteId: "door",
                 collision: true,
-                interaction: INTERACTIONS.ROOM_02_SOUTH_DOOR,
+                interaction: {
+                    handler: "teleport",
+                    triggers: ["action"],
+                    params: {
+                        mapId: "room-01",
+                        entryId: "fromRoom02",
+                    },
+                    message: "You return through the door.",
+                },
             },
             {
                 id: "north-door",
@@ -187,7 +228,15 @@ export const MAPS = [
                 row: 0,
                 spriteId: "door",
                 collision: true,
-                interaction: INTERACTIONS.ROOM_02_NORTH_DOOR,
+                interaction: {
+                    handler: "teleport",
+                    triggers: ["action"],
+                    params: {
+                        mapId: "room-03",
+                        entryId: "fromRoom02",
+                    },
+                    message: "The door opens into another room.",
+                },
             },
         ],
 
@@ -242,7 +291,15 @@ export const MAPS = [
                 row: 2,
                 spriteId: "blue-orb",
                 collision: false,
-                interaction: INTERACTIONS.BLUE_ORB,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action", "touch"],
+                    effects: [
+                        { type: "setFlag", flag: "room03.orbCollected", value: true },
+                        { type: "playSound", soundId: "orb-collect" },
+                    ],
+                    message: "The blue orb dissolves. A section of the wall disappears.",
+                },
                 condition: { notFlag: "room03.orbCollected" },
             },
             {
@@ -252,7 +309,15 @@ export const MAPS = [
                 row: 6,
                 spriteId: "door",
                 collision: true,
-                interaction: INTERACTIONS.ROOM_03_SOUTH_DOOR,
+                interaction: {
+                    handler: "teleport",
+                    triggers: ["action"],
+                    params: {
+                        mapId: "room-02",
+                        entryId: "fromRoom03",
+                    },
+                    message: "You return to the previous room.",
+                },
             },
         ],
 
@@ -357,7 +422,15 @@ export const MAPS = [
                 row: 3,
                 spriteId: "door",
                 collision: true,
-                interaction: INTERACTIONS.ROOM_04_WEST_DOOR,
+                interaction: {
+                    handler: "teleport",
+                    triggers: ["action"],
+                    params: {
+                        mapId: "room-01",
+                        entryId: "fromRoom04",
+                    },
+                    message: "You return to the main room.",
+                },
             },
             {
                 id: "receiver",
@@ -366,7 +439,25 @@ export const MAPS = [
                 row: 2,
                 spriteId: "receiver",
                 collision: true,
-                interaction: INTERACTIONS.RECEIVER,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        { type: "playSound", soundId: "receiver-chime" },
+                        {
+                            type: "showText",
+                            speaker: "Receiver",
+                            pages: [
+                                "The receiver wakes with a clear two-note chime.",
+                                "A voice beneath the static says: The glass remembers who listened.",
+                                "Then the signal cuts out.",
+                            ],
+                            afterClose: [
+                                { type: "setFlag", flag: "room04.receiverUsed", value: true },
+                            ],
+                        },
+                    ],
+                },
             },
             {
                 id: "glass-figure",
@@ -375,7 +466,31 @@ export const MAPS = [
                 row: 3,
                 spriteId: "glass-figure",
                 collision: true,
-                interaction: INTERACTIONS.GLASS_FIGURE,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            condition: { notFlag: "room04.receiverUsed" },
+                            speaker: "Glass Figure",
+                            pages: [
+                                "The glass figure is cold and perfectly still.",
+                                "Its blank face is turned away from the receiver.",
+                            ],
+                        },
+                        {
+                            type: "showText",
+                            condition: { flag: "room04.receiverUsed", equals: true },
+                            speaker: "Glass Figure",
+                            pages: [
+                                "A faint vibration runs through the glass.",
+                                "Its face is now angled toward the receiver.",
+                                "There is no seam showing how it moved.",
+                            ],
+                        },
+                    ],
+                },
             },
         ],
 
@@ -492,13 +607,34 @@ export const MAPS = [
 
         entities: [
             {
+                id: "save-point",
+                active: true,
+                col: 1,
+                row: 3,
+                spriteId: "save-point",
+                collision: true,
+                interaction: COMMON_INTERACTIONS.SAVE_POINT,
+            },
+            {
                 id: "permanent-collectible",
                 active: true,
                 col: 2,
                 row: 1,
                 spriteId: "blue-orb",
                 collision: false,
-                interaction: INTERACTIONS.ROOM_05_PERMANENT_COLLECTIBLE,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action", "touch"],
+                    effects: [
+                        {
+                            type: "setFlag",
+                            flag: "room05.permanentCollected",
+                            value: true,
+                        },
+                        { type: "playSound", soundId: "orb-collect" },
+                    ],
+                    message: "The permanent collectible is recorded by its flag.",
+                },
                 condition: { notFlag: "room05.permanentCollected" },
             },
             {
@@ -508,7 +644,19 @@ export const MAPS = [
                 row: 2,
                 spriteId: "pink-orb",
                 collision: false,
-                interaction: INTERACTIONS.ROOM_05_POSSESSION_COLLECTIBLE,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action", "touch"],
+                    effects: [
+                        {
+                            type: "addItem",
+                            itemId: "room05-possession-collectible",
+                            quantity: 1,
+                        },
+                        { type: "playSound", soundId: "orb-collect" },
+                    ],
+                    message: "The possession collectible enters your inventory.",
+                },
                 condition: { notItem: "room05-possession-collectible" },
             },
             {
@@ -518,7 +666,19 @@ export const MAPS = [
                 row: 4,
                 spriteId: "blue-orb",
                 collision: false,
-                interaction: INTERACTIONS.ROOM_05_SPAWNED_COLLECTIBLE,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action", "touch"],
+                    effects: [
+                        {
+                            type: "setEntityActive",
+                            entityId: "spawned-collectible",
+                            active: false,
+                        },
+                        { type: "playSound", soundId: "orb-collect" },
+                    ],
+                    message: "The independent spawned collectible disappears.",
+                },
             },
         ],
 

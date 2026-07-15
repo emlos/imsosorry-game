@@ -268,6 +268,17 @@ const EFFECT_HANDLERS = new Map([
         },
     ],
     [
+        "saveGame",
+        {
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, effectKeys(), label);
+            },
+            execute({ game }) {
+                game.requestSave();
+            },
+        },
+    ],
+    [
         "playSound",
         {
             validateDefinition({ effect, label }) {
