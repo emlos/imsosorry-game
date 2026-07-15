@@ -16,18 +16,64 @@ export class AudioSystem {
 
         this.soundDefinitions = new Map(Object.entries(soundDefinitions));
         this.musicDefinitions = new Map(Object.entries(musicDefinitions));
-        this.soundTemplates = new Map();
+        this.soundBuffers = new Map();
+        this.pendingSoundIds = [];
+        this.soundContext = new AudioContext();
+        this.preparePromise = null;
         this.currentMusicId = null;
         this.currentMusic = null;
         this.musicRequestId = 0;
+
+        this.resumeSoundContext = () => {
+            if (this.soundContext.state === "running") {
+                this.flushPendingSounds();
+                return;
+            }
+
+            this.soundContext
+                .resume()
+                .then(() => this.flushPendingSounds())
+                .catch((error) => {
+                    console.warn("Could not enable game sound effects.", error);
+                });
+        };
+
+        window.addEventListener("keydown", this.resumeSoundContext, { capture: true });
+        window.addEventListener("pointerdown", this.resumeSoundContext, { capture: true });
     }
 
     prepare() {
-        for (const [soundId, path] of this.soundDefinitions) {
-            const audio = new Audio(path);
-            audio.preload = "auto";
-            this.soundTemplates.set(soundId, audio);
+        if (!this.preparePromise) {
+            this.preparePromise = this.loadSoundBuffers();
         }
+
+        return this.preparePromise;
+    }
+
+    async loadSoundBuffers() {
+        const loadedBuffers = await Promise.all(
+            [...this.soundDefinitions].map(async ([soundId, path]) => {
+                const response = await fetch(path);
+                if (!response.ok) {
+                    throw new Error(
+                        `Could not load sound "${soundId}" from "${path}" (${response.status} ${response.statusText}).`,
+                    );
+                }
+
+                const encodedAudio = await response.arrayBuffer();
+
+                try {
+                    const buffer = await this.soundContext.decodeAudioData(encodedAudio);
+                    return [soundId, buffer];
+                } catch (error) {
+                    throw new Error(`Could not decode sound "${soundId}" from "${path}".`, {
+                        cause: error,
+                    });
+                }
+            }),
+        );
+
+        this.soundBuffers = new Map(loadedBuffers);
     }
 
     hasSound(soundId) {
@@ -39,15 +85,35 @@ export class AudioSystem {
     }
 
     playSound(soundId) {
-        const template = this.soundTemplates.get(soundId);
-        if (!template) {
+        if (!this.soundBuffers.has(soundId)) {
             throw new Error(`Sound "${soundId}" is not prepared.`);
         }
 
-        const audio = template.cloneNode();
-        audio.play().catch((error) => {
-            console.warn(`Could not play sound "${soundId}".`, error);
-        });
+        if (this.soundContext.state !== "running") {
+            this.pendingSoundIds.push(soundId);
+            return;
+        }
+
+        this.startSound(soundId);
+    }
+
+    startSound(soundId) {
+        const source = this.soundContext.createBufferSource();
+        source.buffer = this.soundBuffers.get(soundId);
+        source.connect(this.soundContext.destination);
+        source.addEventListener("ended", () => source.disconnect(), { once: true });
+        source.start();
+    }
+
+    flushPendingSounds() {
+        if (this.soundContext.state !== "running" || this.pendingSoundIds.length === 0) {
+            return;
+        }
+
+        const pendingSoundIds = this.pendingSoundIds.splice(0);
+        for (const soundId of pendingSoundIds) {
+            this.startSound(soundId);
+        }
     }
 
     async playMusic(musicId) {

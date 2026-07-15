@@ -129,8 +129,10 @@ export class Game {
 
     async start() {
         this.prepareMaps();
-        this.audio.prepare();
-        await this.preloadAllImages();
+        await Promise.all([
+            this.audio.prepare(),
+            this.preloadAllImages(),
+        ]);
 
         const initialMap = this.maps[0];
         this.transitionTo({
