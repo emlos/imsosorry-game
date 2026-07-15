@@ -17,7 +17,7 @@ import {
 import { Player } from "./player.js";
 import { MUSIC, SOUNDS } from "./sounds.js";
 import { PLAYER_SPRITES, SPRITES } from "./sprites.js";
-import { DEFAULT_TILE_SIZE, EMPTY_TILE_ID, TILES } from "./tiles.js";
+import { TILE_SIZE, EMPTY_TILE_ID, TILES } from "./tiles.js";
 import { SAVE_VERSION } from "./saves.js";
 import {
     requireArray,
@@ -39,6 +39,8 @@ const OPPOSITE_EDGE = {
     east: "west",
     west: "east",
 };
+
+const RENDER_LAYER_NAMES = new Set(["base", "obstacles", "foreground"]);
 
 function cloneLayers(layers) {
     return Object.fromEntries(
@@ -111,7 +113,7 @@ export class Game {
         this.mode = "world";
         this.selectedItemId = null;
         this.camera = { x: 0, y: 0 };
-        this.player = new Player(DEFAULT_TILE_SIZE, this.state.player);
+        this.player = new Player(TILE_SIZE, this.state.player);
         this.lastTime = performance.now();
 
         this.statusElement = document.querySelector("#status");
@@ -244,6 +246,12 @@ export class Game {
         requireObject(map.layers, `Map "${map.id}" layers`);
         requireArray(map.entities, `Map "${map.id}" entities`);
         requireArray(map.exits, `Map "${map.id}" exits`);
+
+        for (const layerName of Object.keys(map.layers)) {
+            if (!RENDER_LAYER_NAMES.has(layerName)) {
+                throw new Error(`Map "${map.id}" contains unsupported layer "${layerName}".`);
+            }
+        }
 
         const baseLayer = map.layers.base;
         requireNonEmptyArray(baseLayer, `Map "${map.id}" base layer`);
@@ -527,6 +535,10 @@ export class Game {
             this.validateSize(tile.size, `Tile ${String(tileId)} in "${mapId}"`);
         }
 
+        if (tile.footprint !== undefined) {
+            this.validateTileFootprintDefinition(tile.footprint, `${label}.footprint`);
+        }
+
         if (tile.condition) {
             validateCondition(tile.condition, `Condition for tile ${String(tileId)} in "${mapId}"`);
         }
@@ -537,6 +549,29 @@ export class Game {
                 `interaction on tile ${String(tileId)} in "${mapId}"`,
             );
         }
+    }
+
+    validateTileFootprintDefinition(footprint, label) {
+        requireNonEmptyArray(footprint, label);
+
+        const seenOffsets = new Set();
+        footprint.forEach((offset, index) => {
+            const entryLabel = `${label}[${index}]`;
+            if (!Array.isArray(offset) || offset.length !== 2 || !offset.every(Number.isInteger)) {
+                throw new Error(`${entryLabel} must contain two integers.`);
+            }
+
+            const [dc, dr] = offset;
+            if (dc < 0 || dr < 0) {
+                throw new Error(`${entryLabel} must contain non-negative offsets.`);
+            }
+
+            const key = `${dc},${dr}`;
+            if (seenOffsets.has(key)) {
+                throw new Error(`${label} contains duplicate offset ${key}.`);
+            }
+            seenOffsets.add(key);
+        });
     }
 
     validateEntityDefinition(entity, map) {
@@ -940,8 +975,8 @@ export class Game {
             interactions,
             entities: visibleEntities,
             bounds: {
-                width: map.gridSize.width * DEFAULT_TILE_SIZE,
-                height: map.gridSize.height * DEFAULT_TILE_SIZE,
+                width: map.gridSize.width * TILE_SIZE,
+                height: map.gridSize.height * TILE_SIZE,
             },
         };
     }
@@ -956,18 +991,12 @@ export class Game {
     }
 
     getOccupiedTileCells(col, row, tile) {
-        const [widthPx, heightPx] = tile.size ?? [DEFAULT_TILE_SIZE, DEFAULT_TILE_SIZE];
-        const widthInTiles = Math.ceil(widthPx / DEFAULT_TILE_SIZE);
-        const heightInTiles = Math.ceil(heightPx / DEFAULT_TILE_SIZE);
-        const cells = [];
+        const offsets = tile.footprint ?? [[0, 0]];
 
-        for (let dy = 0; dy < heightInTiles; dy += 1) {
-            for (let dx = 0; dx < widthInTiles; dx += 1) {
-                cells.push({ col: col + dx, row: row + dy });
-            }
-        }
-
-        return cells;
+        return offsets.map(([dc, dr]) => ({
+            col: col + dc,
+            row: row + dr,
+        }));
     }
 
     collectUsedTileIdsByMap() {
@@ -1378,7 +1407,7 @@ export class Game {
         this.input.clearMovement();
 
         this.state = prepared.state;
-        this.player = new Player(DEFAULT_TILE_SIZE, this.state.player);
+        this.player = new Player(TILE_SIZE, this.state.player);
         this.activeSpatialData = prepared.spatialData;
         this.selectedItemId = Object.keys(this.state.inventory)[0] ?? null;
         this.mode = "world";
@@ -1924,8 +1953,8 @@ export class Game {
     }
 
     updateCamera() {
-        const desiredX = this.player.x + DEFAULT_TILE_SIZE / 2 - this.canvas.width / 2;
-        const desiredY = this.player.y + DEFAULT_TILE_SIZE / 2 - this.canvas.height / 2;
+        const desiredX = this.player.x + TILE_SIZE / 2 - this.canvas.width / 2;
+        const desiredY = this.player.y + TILE_SIZE / 2 - this.canvas.height / 2;
 
         const maxX = Math.max(0, this.activeSpatialData.bounds.width - this.canvas.width);
         const maxY = Math.max(0, this.activeSpatialData.bounds.height - this.canvas.height);
@@ -1937,19 +1966,39 @@ export class Game {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        for (const layer of Object.values(this.activeMapState.layers)) {
-            this.renderLayer(layer);
+        this.renderLayer(this.activeMapState.layers.base);
+
+        const drawables = [];
+        let sequence = 0;
+
+        this.collectTileDrawables(
+            this.activeMapState.layers.obstacles,
+            drawables,
+            () => sequence++,
+        );
+        this.collectEntityDrawables(drawables, () => sequence++);
+        drawables.push({
+            kind: "player",
+            depthY: this.player.y + TILE_SIZE,
+            sequence: sequence++,
+        });
+
+        drawables.sort(
+            (first, second) => first.depthY - second.depthY || first.sequence - second.sequence,
+        );
+
+        for (const drawable of drawables) {
+            this.renderDrawable(drawable);
         }
 
-        this.renderEntities();
-
-        const playerSprite = this.playerSpriteDefinitions.get(this.state.player.spriteId);
-        const playerImage =
-            playerSprite.kind === "image" ? this.images.get(playerSprite.path) : null;
-        this.player.render(this.ctx, this.camera, playerSprite, playerImage);
+        if (this.activeMapState.layers.foreground) {
+            this.renderLayer(this.activeMapState.layers.foreground);
+        }
     }
 
     renderLayer(layer) {
+        if (!layer) return;
+
         layer.forEach((row, rowIndex) => {
             row.forEach((tileId, colIndex) => {
                 if (tileId === EMPTY_TILE_ID) return;
@@ -1957,30 +2006,90 @@ export class Game {
                 const tile = this.activeMap.tiles[tileId];
                 if (!this.isTilePresent(tile)) return;
 
-                const image = this.images.get(tile.path);
-                if (!image) return;
-
-                const [width, height] = tile.size ?? [DEFAULT_TILE_SIZE, DEFAULT_TILE_SIZE];
-                const drawX = colIndex * DEFAULT_TILE_SIZE - this.camera.x;
-                const drawY = rowIndex * DEFAULT_TILE_SIZE - this.camera.y;
-
-                this.ctx.drawImage(image, drawX, drawY, width, height);
+                this.renderTile(tile, colIndex, rowIndex);
             });
         });
     }
 
-    renderEntities() {
+    collectTileDrawables(layer, drawables, nextSequence) {
+        if (!layer) return;
+
+        layer.forEach((row, rowIndex) => {
+            row.forEach((tileId, colIndex) => {
+                if (tileId === EMPTY_TILE_ID) return;
+
+                const tile = this.activeMap.tiles[tileId];
+                if (!this.isTilePresent(tile)) return;
+
+                const occupiedCells = this.getOccupiedTileCells(colIndex, rowIndex, tile);
+                const bottomRow = Math.max(...occupiedCells.map((cell) => cell.row));
+
+                drawables.push({
+                    kind: "tile",
+                    tile,
+                    col: colIndex,
+                    row: rowIndex,
+                    depthY: (bottomRow + 1) * TILE_SIZE,
+                    sequence: nextSequence(),
+                });
+            });
+        });
+    }
+
+    collectEntityDrawables(drawables, nextSequence) {
         for (const entity of this.activeSpatialData.entities) {
-            const sprite = this.spriteDefinitions.get(entity.state.spriteId);
-            const image = this.images.get(sprite.path);
-            if (!image) continue;
-
-            const [width, height] = sprite.size;
-            const drawX = entity.state.col * DEFAULT_TILE_SIZE - this.camera.x;
-            const drawY = entity.state.row * DEFAULT_TILE_SIZE - this.camera.y;
-
-            this.ctx.drawImage(image, drawX, drawY, width, height);
+            drawables.push({
+                kind: "entity",
+                entity,
+                depthY: (entity.state.row + 1) * TILE_SIZE,
+                sequence: nextSequence(),
+            });
         }
+    }
+
+    renderDrawable(drawable) {
+        if (drawable.kind === "tile") {
+            this.renderTile(drawable.tile, drawable.col, drawable.row);
+            return;
+        }
+
+        if (drawable.kind === "entity") {
+            this.renderEntity(drawable.entity);
+            return;
+        }
+
+        const playerSprite = this.playerSpriteDefinitions.get(this.state.player.spriteId);
+        const playerImage =
+            playerSprite.kind === "image" ? this.images.get(playerSprite.path) : null;
+        this.player.render(this.ctx, this.camera, playerSprite, playerImage);
+    }
+
+    renderTile(tile, col, row) {
+        const image = this.images.get(tile.path);
+        if (!image) return;
+
+        const occupiedCells = this.getOccupiedTileCells(col, row, tile);
+        const bottomRow = Math.max(...occupiedCells.map((cell) => cell.row));
+        const worldBottomY = (bottomRow + 1) * TILE_SIZE;
+        const [width, height] = tile.size ?? [TILE_SIZE, TILE_SIZE];
+        const drawX = Math.round(col * TILE_SIZE - this.camera.x);
+        const drawY = Math.round(worldBottomY - height - this.camera.y);
+
+        this.ctx.drawImage(image, drawX, drawY, width, height);
+    }
+
+    renderEntity(entity) {
+        const sprite = this.spriteDefinitions.get(entity.state.spriteId);
+        const image = this.images.get(sprite.path);
+        if (!image) return;
+
+        const [width, height] = sprite.size;
+        const worldX = entity.state.col * TILE_SIZE;
+        const worldY = entity.state.row * TILE_SIZE;
+        const drawX = Math.round(worldX + (TILE_SIZE - width) / 2 - this.camera.x);
+        const drawY = Math.round(worldY + TILE_SIZE - height - this.camera.y);
+
+        this.ctx.drawImage(image, drawX, drawY, width, height);
     }
 
     loop(time) {

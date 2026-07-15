@@ -2,8 +2,8 @@ import { COMMON_INTERACTIONS } from "./interactions.js";
 import { EMPTY_TILE_ID, TILE_IDS } from "./tiles.js";
 
 const E = EMPTY_TILE_ID;
-const { FLOOR, FLOOR_ALT, WALL, WIDE_WALL } = TILE_IDS;
-const ROOM_03_ORB_WALL = 4; //TODO: move to tiles for the room-03 map. this doesnt need to be a global property
+const { FLOOR, FLOOR_ALT, WALL, WIDE_WALL, TREE } = TILE_IDS;
+const ROOM_03_ORB_WALL = 100; //TODO: move to tiles for the room-03 map. this doesnt need to be a global property
 
 export const MAPS = [
     {
@@ -272,6 +272,11 @@ export const MAPS = [
                 row: 5,
                 facing: { dc: 0, dr: 1 },
             },
+            fromRoom06: {
+                col: 7,
+                row: 1,
+                facing: { dc: 0, dr: 1 },
+            },
         },
 
         exits: [],
@@ -317,6 +322,23 @@ export const MAPS = [
                         entryId: "fromRoom03",
                     },
                     message: "You return to the previous room.",
+                },
+            },
+            {
+                id: "forest-door",
+                active: true,
+                col: 7,
+                row: 0,
+                spriteId: "door",
+                collision: true,
+                interaction: {
+                    handler: "teleport",
+                    triggers: ["action"],
+                    params: {
+                        mapId: "room-06",
+                        entryId: "fromRoom03",
+                    },
+                    message: "The door opens onto a small forest clearing.",
                 },
             },
         ],
@@ -699,6 +721,152 @@ export const MAPS = [
                 [WALL, E, E, E, E, WALL, E, E],
                 [WALL, E, WALL, E, E, E, E, E],
                 [WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL],
+            ],
+        },
+    },
+
+    {
+        id: "room-06",
+
+        entries: {
+            fromRoom03: {
+                col: 5,
+                row: 7,
+                facing: { dc: 0, dr: -1 },
+            },
+        },
+
+        exits: [],
+
+        tiles: {},
+
+        entities: [
+            {
+                id: "south-door",
+                active: true,
+                col: 5,
+                row: 8,
+                spriteId: "door",
+                collision: true,
+                interaction: {
+                    handler: "teleport",
+                    triggers: ["action"],
+                    params: {
+                        mapId: "room-03",
+                        entryId: "fromRoom06",
+                    },
+                    message: "You leave the clearing.",
+                },
+            },
+        ],
+
+        layers: {
+            base: [
+                [FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR],
+                [
+                    FLOOR,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR,
+                ],
+                [
+                    FLOOR,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR,
+                ],
+                [
+                    FLOOR,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR,
+                ],
+                [
+                    FLOOR,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR,
+                ],
+                [
+                    FLOOR,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR,
+                ],
+                [
+                    FLOOR,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR,
+                ],
+                [
+                    FLOOR,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR_ALT,
+                    FLOOR,
+                ],
+                [FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR],
+            ],
+
+            obstacles: [
+                [WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL],
+                [WALL, E, E, E, E, E, E, E, E, E, WALL],
+                [WALL, E, E, E, E, E, E, E, E, E, WALL],
+                [WALL, E, E, TREE, E, E, E, TREE, E, E, WALL],
+                [WALL, E, E, E, E, E, E, E, E, E, WALL],
+                [WALL, E, E, E, E, TREE, E, E, E, E, WALL],
+                [WALL, E, E, TREE, E, E, E, TREE, E, E, WALL],
+                [WALL, E, E, E, E, E, E, E, E, E, WALL],
+                [WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL, WALL],
             ],
         },
     },

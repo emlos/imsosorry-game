@@ -1,4 +1,4 @@
-export const DEFAULT_TILE_SIZE = 32;
+export const TILE_SIZE = 32;
 export const EMPTY_TILE_ID = -1;
 
 export const TILE_IDS = {
@@ -6,9 +6,9 @@ export const TILE_IDS = {
     FLOOR_ALT: 1,
     WALL: 2,
     WIDE_WALL: 3,
+    TREE: 4,
 };
-//TODO: allow collission independently of size, e.g for a tree, a 2x1 tile, where only the bottom has collission, and the top is just a visual.
-//This will require a new property for tiles, and specify whether the 'walkable' part of the tile is to be rendered above or below the player
+
 export const TILES = {
     [TILE_IDS.FLOOR]: {
         path: "./assets/tiles/floor.png",
@@ -21,6 +21,15 @@ export const TILES = {
     },
     [TILE_IDS.WIDE_WALL]: {
         path: "./assets/tiles/wide_wall.png",
-        size: [128, 64], //TODO: instead of fixed sizes, use multiplies/scale factors to match tile size
+        size: [64, 32],
+        footprint: [
+            [0, 0],
+            [1, 0],
+        ],
+    },
+    [TILE_IDS.TREE]: {
+        path: "./assets/tiles/tree.png",
+        size: [32, 64],
+        footprint: [[0, 0]],
     },
 };

@@ -105,15 +105,18 @@ export class Player {
     }
 
     render(ctx, camera, sprite, image) {
-        const drawX = Math.round(this.x - camera.x);
-        const drawY = Math.round(this.y - camera.y);
-
         if (sprite.kind === "image") {
             const [width, height] = sprite.size;
+            const drawX = Math.round(
+                this.x + (this.tileSize - width) / 2 - camera.x,
+            );
+            const drawY = Math.round(this.y + this.tileSize - height - camera.y);
             ctx.drawImage(image, drawX, drawY, width, height);
             return;
         }
 
+        const drawX = Math.round(this.x - camera.x);
+        const drawY = Math.round(this.y - camera.y);
         const inset = Math.round(this.tileSize * 0.18);
         const size = this.tileSize - inset * 2;
         const shapeX = drawX + inset;

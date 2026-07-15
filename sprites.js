@@ -27,13 +27,8 @@ export const SPRITES = {
 
 export const PLAYER_SPRITES = {
     default: {
-        kind: "shape",
-        fillStyle: "#f2f4ff",
-        strokeStyle: "#141821",
-    },
-    "orb-form": {
         kind: "image",
-        path: "./assets/tiles/orb.png",
-        size: [32, 32],
+        path: "./assets/player/default.png",
+        size: [32, 64],
     },
 };
