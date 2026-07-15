@@ -28,6 +28,8 @@ import {
 import { EditorRenderer } from "./editor-renderer.js";
 
 const byId = (id) => document.getElementById(id);
+export const ZOOM_LEVELS = Object.freeze([0.5, 0.75, 1, 1.5, 2, 3, 4]);
+
 const directionVectors = {
     up: { dc: 0, dr: -1 },
     down: { dc: 0, dr: 1 },
@@ -98,8 +100,11 @@ export class MapEditor {
         this.dirty = false;
         this.palettePreviews = [];
         this.exitJsonDirty = false;
+        this.zoom = 1;
         this.renderer = new EditorRenderer(byId("editor-canvas"));
         this.canvas = byId("editor-canvas");
+        this.canvasStage = byId("canvas-stage");
+        this.canvasScroll = byId("canvas-scroll");
     }
 
     get currentMap() {
@@ -288,6 +293,12 @@ export class MapEditor {
             "change",
             (event) => (this.showFootprints = event.target.checked),
         );
+        byId("zoom-out").addEventListener("click", () => this.changeZoom(-1));
+        byId("zoom-reset").addEventListener("click", () => this.setZoom(1));
+        byId("zoom-in").addEventListener("click", () => this.changeZoom(1));
+        this.canvasScroll.addEventListener("wheel", (event) => this.onCanvasWheel(event), {
+            passive: false,
+        });
         byId("entity-preset").addEventListener(
             "change",
             (event) => (this.selectedEntityPreset = event.target.value),
@@ -562,6 +573,80 @@ export class MapEditor {
         });
     }
 
+    onCanvasWheel(event) {
+        if (!event.ctrlKey && !event.metaKey) return;
+
+        event.preventDefault();
+        const direction = event.deltaY < 0 ? 1 : -1;
+        this.changeZoom(direction, event);
+    }
+
+    applyZoom() {
+        const width = this.canvas.width * this.zoom;
+        const height = this.canvas.height * this.zoom;
+        const cssWidth = `${width}px`;
+        const cssHeight = `${height}px`;
+
+        if (this.canvas.style.width !== cssWidth) this.canvas.style.width = cssWidth;
+        if (this.canvas.style.height !== cssHeight) this.canvas.style.height = cssHeight;
+        if (this.canvasStage.style.width !== cssWidth) this.canvasStage.style.width = cssWidth;
+        if (this.canvasStage.style.height !== cssHeight) this.canvasStage.style.height = cssHeight;
+
+        byId("zoom-reset").textContent = `${Math.round(this.zoom * 100)}%`;
+        const zoomIndex = ZOOM_LEVELS.indexOf(this.zoom);
+        byId("zoom-out").disabled = zoomIndex <= 0;
+        byId("zoom-in").disabled = zoomIndex >= ZOOM_LEVELS.length - 1;
+    }
+
+    getZoomAnchor(event = null) {
+        if (event && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+            return { clientX: event.clientX, clientY: event.clientY };
+        }
+
+        const rect = this.canvasScroll.getBoundingClientRect();
+        return {
+            clientX: rect.left + this.canvasScroll.clientWidth / 2,
+            clientY: rect.top + this.canvasScroll.clientHeight / 2,
+        };
+    }
+
+    setZoom(nextZoom, event = null) {
+        if (!ZOOM_LEVELS.includes(nextZoom)) {
+            throw new Error(`Unsupported editor zoom level ${String(nextZoom)}.`);
+        }
+
+        const anchor = this.getZoomAnchor(event);
+        const beforeRect = this.canvas.getBoundingClientRect();
+        const sourceX =
+            beforeRect.width > 0
+                ? ((anchor.clientX - beforeRect.left) / beforeRect.width) * this.canvas.width
+                : this.canvas.width / 2;
+        const sourceY =
+            beforeRect.height > 0
+                ? ((anchor.clientY - beforeRect.top) / beforeRect.height) * this.canvas.height
+                : this.canvas.height / 2;
+
+        this.zoom = nextZoom;
+        this.applyZoom();
+
+        const afterRect = this.canvas.getBoundingClientRect();
+        const scaledClientX = afterRect.left + (sourceX / this.canvas.width) * afterRect.width;
+        const scaledClientY = afterRect.top + (sourceY / this.canvas.height) * afterRect.height;
+
+        this.canvasScroll.scrollLeft += scaledClientX - anchor.clientX;
+        this.canvasScroll.scrollTop += scaledClientY - anchor.clientY;
+    }
+
+    changeZoom(direction, event = null) {
+        const currentIndex = ZOOM_LEVELS.indexOf(this.zoom);
+        const nextIndex = Math.max(
+            0,
+            Math.min(ZOOM_LEVELS.length - 1, currentIndex + Math.sign(direction)),
+        );
+        if (nextIndex === currentIndex) return;
+        this.setZoom(ZOOM_LEVELS[nextIndex], event);
+    }
+
     animationLoop(time) {
         this.renderer.advance(time);
         this.renderer.render(this.currentMap, {
@@ -575,6 +660,7 @@ export class MapEditor {
             selectedExitIndex: this.selectedExitIndex,
             rectanglePreview: this.rectanglePreview,
         });
+        this.applyZoom();
         for (const preview of this.palettePreviews) {
             this.renderer.renderVisualPreview(
                 preview.ctx,

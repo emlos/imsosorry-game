@@ -192,10 +192,13 @@ p {
 .canvas-scroll {
     overflow: auto;
     padding: 34px;
-    display: grid;
-    place-items: start center;
+}
+.canvas-stage {
+    position: relative;
+    margin: 0 auto;
 }
 #editor-canvas {
+    display: block;
     image-rendering: pixelated;
     background: #08090d;
     box-shadow:
@@ -204,14 +207,33 @@ p {
     touch-action: none;
 }
 .canvas-status {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
     padding: 0.45rem 0.8rem;
     border-top: 1px solid #343641;
     background: #171923;
     font-size: 0.8rem;
     color: #aeb1bd;
 }
+
+.canvas-status #selection-status {
+    text-align: right;
+}
+.zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+.zoom-controls button {
+    min-width: 2.2rem;
+    padding: 0.25rem 0.5rem;
+}
+#zoom-reset {
+    min-width: 4.2rem;
+}
+
 .validation-panel {
     max-height: 150px;
     overflow: auto;

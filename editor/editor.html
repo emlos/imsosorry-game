@@ -111,10 +111,17 @@
 
         <section class="canvas-column">
             <div id="canvas-scroll" class="canvas-scroll">
-                <canvas id="editor-canvas" width="320" height="256"></canvas>
+                <div id="canvas-stage" class="canvas-stage">
+                    <canvas id="editor-canvas" width="320" height="256"></canvas>
+                </div>
             </div>
             <div class="canvas-status">
                 <span id="cursor-position">Cell: —</span>
+                <div class="zoom-controls" aria-label="Canvas zoom">
+                    <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+                    <button id="zoom-reset" type="button">100%</button>
+                    <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+                </div>
                 <span id="selection-status">No selection</span>
             </div>
             <section class="validation-panel">
