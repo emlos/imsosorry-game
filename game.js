@@ -10,7 +10,7 @@ import {
     validateInteractionDefinition,
     validateInteractionReferences,
 } from "./interactions.js";
-import { Player } from "./player.js";
+import { MOVEMENT_SUBDIVISIONS, Player } from "./player.js";
 import { MUSIC, SOUNDS } from "./sounds.js";
 import { PLAYER_SPRITES, SPRITES } from "./sprites.js";
 import { TILE_SIZE, EMPTY_TILE_ID, TILES } from "./tiles.js";
@@ -37,6 +37,7 @@ const OPPOSITE_EDGE = {
 };
 
 const RENDER_LAYER_NAMES = new Set(["base", "obstacles", "foreground"]);
+const COLLISION_EPSILON = 1e-7;
 
 function cloneLayers(layers) {
     return Object.fromEntries(
@@ -109,7 +110,11 @@ export class Game {
         this.mode = "world";
         this.selectedItemId = null;
         this.camera = { x: 0, y: 0 };
-        this.player = new Player(TILE_SIZE, this.state.player);
+        this.player = new Player(
+            TILE_SIZE,
+            this.state.player,
+            this.getPlayerFootprint(this.state.player.spriteId),
+        );
         this.ambientAnimationTimeMs = 0;
         this.playerAnimation = {
             spriteId: null,
@@ -514,7 +519,7 @@ export class Game {
         const targetMap = this.mapsById.get(exit.targetMapId);
         const targetAxis = sourceAxis + exit.offset;
         const position = this.getEdgePosition(targetMap, exit.targetEdge, targetAxis);
-        this.validateMapPosition(
+        this.validatePlayerPosition(
             exit.targetMapId,
             position.col,
             position.row,
@@ -719,27 +724,51 @@ export class Game {
             requireObject(sprite, label);
 
             if (sprite.kind === "shape") {
-                requireExactKeys(sprite, new Set(["kind", "fillStyle", "strokeStyle"]), label);
+                requireExactKeys(
+                    sprite,
+                    new Set(["kind", "fillStyle", "strokeStyle", "footprint"]),
+                    label,
+                );
 
                 requireString(sprite.fillStyle, `${label}.fillStyle`);
                 requireString(sprite.strokeStyle, `${label}.strokeStyle`);
+                this.validatePlayerFootprintDefinition(sprite.footprint, `${label}.footprint`);
                 continue;
             }
 
             if (sprite.kind === "image") {
                 requireExactKeys(
                     sprite,
-                    new Set(["kind", "path", "size", "source", "defaultAnimation", "animations"]),
+                    new Set([
+                        "kind",
+                        "path",
+                        "size",
+                        "source",
+                        "defaultAnimation",
+                        "animations",
+                        "footprint",
+                    ]),
                     label,
                 );
                 requireString(sprite.path, `${label}.path`);
                 this.validateSize(sprite.size, label);
+                this.validatePlayerFootprintDefinition(sprite.footprint, `${label}.footprint`);
                 this.validateVisualDefinition(sprite, label);
                 continue;
             }
 
             throw new Error(`${label} has unsupported kind "${String(sprite.kind)}".`);
         }
+    }
+
+    validatePlayerFootprintDefinition(footprint, label) {
+        requireObject(footprint, label);
+        requireExactKeys(footprint, new Set(["width", "height", "offsetX", "offsetY"]), label);
+
+        requirePositiveNumber(footprint.width, `${label}.width`);
+        requirePositiveNumber(footprint.height, `${label}.height`);
+        requireInteger(footprint.offsetX, `${label}.offsetX`);
+        requireInteger(footprint.offsetY, `${label}.offsetY`);
     }
 
     validateVisualDefinition(visual, label) {
@@ -947,6 +976,85 @@ export class Game {
 
         if (col >= map.gridSize.width || row >= map.gridSize.height) {
             throw new Error(`${label} references position ${col},${row} outside "${mapId}".`);
+        }
+    }
+
+    getPlayerFootprint(spriteId) {
+        return this.playerSpriteDefinitions.get(spriteId).footprint;
+    }
+
+    validatePlayerPosition(mapId, col, row, label) {
+        const map =
+            this.mapsById.get(mapId) ?? this.maps.find((candidate) => candidate.id === mapId);
+        if (!map) {
+            throw new Error(`${label} references missing map "${mapId}".`);
+        }
+
+        const validCoordinate = (value) =>
+            Number.isFinite(value) &&
+            value >= 0 &&
+            Math.abs(value * MOVEMENT_SUBDIVISIONS - Math.round(value * MOVEMENT_SUBDIVISIONS)) <
+                COLLISION_EPSILON;
+
+        if (!validCoordinate(col) || !validCoordinate(row)) {
+            throw new Error(`${label} must use non-negative quarter-cell col and row coordinates.`);
+        }
+
+        if (col >= map.gridSize.width || row >= map.gridSize.height) {
+            throw new Error(`${label} references position ${col},${row} outside "${mapId}".`);
+        }
+    }
+
+    getFootboxCells(x, y, footprint, map) {
+        const left = x + footprint.offsetX;
+        const top = y + footprint.offsetY;
+        const right = left + footprint.width;
+        const bottom = top + footprint.height;
+        const mapWidth = map.gridSize.width * TILE_SIZE;
+        const mapHeight = map.gridSize.height * TILE_SIZE;
+
+        if (
+            left < -COLLISION_EPSILON ||
+            top < -COLLISION_EPSILON ||
+            right > mapWidth + COLLISION_EPSILON ||
+            bottom > mapHeight + COLLISION_EPSILON
+        ) {
+            return null;
+        }
+
+        const firstCol = Math.floor((left + COLLISION_EPSILON) / TILE_SIZE);
+        const lastCol = Math.floor((right - COLLISION_EPSILON) / TILE_SIZE);
+        const firstRow = Math.floor((top + COLLISION_EPSILON) / TILE_SIZE);
+        const lastRow = Math.floor((bottom - COLLISION_EPSILON) / TILE_SIZE);
+        const cells = [];
+
+        for (let row = firstRow; row <= lastRow; row += 1) {
+            for (let col = firstCol; col <= lastCol; col += 1) {
+                cells.push({ col, row });
+            }
+        }
+
+        return cells;
+    }
+
+    canFootboxOccupy(spatialData, map, x, y, footprint) {
+        const cells = this.getFootboxCells(x, y, footprint, map);
+        if (!cells) return false;
+
+        return cells.every(({ col, row }) => {
+            const key = `${col},${row}`;
+            return spatialData.walkable.has(key) && !spatialData.collision.has(key);
+        });
+    }
+
+    validatePlayerPlacement(spatialData, map, col, row, spriteId, label) {
+        this.validatePlayerPosition(map.id, col, row, label);
+        const footprint = this.getPlayerFootprint(spriteId);
+        const x = col * TILE_SIZE;
+        const y = row * TILE_SIZE;
+
+        if (!this.canFootboxOccupy(spatialData, map, x, y, footprint)) {
+            throw new Error(`${label} is outside walkable space or blocked by collision.`);
         }
     }
 
@@ -1311,10 +1419,12 @@ export class Game {
 
         const activeMap = this.mapsById.get(candidate.player.mapId);
         const spatialData = this.buildSpatialData(activeMap, candidate);
-        this.validateTransitionCell(
+        this.validatePlayerPlacement(
             spatialData,
+            activeMap,
             candidate.player.col,
             candidate.player.row,
+            candidate.player.spriteId,
             "Saved player position",
         );
 
@@ -1338,10 +1448,24 @@ export class Game {
             throw new Error(`Save data.player references missing map "${player.mapId}".`);
         }
 
-        this.validateEntry(player, "Save data.player");
-        this.validateMapPosition(player.mapId, player.col, player.row, "Save data.player position");
-        this.validatePlayerSpriteReference(player.spriteId, "Save data.player");
+        this.validatePlayerPosition(
+            player.mapId,
+            player.col,
+            player.row,
+            "Save data.player position",
+        );
 
+        const facing = player.facing;
+        const cardinalFacing =
+            facing &&
+            Number.isInteger(facing.dc) &&
+            Number.isInteger(facing.dr) &&
+            Math.abs(facing.dc) + Math.abs(facing.dr) === 1;
+        if (!cardinalFacing) {
+            throw new Error("Save data.player must define a cardinal facing direction.");
+        }
+
+        this.validatePlayerSpriteReference(player.spriteId, "Save data.player");
         requirePositiveNumber(player.movementSpeed, "Save data.player.movementSpeed");
 
         candidate.player = structuredClone(player);
@@ -1514,7 +1638,11 @@ export class Game {
         this.input.clearMovement();
 
         this.state = prepared.state;
-        this.player = new Player(TILE_SIZE, this.state.player);
+        this.player = new Player(
+            TILE_SIZE,
+            this.state.player,
+            this.getPlayerFootprint(this.state.player.spriteId),
+        );
         this.resetPlayerAnimation();
         this.activeSpatialData = prepared.spatialData;
         this.selectedItemId = Object.keys(this.state.inventory)[0] ?? null;
@@ -1581,7 +1709,14 @@ export class Game {
             : `Position: ${position.col},${position.row}`;
 
         const spatialData = this.buildSpatialData(map);
-        this.validateTransitionCell(spatialData, position.col, position.row, "Transition position");
+        this.validatePlayerPlacement(
+            spatialData,
+            map,
+            position.col,
+            position.row,
+            this.state.player.spriteId,
+            "Transition position",
+        );
 
         this.inventoryPanel.hide();
         this.mode = "world";
@@ -1603,10 +1738,12 @@ export class Game {
         if (this.state.player.mapId !== mapId) return;
 
         const spatialData = this.buildSpatialData(this.mapsById.get(mapId));
-        this.validateTransitionCell(
+        this.validatePlayerPlacement(
             spatialData,
+            this.activeMap,
             this.player.col,
             this.player.row,
+            this.state.player.spriteId,
             `${label} would invalidate the player position`,
         );
         this.activeSpatialData = spatialData;
@@ -1852,7 +1989,22 @@ export class Game {
 
     setPlayerSprite(spriteId) {
         this.validatePlayerSpriteReference(spriteId, "Setting player sprite");
+        const footprint = this.getPlayerFootprint(spriteId);
+
+        if (
+            !this.canFootboxOccupy(
+                this.activeSpatialData,
+                this.activeMap,
+                this.player.x,
+                this.player.y,
+                footprint,
+            )
+        ) {
+            throw new Error(`Player sprite "${spriteId}" does not fit at the current position.`);
+        }
+
         this.state.player.spriteId = spriteId;
+        this.player.setFootprint(footprint);
         this.resetPlayerAnimation();
     }
 
@@ -1952,61 +2104,163 @@ export class Game {
         );
     }
 
-    canPlayerEnter(col, row) {
-        const key = `${col},${row}`;
-        return (
-            this.activeSpatialData.walkable.has(key) && !this.activeSpatialData.collision.has(key)
+    canPlayerOccupy(x, y) {
+        return this.canFootboxOccupy(
+            this.activeSpatialData,
+            this.activeMap,
+            x,
+            y,
+            this.player.footprint,
         );
     }
 
-    attemptPlayerMovement(dc, dr) {
+    attemptPlayerMovement(dc, dr, facing) {
         if (this.mode !== "world" || this.player.isMoving) return false;
 
-        this.player.setFacing(dc, dr);
+        this.player.setFacing(facing.dc, facing.dr);
+        const target = this.player.getStepTarget(dc, dr);
+        const targetIsOpen = this.canPlayerOccupy(target.x, target.y);
 
-        const targetCol = this.player.col + dc;
-        const targetRow = this.player.row + dr;
+        if (dc !== 0 && dr !== 0) {
+            const horizontalTarget = this.player.getStepTarget(dc, 0);
+            const verticalTarget = this.player.getStepTarget(0, dr);
+            const horizontalIsOpen = this.canPlayerOccupy(horizontalTarget.x, horizontalTarget.y);
+            const verticalIsOpen = this.canPlayerOccupy(verticalTarget.x, verticalTarget.y);
 
-        if (this.canPlayerEnter(targetCol, targetRow)) {
-            this.player.startMove(targetCol, targetRow);
+            if (targetIsOpen && horizontalIsOpen && verticalIsOpen) {
+                this.player.beginStep(dc, dr);
+                return true;
+            }
+
+            const exitAttempt = this.getExitAttempt(target.x, target.y, dc, dr, targetIsOpen);
+            const exitAxisIsOpen =
+                exitAttempt && (exitAttempt.edge === "west" || exitAttempt.edge === "east")
+                    ? verticalIsOpen
+                    : horizontalIsOpen;
+            if (exitAttempt && exitAxisIsOpen && this.tryExecuteExit(exitAttempt)) return true;
+
+            const horizontalFirst = facing.dc !== 0;
+            const slideCandidates = horizontalFirst
+                ? [
+                      { dc, dr: 0, open: horizontalIsOpen },
+                      { dc: 0, dr, open: verticalIsOpen },
+                  ]
+                : [
+                      { dc: 0, dr, open: verticalIsOpen },
+                      { dc, dr: 0, open: horizontalIsOpen },
+                  ];
+
+            for (const candidate of slideCandidates) {
+                if (!candidate.open) continue;
+                this.player.beginStep(candidate.dc, candidate.dr);
+                return true;
+            }
+
+            return false;
+        }
+
+        if (targetIsOpen) {
+            this.player.beginStep(dc, dr);
             return true;
         }
 
-        const exitAttempt = this.getExitAttempt(targetCol, targetRow, dc, dr);
-        if (!exitAttempt) return false;
+        const exitAttempt = this.getExitAttempt(target.x, target.y, dc, dr, targetIsOpen);
+        return exitAttempt ? this.tryExecuteExit(exitAttempt) : false;
+    }
 
+    getExitAttempt(targetX, targetY, dc, dr, targetIsOpen) {
+        if (targetIsOpen) return null;
+
+        const footbox = this.player.getFootboxAt(targetX, targetY);
+        const mapWidth = this.activeMap.gridSize.width * TILE_SIZE;
+        const mapHeight = this.activeMap.gridSize.height * TILE_SIZE;
+        const touchedCells = this.getFootboxCells(
+            targetX,
+            targetY,
+            this.player.footprint,
+            this.activeMap,
+        );
+
+        if (
+            touchedCells?.some(({ col, row }) =>
+                this.activeSpatialData.collision.has(`${col},${row}`),
+            )
+        ) {
+            return null;
+        }
+
+        const boundaryIsNotWalkable = (edge) => {
+            if (!touchedCells) return false;
+
+            return touchedCells.some(({ col, row }) => {
+                const onEdge =
+                    (edge === "west" && col === 0) ||
+                    (edge === "east" && col === this.activeMap.gridSize.width - 1) ||
+                    (edge === "north" && row === 0) ||
+                    (edge === "south" && row === this.activeMap.gridSize.height - 1);
+
+                return onEdge && !this.activeSpatialData.walkable.has(`${col},${row}`);
+            });
+        };
+
+        const edges = [];
+        if (dc < 0 && (footbox.x < 0 || boundaryIsNotWalkable("west"))) {
+            edges.push("west");
+        }
+        if (dc > 0 && (footbox.x + footbox.width > mapWidth || boundaryIsNotWalkable("east"))) {
+            edges.push("east");
+        }
+        if (dr < 0 && (footbox.y < 0 || boundaryIsNotWalkable("north"))) {
+            edges.push("north");
+        }
+        if (dr > 0 && (footbox.y + footbox.height > mapHeight || boundaryIsNotWalkable("south"))) {
+            edges.push("south");
+        }
+
+        if (edges.length !== 1) return null;
+
+        const edge = edges[0];
+        const currentTile = this.player.getCurrentTile();
+        const horizontalEdge = edge === "west" || edge === "east";
+        const rangeAxis = horizontalEdge ? currentTile.row : currentTile.col;
+        const sourceAxis = horizontalEdge ? this.player.row : this.player.col;
+        const movementDirection =
+            edge === "west"
+                ? { dc: -1, dr: 0 }
+                : edge === "east"
+                  ? { dc: 1, dr: 0 }
+                  : edge === "north"
+                    ? { dc: 0, dr: -1 }
+                    : { dc: 0, dr: 1 };
+
+        return { edge, rangeAxis, sourceAxis, movementDirection };
+    }
+
+    tryExecuteExit(exitAttempt) {
         const exit = this.activeMap.exits.find(
             (candidate) =>
                 candidate.edge === exitAttempt.edge &&
-                exitAttempt.axis >= candidate.range[0] &&
-                exitAttempt.axis <= candidate.range[1],
+                exitAttempt.rangeAxis >= candidate.range[0] &&
+                exitAttempt.rangeAxis <= candidate.range[1],
         );
         if (!exit) return false;
 
-        this.executeEdgeExit(exit, exitAttempt.axis, { dc, dr });
-        return true;
-    }
-
-    getExitAttempt(targetCol, targetRow, dc, dr) {
-        const { width, height } = this.activeMap.gridSize;
-        const outside = targetCol < 0 || targetCol >= width || targetRow < 0 || targetRow >= height;
-
-        if (!outside) {
-            const targetKey = `${targetCol},${targetRow}`;
-            if (this.activeSpatialData.walkable.has(targetKey)) return null;
-
-            const targetsBoundary =
-                (dc === -1 && targetCol === 0) ||
-                (dc === 1 && targetCol === width - 1) ||
-                (dr === -1 && targetRow === 0) ||
-                (dr === 1 && targetRow === height - 1);
-            if (!targetsBoundary) return null;
+        if (exit.preserveAxis === true) {
+            const targetMap = this.mapsById.get(exit.targetMapId);
+            const targetPosition = this.getPreservedExitPosition(exit, exitAttempt.sourceAxis);
+            const targetSpatialData = this.buildSpatialData(targetMap);
+            const targetIsOpen = this.canFootboxOccupy(
+                targetSpatialData,
+                targetMap,
+                targetPosition.col * TILE_SIZE,
+                targetPosition.row * TILE_SIZE,
+                this.player.footprint,
+            );
+            if (!targetIsOpen) return false;
         }
 
-        if (dc === -1) return { edge: "west", axis: targetRow };
-        if (dc === 1) return { edge: "east", axis: targetRow };
-        if (dr === -1) return { edge: "north", axis: targetCol };
-        return { edge: "south", axis: targetCol };
+        this.executeEdgeExit(exit, exitAttempt.sourceAxis, exitAttempt.movementDirection);
+        return true;
     }
 
     executeEdgeExit(exit, sourceAxis, movementDirection) {
@@ -2101,18 +2355,30 @@ export class Game {
         this.ambientAnimationTimeMs += deltaMs;
 
         if (this.mode === "world") {
-            const completedMove = this.player.update(deltaMs);
+            let remainingMs = deltaMs;
 
-            if (completedMove) {
-                this.handleTouchInteraction();
-            }
+            for (let stepCount = 0; stepCount < 64 && this.mode === "world"; stepCount += 1) {
+                if (this.player.isMoving) {
+                    const result = this.player.update(remainingMs);
+                    remainingMs = result.remainingMs;
 
-            if (this.mode === "world" && !this.player.isMoving) {
-                const direction = this.input.getActiveMovementDirection();
+                    if (!result.completed) break;
 
-                if (direction) {
-                    this.attemptPlayerMovement(direction.dc, direction.dr);
+                    if (result.tileChanged) {
+                        this.handleTouchInteraction();
+                        if (this.mode !== "world") break;
+                    }
                 }
+
+                const movement = this.input.getMovementVector();
+                if (!movement) break;
+
+                const started = this.attemptPlayerMovement(
+                    movement.dc,
+                    movement.dr,
+                    movement.facing,
+                );
+                if (!started || !this.player.isMoving || remainingMs <= 0) break;
             }
 
             this.updatePlayerAnimation(deltaMs);

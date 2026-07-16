@@ -1,8 +1,6 @@
 const ACTION_KEYS = new Set(["KeyZ", "Enter", "NumpadEnter"]);
 const INVENTORY_KEYS = new Set(["KeyI", "Escape"]);
 
-//TODO: allow diagnoal movement
-//TODO: dont adhere player strictly to the grid, allow for some movement in between tiles - lest say movement on an invisible grid of 1/4 tile increments, and allow for movement in between tiles?
 export class InputController {
     constructor(game) {
         this.game = game;
@@ -104,14 +102,39 @@ export class InputController {
         this.movementKeyOrder.length = 0;
     }
 
-    getActiveMovementDirection() {
+    getMovementVector() {
+        let dc = 0;
+        let dr = 0;
+
+        for (const code of this.keysPressed) {
+            const direction = this.movementDirections.get(code);
+            dc += direction.dc;
+            dr += direction.dr;
+        }
+
+        dc = Math.sign(dc);
+        dr = Math.sign(dr);
+        if (dc === 0 && dr === 0) return null;
+
+        let facing = null;
         for (let index = this.movementKeyOrder.length - 1; index >= 0; index -= 1) {
             const code = this.movementKeyOrder[index];
-            if (this.keysPressed.has(code)) {
-                return this.movementDirections.get(code);
+            if (!this.keysPressed.has(code)) continue;
+
+            const direction = this.movementDirections.get(code);
+            const contributes =
+                (direction.dc !== 0 && direction.dc === dc) ||
+                (direction.dr !== 0 && direction.dr === dr);
+            if (contributes) {
+                facing = direction;
+                break;
             }
         }
 
-        return null;
+        return {
+            dc,
+            dr,
+            facing: facing ?? (dc !== 0 ? { dc, dr: 0 } : { dc: 0, dr }),
+        };
     }
 }

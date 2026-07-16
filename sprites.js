@@ -126,6 +126,12 @@ export const PLAYER_SPRITES = {
         path: "./assets/player/default-sheet.png",
         source: [0, 0, 32, 64],
         size: [32, 64],
+        footprint: {
+            width: 16,
+            height: 16,
+            offsetX: 8,
+            offsetY: 8,
+        },
         defaultAnimation: "idle-down",
         animations: {
             "idle-down": {
@@ -186,5 +192,11 @@ export const PLAYER_SPRITES = {
         kind: "shape",
         fillStyle: "#f3a7c0",
         strokeStyle: "#3f2945",
+        footprint: {
+            width: 16,
+            height: 16,
+            offsetX: 8,
+            offsetY: 8,
+        },
     },
 };
