@@ -2,7 +2,12 @@ import { drawImageVisual, resolveAnimationId, resolveVisualFrame } from "./anima
 import { AudioSystem } from "./audio.js";
 import { evaluateCondition, validateCondition, validateConditionReferences } from "./conditions.js";
 import { DialogueBox } from "./dialogue.js";
-import { runEffects, validateEffectsDefinition, validateEffectsReferences } from "./effects.js";
+import {
+    collectRandomEffectIds,
+    runEffects,
+    validateEffectsDefinition,
+    validateEffectsReferences,
+} from "./effects.js";
 import { InputController } from "./input.js";
 import { InventoryPanel } from "./inventory.js";
 import {
@@ -22,6 +27,13 @@ import { MUSIC, MUSIC_EFFECTS, SOUNDS } from "./sounds.js";
 import { PLAYER_SPRITES, SPRITES } from "./sprites.js";
 import { TILE_SIZE, EMPTY_TILE_ID, TILES } from "./tiles.js";
 import { SAVE_VERSION } from "./saves.js";
+import {
+    RANDOM_SCOPES,
+    RANDOM_STATE_VERSION,
+    chooseWeightedIndex,
+    createRandomState,
+    deterministicFloat,
+} from "./random.js";
 import {
     requireArray,
     requireBoolean,
@@ -90,6 +102,7 @@ function createRuntimeState(maps) {
         flags: {},
         inventory: {},
         maps: Object.fromEntries(maps.map((map) => [map.id, createMapState(map)])),
+        random: createRandomState(),
     };
 }
 
@@ -110,6 +123,7 @@ export class Game {
         this.sessionMusicEventIds = new Set();
         this.saveMusicEventIds = new Set();
         this.audioDebugElapsedMs = 0;
+        this.runningExitEvents = false;
 
         this.state = createRuntimeState(authoredMaps);
 
@@ -274,6 +288,18 @@ export class Game {
         requireObject(map.layers, `Map "${map.id}" layers`);
         requireArray(map.entities, `Map "${map.id}" entities`);
         requireArray(map.exits, `Map "${map.id}" exits`);
+        if (map.onEnter !== undefined) {
+            requireArray(map.onEnter, `Map "${map.id}" onEnter`);
+            if (map.onEnter.length > 0) {
+                validateEffectsDefinition(map.onEnter, `Map "${map.id}" onEnter`);
+            }
+        }
+        if (map.onExit !== undefined) {
+            requireArray(map.onExit, `Map "${map.id}" onExit`);
+            if (map.onExit.length > 0) {
+                validateEffectsDefinition(map.onExit, `Map "${map.id}" onExit`);
+            }
+        }
         validateMapMusicDefinition(map);
 
         for (const layerName of Object.keys(map.layers)) {
@@ -366,7 +392,15 @@ export class Game {
             entityIds.add(entity.id);
         }
 
-        map.exits.forEach((exit, index) => this.validateExitDefinition(exit, map, index));
+        const randomExitIds = new Set();
+        map.exits.forEach((exit, index) => {
+            this.validateExitDefinition(exit, map, index);
+            if (exit.destination?.type !== "random") return;
+            if (randomExitIds.has(exit.id)) {
+                throw new Error(`Map "${map.id}" contains duplicate random exit ID "${exit.id}".`);
+            }
+            randomExitIds.add(exit.id);
+        });
         this.validateExitRangeOverlaps(map);
     }
 
@@ -387,10 +421,83 @@ export class Game {
         }
     }
 
+    validateExitDestinationDefinition(destination, sourceEdge, label) {
+        requireObject(destination, label);
+        this.validateMusicTransitionOptions(destination, label);
+        requireString(destination.targetMapId, `${label}.targetMapId`);
+
+        if (Object.hasOwn(destination, "entryId")) {
+            requireExactKeys(
+                destination,
+                new Set([
+                    "weight",
+                    "targetMapId",
+                    "entryId",
+                    "musicTransition",
+                    "musicTransitionMs",
+                ]),
+                label,
+            );
+            requireString(destination.entryId, `${label}.entryId`);
+            return;
+        }
+
+        if (Object.hasOwn(destination, "targetPosition")) {
+            requireExactKeys(
+                destination,
+                new Set([
+                    "weight",
+                    "targetMapId",
+                    "targetPosition",
+                    "musicTransition",
+                    "musicTransitionMs",
+                ]),
+                label,
+            );
+            requireObject(destination.targetPosition, `${label}.targetPosition`);
+            requireExactKeys(
+                destination.targetPosition,
+                new Set(["col", "row", "facing"]),
+                `${label}.targetPosition`,
+            );
+            this.validateEntry(destination.targetPosition, `${label}.targetPosition`);
+            return;
+        }
+
+        requireExactKeys(
+            destination,
+            new Set([
+                "weight",
+                "targetMapId",
+                "targetEdge",
+                "preserveAxis",
+                "offset",
+                "musicTransition",
+                "musicTransitionMs",
+            ]),
+            label,
+        );
+
+        if (destination.preserveAxis !== true) {
+            throw new Error(`${label}.preserveAxis must be true.`);
+        }
+
+        const edges = new Set(["north", "south", "east", "west"]);
+        if (!edges.has(destination.targetEdge)) {
+            throw new Error(`${label}.targetEdge must be north, south, east, or west.`);
+        }
+        if (destination.targetEdge !== OPPOSITE_EDGE[sourceEdge]) {
+            throw new Error(
+                `${label}.targetEdge must be the opposite edge (${sourceEdge} to ` +
+                    `${OPPOSITE_EDGE[sourceEdge]}).`,
+            );
+        }
+        requireInteger(destination.offset, `${label}.offset`);
+    }
+
     validateExitDefinition(exit, map, index) {
         const label = `Exit ${index} in "${map.id}"`;
         requireObject(exit, label);
-        this.validateMusicTransitionOptions(exit, label);
 
         const edges = new Set(["north", "south", "east", "west"]);
         if (!edges.has(exit.edge)) {
@@ -413,79 +520,41 @@ export class Game {
             throw new Error(`${label}.range exceeds the ${exit.edge} edge of "${map.id}".`);
         }
 
-        requireString(exit.targetMapId, `${label}.targetMapId`);
-
-        if (Object.hasOwn(exit, "entryId")) {
+        if (Object.hasOwn(exit, "destination")) {
+            requireExactKeys(exit, new Set(["id", "edge", "range", "destination"]), label);
+            requireString(exit.id, `${label}.id`);
+            const destination = exit.destination;
+            requireObject(destination, `${label}.destination`);
             requireExactKeys(
-                exit,
-                new Set([
-                    "edge",
-                    "range",
-                    "targetMapId",
-                    "entryId",
-                    "musicTransition",
-                    "musicTransitionMs",
-                ]),
-                label,
+                destination,
+                new Set(["type", "id", "scope", "choices"]),
+                `${label}.destination`,
             );
-            requireString(exit.entryId, `${label}.entryId`);
+            if (destination.type !== "random") {
+                throw new Error(`${label}.destination.type must be "random".`);
+            }
+            requireString(destination.id, `${label}.destination.id`);
+            if (!RANDOM_SCOPES.has(destination.scope)) {
+                throw new Error(`${label}.destination.scope is unsupported.`);
+            }
+            requireNonEmptyArray(destination.choices, `${label}.destination.choices`);
+            destination.choices.forEach((choice, choiceIndex) => {
+                requirePositiveNumber(
+                    choice?.weight,
+                    `${label}.destination.choices[${choiceIndex}].weight`,
+                );
+                this.validateExitDestinationDefinition(
+                    choice,
+                    exit.edge,
+                    `${label}.destination.choices[${choiceIndex}]`,
+                );
+            });
             return;
         }
 
-        if (Object.hasOwn(exit, "targetPosition")) {
-            requireExactKeys(
-                exit,
-                new Set([
-                    "edge",
-                    "range",
-                    "targetMapId",
-                    "targetPosition",
-                    "musicTransition",
-                    "musicTransitionMs",
-                ]),
-                label,
-            );
-            requireObject(exit.targetPosition, `${label}.targetPosition`);
-            requireExactKeys(
-                exit.targetPosition,
-                new Set(["col", "row", "facing"]),
-                `${label}.targetPosition`,
-            );
-            this.validateEntry(exit.targetPosition, `${label}.targetPosition`);
-            return;
-        }
-
-        requireExactKeys(
-            exit,
-            new Set([
-                "edge",
-                "range",
-                "targetMapId",
-                "targetEdge",
-                "preserveAxis",
-                "offset",
-                "musicTransition",
-                "musicTransitionMs",
-            ]),
-            label,
-        );
-
-        if (exit.preserveAxis !== true) {
-            throw new Error(`${label}.preserveAxis must be true.`);
-        }
-
-        if (!edges.has(exit.targetEdge)) {
-            throw new Error(`${label}.targetEdge must be north, south, east, or west.`);
-        }
-
-        if (exit.targetEdge !== OPPOSITE_EDGE[exit.edge]) {
-            throw new Error(
-                `${label}.targetEdge must be the opposite edge (${exit.edge} to ` +
-                    `${OPPOSITE_EDGE[exit.edge]}).`,
-            );
-        }
-
-        requireInteger(exit.offset, `${label}.offset`);
+        this.validateMusicTransitionOptions(exit, label);
+        const { edge, range, ...destination } = exit;
+        this.validateExitDestinationDefinition(destination, edge, label);
     }
 
     validateExitRangeOverlaps(map) {
@@ -512,55 +581,70 @@ export class Game {
         }
     }
 
+    validateExitDestinationReferences(exit, destination, label, initialSpatialDataByMap) {
+        const targetMap = this.mapsById.get(destination.targetMapId);
+        if (!targetMap) {
+            throw new Error(`${label} references missing map "${destination.targetMapId}".`);
+        }
+
+        if (Object.hasOwn(destination, "entryId")) {
+            this.validateEntryReference(destination.targetMapId, destination.entryId, label);
+            return;
+        }
+
+        if (Object.hasOwn(destination, "targetPosition")) {
+            this.validateMapPosition(
+                destination.targetMapId,
+                destination.targetPosition.col,
+                destination.targetPosition.row,
+                `${label}.targetPosition`,
+            );
+            this.validateTransitionCell(
+                initialSpatialDataByMap.get(destination.targetMapId),
+                destination.targetPosition.col,
+                destination.targetPosition.row,
+                `${label}.targetPosition`,
+            );
+            return;
+        }
+
+        const targetAxisLimit =
+            destination.targetEdge === "east" || destination.targetEdge === "west"
+                ? targetMap.gridSize.height
+                : targetMap.gridSize.width;
+        const firstTargetAxis = exit.range[0] + destination.offset;
+        const lastTargetAxis = exit.range[1] + destination.offset;
+        if (firstTargetAxis < 0 || lastTargetAxis >= targetAxisLimit) {
+            throw new Error(`${label} preserves its axis outside "${destination.targetMapId}".`);
+        }
+
+        const targetSpatialData = initialSpatialDataByMap.get(destination.targetMapId);
+        for (let sourceAxis = exit.range[0]; sourceAxis <= exit.range[1]; sourceAxis += 1) {
+            const targetPosition = this.getPreservedExitPosition(destination, sourceAxis);
+            this.validateTransitionCell(
+                targetSpatialData,
+                targetPosition.col,
+                targetPosition.row,
+                `${label} destination for source axis ${sourceAxis}`,
+            );
+        }
+    }
+
     validateExitReferences(map, initialSpatialDataByMap) {
         map.exits.forEach((exit, index) => {
             const label = `Exit ${index} in "${map.id}"`;
-            const targetMap = this.mapsById.get(exit.targetMapId);
-            if (!targetMap) {
-                throw new Error(`${label} references missing map "${exit.targetMapId}".`);
-            }
-
-            if (Object.hasOwn(exit, "entryId")) {
-                this.validateEntryReference(exit.targetMapId, exit.entryId, label);
+            if (exit.destination?.type === "random") {
+                exit.destination.choices.forEach((choice, choiceIndex) => {
+                    this.validateExitDestinationReferences(
+                        exit,
+                        choice,
+                        `${label}.destination.choices[${choiceIndex}]`,
+                        initialSpatialDataByMap,
+                    );
+                });
                 return;
             }
-
-            if (Object.hasOwn(exit, "targetPosition")) {
-                this.validateMapPosition(
-                    exit.targetMapId,
-                    exit.targetPosition.col,
-                    exit.targetPosition.row,
-                    `${label}.targetPosition`,
-                );
-                this.validateTransitionCell(
-                    initialSpatialDataByMap.get(exit.targetMapId),
-                    exit.targetPosition.col,
-                    exit.targetPosition.row,
-                    `${label}.targetPosition`,
-                );
-                return;
-            }
-
-            const targetAxisLimit =
-                exit.targetEdge === "east" || exit.targetEdge === "west"
-                    ? targetMap.gridSize.height
-                    : targetMap.gridSize.width;
-            const firstTargetAxis = exit.range[0] + exit.offset;
-            const lastTargetAxis = exit.range[1] + exit.offset;
-            if (firstTargetAxis < 0 || lastTargetAxis >= targetAxisLimit) {
-                throw new Error(`${label} preserves its axis outside "${exit.targetMapId}".`);
-            }
-
-            const targetSpatialData = initialSpatialDataByMap.get(exit.targetMapId);
-            for (let sourceAxis = exit.range[0]; sourceAxis <= exit.range[1]; sourceAxis += 1) {
-                const targetPosition = this.getPreservedExitPosition(exit, sourceAxis);
-                this.validateTransitionCell(
-                    targetSpatialData,
-                    targetPosition.col,
-                    targetPosition.row,
-                    `${label} destination for source axis ${sourceAxis}`,
-                );
-            }
+            this.validateExitDestinationReferences(exit, exit, label, initialSpatialDataByMap);
         });
     }
 
@@ -712,6 +796,7 @@ export class Game {
 
     validateMapReferences(map) {
         const validatedTileIds = new Set();
+        const tileRandomIds = new Map();
 
         for (const layer of Object.values(map.layers)) {
             for (const row of layer) {
@@ -730,6 +815,19 @@ export class Game {
                     }
 
                     if (interaction) {
+                        if (interaction.handler === "effects") {
+                            for (const randomId of collectRandomEffectIds(interaction.effects)) {
+                                const previousTileId = tileRandomIds.get(randomId);
+                                if (previousTileId !== undefined) {
+                                    throw new Error(
+                                        `Map "${map.id}" tile interactions duplicate random ID ` +
+                                            `"${randomId}" on tile ${String(previousTileId)} and ` +
+                                            `${String(tileId)}.`,
+                                    );
+                                }
+                                tileRandomIds.set(randomId, tileId);
+                            }
+                        }
                         validateInteractionReferences(
                             this,
                             interaction,
@@ -742,6 +840,13 @@ export class Game {
         }
 
         validateMapMusicReferences(this, map);
+
+        if (map.onEnter !== undefined) {
+            validateEffectsReferences(this, map.onEnter, map.id, `Map "${map.id}" onEnter`);
+        }
+        if (map.onExit !== undefined) {
+            validateEffectsReferences(this, map.onExit, map.id, `Map "${map.id}" onExit`);
+        }
 
         for (const entity of map.entities) {
             if (entity.condition) {
@@ -1506,6 +1611,7 @@ export class Game {
             flags: structuredClone(this.state.flags),
             inventory: structuredClone(this.state.inventory),
             maps,
+            random: structuredClone(this.state.random),
             music: {
                 playback: this.audio.createSaveState(),
                 playedEventIds: [...this.saveMusicEventIds].sort(),
@@ -1519,7 +1625,16 @@ export class Game {
         requirePlainObject(rawSaveData, "Save data");
         requireExactKeys(
             rawSaveData,
-            new Set(["version", "savedAt", "player", "flags", "inventory", "maps", "music"]),
+            new Set([
+                "version",
+                "savedAt",
+                "player",
+                "flags",
+                "inventory",
+                "maps",
+                "random",
+                "music",
+            ]),
             "Save data",
         );
 
@@ -1538,6 +1653,7 @@ export class Game {
         this.applySavedFlags(candidate, rawSaveData.flags);
         this.applySavedInventory(candidate, rawSaveData.inventory);
         this.applySavedMaps(candidate, rawSaveData.maps);
+        this.applySavedRandom(candidate, rawSaveData.random);
         const music = this.prepareSavedMusic(rawSaveData.music);
 
         const activeMap = this.mapsById.get(candidate.player.mapId);
@@ -1650,6 +1766,106 @@ export class Game {
         }
 
         candidate.inventory = structuredClone(inventory);
+    }
+
+    applySavedRandom(candidate, random) {
+        requirePlainObject(random, "Save data.random");
+        requireExactKeys(
+            random,
+            new Set([
+                "version",
+                "seed",
+                "counters",
+                "resolved",
+                "roomVisits",
+                "currentRoomRuntime",
+            ]),
+            "Save data.random",
+        );
+
+        if (random.version !== RANDOM_STATE_VERSION) {
+            throw new Error(`Unsupported random-state version "${String(random.version)}".`);
+        }
+        requireString(random.seed, "Save data.random.seed");
+        if (!/^[0-9a-f]{8}$/i.test(random.seed)) {
+            throw new Error("Save data.random.seed must be an eight-digit hexadecimal string.");
+        }
+
+        requirePlainObject(random.counters, "Save data.random.counters");
+        for (const [counterId, value] of Object.entries(random.counters)) {
+            requireString(counterId, "Random counter ID");
+            requireNonNegativeInteger(value, `Random counter "${counterId}"`);
+        }
+
+        requirePlainObject(random.resolved, "Save data.random.resolved");
+        for (const [decisionId, decision] of Object.entries(random.resolved)) {
+            requireString(decisionId, "Resolved random decision ID");
+            requirePlainObject(decision, `Resolved random decision "${decisionId}"`);
+            requireExactKeys(
+                decision,
+                new Set(["choiceIndex", "consumed"]),
+                `Resolved random decision "${decisionId}"`,
+            );
+            requireNonNegativeInteger(
+                decision.choiceIndex,
+                `Resolved random decision "${decisionId}".choiceIndex`,
+            );
+            if (decision.consumed !== undefined) {
+                requireBoolean(
+                    decision.consumed,
+                    `Resolved random decision "${decisionId}".consumed`,
+                );
+            }
+        }
+
+        requirePlainObject(random.roomVisits, "Save data.random.roomVisits");
+        for (const [mapId, visitSerial] of Object.entries(random.roomVisits)) {
+            if (!this.mapsById.has(mapId)) {
+                throw new Error(`Save data.random.roomVisits references missing map "${mapId}".`);
+            }
+            requirePositiveInteger(visitSerial, `Room visit serial for "${mapId}"`);
+        }
+
+        const roomRuntime = random.currentRoomRuntime;
+        requirePlainObject(roomRuntime, "Save data.random.currentRoomRuntime");
+        requireExactKeys(
+            roomRuntime,
+            new Set(["mapId", "visitSerial", "entityOverrides"]),
+            "Save data.random.currentRoomRuntime",
+        );
+        requireString(roomRuntime.mapId, "Save data.random.currentRoomRuntime.mapId");
+        if (roomRuntime.mapId !== candidate.player.mapId) {
+            throw new Error("Saved current room runtime must match the player's map.");
+        }
+        requirePositiveInteger(
+            roomRuntime.visitSerial,
+            "Save data.random.currentRoomRuntime.visitSerial",
+        );
+        if (random.roomVisits[roomRuntime.mapId] !== roomRuntime.visitSerial) {
+            throw new Error("Saved current room visit serial does not match roomVisits.");
+        }
+        requirePlainObject(
+            roomRuntime.entityOverrides,
+            "Save data.random.currentRoomRuntime.entityOverrides",
+        );
+        for (const [entityId, override] of Object.entries(roomRuntime.entityOverrides)) {
+            this.validateEntityReference(roomRuntime.mapId, entityId, "Saved room entity override");
+            requirePlainObject(
+                override,
+                `Save data.random.currentRoomRuntime.entityOverrides.${entityId}`,
+            );
+            requireExactKeys(
+                override,
+                new Set(["active"]),
+                `Save data.random.currentRoomRuntime.entityOverrides.${entityId}`,
+            );
+            requireBoolean(
+                override.active,
+                `Save data.random.currentRoomRuntime.entityOverrides.${entityId}.active`,
+            );
+        }
+
+        candidate.random = structuredClone(random);
     }
 
     applySavedMaps(candidate, savedMaps) {
@@ -1884,7 +2100,7 @@ export class Game {
         void this.audio.playMusicEffect(musicEffectId, options);
     }
 
-    showText({ pages, speaker, afterClose, mapId }) {
+    showText({ pages, speaker, afterClose, mapId, ownerId }) {
         if (this.mode !== "world") {
             throw new Error(`Cannot open dialogue while game mode is "${this.mode}".`);
         }
@@ -1899,7 +2115,7 @@ export class Game {
                 this.mode = "world";
 
                 if (afterClose !== null) {
-                    this.runEffects(afterClose, { mapId });
+                    this.runEffects(afterClose, { mapId, ownerId });
                 }
             },
         });
@@ -1955,10 +2171,11 @@ export class Game {
     }
 
     runMapMusicEntryEvents(map, entryId) {
+        const roomRuntime = this.state.random.currentRoomRuntime;
+
         for (const event of map.musicEvents ?? []) {
             if (event.entryId !== undefined && event.entryId !== entryId) continue;
             if (event.condition && !this.evaluateCondition(event.condition)) continue;
-            if (event.probability !== undefined && Math.random() >= event.probability) continue;
 
             const eventKey = `${map.id}:${event.id}`;
             const frequency = event.frequency ?? "once-per-visit";
@@ -1974,26 +2191,85 @@ export class Game {
 
             if (frequency === "first-entry") this.sessionMusicEventIds.add(eventKey);
             if (frequency === "once-per-save") this.saveMusicEventIds.add(eventKey);
-            this.runEffects(event.effects, { mapId: map.id });
+
+            if (event.probability !== undefined) {
+                const occurrence =
+                    frequency === "once-per-visit"
+                        ? `${map.id}:${roomRuntime?.visitSerial ?? 0}`
+                        : frequency;
+                const value = deterministicFloat(
+                    this.state.random.seed,
+                    `map:${map.id}:music-event:${event.id}:probability`,
+                    occurrence,
+                );
+                if (value >= event.probability) continue;
+            }
+
+            this.runEffects(event.effects, {
+                mapId: map.id,
+                ownerId: `map:${map.id}:music-event:${event.id}`,
+            });
         }
     }
 
-    transitionTo(transition) {
+    runActiveMapExitEvents() {
+        const roomRuntime = this.state.random.currentRoomRuntime;
+        if (!roomRuntime || this.runningExitEvents) return true;
+
+        const sourceMapId = this.state.player.mapId;
+        const map = this.mapsById.get(sourceMapId);
+        this.runningExitEvents = true;
+        try {
+            if (map.onExit !== undefined) {
+                this.runEffects(map.onExit, {
+                    mapId: sourceMapId,
+                    ownerId: `map:${sourceMapId}:onExit`,
+                });
+            }
+        } finally {
+            this.runningExitEvents = false;
+        }
+
+        return this.state.player.mapId === sourceMapId && this.mode === "world";
+    }
+
+    establishRoomRuntime(mapId) {
+        const visits = (this.state.random.roomVisits[mapId] ?? 0) + 1;
+        this.state.random.roomVisits[mapId] = visits;
+        this.state.random.currentRoomRuntime = {
+            mapId,
+            visitSerial: visits,
+            entityOverrides: {},
+        };
+    }
+
+    transitionTo(transition, { exitEventsHandled = false } = {}) {
         if (this.mode === "dialogue") {
             throw new Error("Cannot transition while dialogue is open.");
         }
 
+        if (!exitEventsHandled && !this.runActiveMapExitEvents()) return;
+
         const mapId = transition.mapId;
         const map = this.mapsById.get(mapId);
+        if (!map) throw new Error(`Transition references missing map "${mapId}".`);
         const usesEntry = Object.hasOwn(transition, "entryId");
         const position = usesEntry ? map.entries[transition.entryId] : transition.position;
+        if (!position) throw new Error(`Transition to "${mapId}" has no valid destination.`);
         const statusTarget = usesEntry
             ? `Entry: ${transition.entryId}`
             : `Position: ${position.col},${position.row}`;
 
-        const spatialData = this.buildSpatialData(map);
+        const preEntryState = {
+            ...this.state,
+            random: {
+                ...this.state.random,
+                currentRoomRuntime: null,
+            },
+        };
+        const preEntrySpatialData = this.buildSpatialData(map, preEntryState);
         this.validatePlayerPlacement(
-            spatialData,
+            preEntrySpatialData,
             map,
             position.col,
             position.row,
@@ -2003,15 +2279,25 @@ export class Game {
 
         this.inventoryPanel.hide();
         this.mode = "world";
+        this.state.random.currentRoomRuntime = null;
         this.state.player.mapId = mapId;
+        this.establishRoomRuntime(mapId);
         this.player.setPosition(position.col, position.row);
         this.player.setFacing(position.facing.dc, position.facing.dr);
         this.resetPlayerAnimation();
-        this.activeSpatialData = spatialData;
+        this.activeSpatialData = this.buildSpatialData(map);
         this.syncTouchTargets();
 
         this.applyMapMusic(map, transition);
         this.runMapMusicEntryEvents(map, usesEntry ? transition.entryId : null);
+        if (map.onEnter !== undefined) {
+            this.runEffects(map.onEnter, {
+                mapId,
+                ownerId: `map:${mapId}:onEnter`,
+            });
+        }
+
+        if (this.state.player.mapId !== mapId) return;
         this.updateCamera();
         this.setStatus(`Map: ${mapId} -- ${statusTarget}`);
     }
@@ -2204,12 +2490,16 @@ export class Game {
     useSelectedItem() {
         if (this.mode !== "inventory" || this.selectedItemId === null) return false;
 
-        const item = this.itemDefinitions.get(this.selectedItemId);
+        const itemId = this.selectedItemId;
+        const item = this.itemDefinitions.get(itemId);
         if (!item.usable) return false;
 
         const sourceMapId = this.state.player.mapId;
         this.closeInventory();
-        this.runEffects(item.effects, { mapId: sourceMapId });
+        this.runEffects(item.effects, {
+            mapId: sourceMapId,
+            ownerId: `item:${itemId}`,
+        });
         return true;
     }
 
@@ -2221,8 +2511,75 @@ export class Game {
         return evaluateCondition(runtimeState, condition);
     }
 
-    runEffects(effects, { mapId }) {
-        runEffects(this, effects, mapId);
+    runEffects(effects, { mapId, ownerId }) {
+        runEffects(this, effects, { mapId, ownerId });
+    }
+
+    getRandomEventKey(ownerId, randomId) {
+        requireString(ownerId, "Random effect owner ID");
+        return `${ownerId}:${randomId}`;
+    }
+
+    resolveRandomChoice(randomDefinition, { mapId, ownerId }) {
+        const eventKey = this.getRandomEventKey(ownerId, randomDefinition.id);
+        const randomState = this.state.random;
+        const scope = randomDefinition.scope;
+
+        if (scope === "once") {
+            const prior = randomState.resolved[eventKey];
+            if (prior?.consumed === true) return null;
+
+            const randomValue = deterministicFloat(randomState.seed, eventKey, "once");
+            const choiceIndex = chooseWeightedIndex(randomDefinition.choices, randomValue);
+            randomState.resolved[eventKey] = { choiceIndex, consumed: true };
+            return { choiceIndex, choice: randomDefinition.choices[choiceIndex], eventKey };
+        }
+
+        if (scope === "save") {
+            let choiceIndex = randomState.resolved[eventKey]?.choiceIndex;
+            if (choiceIndex === undefined) {
+                const randomValue = deterministicFloat(randomState.seed, eventKey, "save");
+                choiceIndex = chooseWeightedIndex(randomDefinition.choices, randomValue);
+                randomState.resolved[eventKey] = { choiceIndex };
+            }
+            if (choiceIndex >= randomDefinition.choices.length) {
+                throw new Error(
+                    `Saved random decision "${eventKey}" references missing choice ${choiceIndex}.`,
+                );
+            }
+            return { choiceIndex, choice: randomDefinition.choices[choiceIndex], eventKey };
+        }
+
+        if (scope === "roomVisit") {
+            const roomRuntime = randomState.currentRoomRuntime;
+            if (!roomRuntime || roomRuntime.mapId !== mapId) {
+                throw new Error(
+                    `Random event "${eventKey}" requires an active room visit for "${mapId}".`,
+                );
+            }
+            const token = `${mapId}:${roomRuntime.visitSerial}`;
+            const randomValue = deterministicFloat(randomState.seed, eventKey, token);
+            const choiceIndex = chooseWeightedIndex(randomDefinition.choices, randomValue);
+            return { choiceIndex, choice: randomDefinition.choices[choiceIndex], eventKey };
+        }
+
+        if (scope === "interaction" || scope === "use") {
+            const counterKey = `${scope}:${eventKey}`;
+            const occurrence = randomState.counters[counterKey] ?? 0;
+            const randomValue = deterministicFloat(randomState.seed, eventKey, occurrence);
+            const choiceIndex = chooseWeightedIndex(randomDefinition.choices, randomValue);
+            randomState.counters[counterKey] = occurrence + 1;
+            return { choiceIndex, choice: randomDefinition.choices[choiceIndex], eventKey };
+        }
+
+        throw new Error(`Unsupported random scope "${scope}".`);
+    }
+
+    runRandomEffect(effect, context) {
+        const resolved = this.resolveRandomChoice(effect, context);
+        if (!resolved) return;
+        if (resolved.choice.effects.length === 0) return;
+        this.runEffects(resolved.choice.effects, context);
     }
 
     getPlayerFacingName() {
@@ -2306,14 +2663,54 @@ export class Game {
     }
 
     getEntityState(mapId, entityId, runtimeState = this.state) {
+        const persistentState = runtimeState.maps[mapId].entities[entityId];
+        const roomRuntime = runtimeState.random?.currentRoomRuntime;
+        const override =
+            roomRuntime?.mapId === mapId ? roomRuntime.entityOverrides?.[entityId] : undefined;
+        return override ? { ...persistentState, ...override } : persistentState;
+    }
+
+    getPersistentEntityState(mapId, entityId, runtimeState = this.state) {
         return runtimeState.maps[mapId].entities[entityId];
     }
 
-    setEntityActive(mapId, entityId, active) {
+    setEntityActive(mapId, entityId, active, { persistence = "persistent" } = {}) {
         this.validateEntityReference(mapId, entityId, "Setting entity active state");
         requireBoolean(active, `Entity "${entityId}" active state`);
 
-        const state = this.getEntityState(mapId, entityId);
+        if (persistence === "roomVisit") {
+            const roomRuntime = this.state.random.currentRoomRuntime;
+            if (!roomRuntime || roomRuntime.mapId !== mapId || this.state.player.mapId !== mapId) {
+                throw new Error(
+                    `Room-visit entity override for "${entityId}" must target the active map.`,
+                );
+            }
+
+            const previousOverride = roomRuntime.entityOverrides[entityId]
+                ? { ...roomRuntime.entityOverrides[entityId] }
+                : null;
+            this.applySpatialMutation(
+                mapId,
+                `Changing temporary active state for entity "${entityId}" in "${mapId}"`,
+                () => {
+                    roomRuntime.entityOverrides[entityId] = {
+                        ...(roomRuntime.entityOverrides[entityId] ?? {}),
+                        active,
+                    };
+                },
+                () => {
+                    if (previousOverride) roomRuntime.entityOverrides[entityId] = previousOverride;
+                    else delete roomRuntime.entityOverrides[entityId];
+                },
+            );
+            return;
+        }
+
+        if (persistence !== "persistent") {
+            throw new Error(`Unknown entity persistence "${persistence}".`);
+        }
+
+        const state = this.getPersistentEntityState(mapId, entityId);
         const previousActive = state.active;
         this.applySpatialMutation(
             mapId,
@@ -2331,7 +2728,7 @@ export class Game {
         this.validateEntityReference(mapId, entityId, "Moving entity");
         this.validateMapPosition(mapId, col, row, `Entity "${entityId}" position`);
 
-        const state = this.getEntityState(mapId, entityId);
+        const state = this.getPersistentEntityState(mapId, entityId);
         const previousPosition = { col: state.col, row: state.row };
         this.applySpatialMutation(
             mapId,
@@ -2350,14 +2747,14 @@ export class Game {
     setEntitySprite(mapId, entityId, spriteId) {
         this.validateEntityReference(mapId, entityId, "Setting entity sprite");
         this.validateSpriteReference(spriteId, `Entity "${entityId}"`);
-        this.getEntityState(mapId, entityId).spriteId = spriteId;
+        this.getPersistentEntityState(mapId, entityId).spriteId = spriteId;
     }
 
     setEntityCollision(mapId, entityId, collision) {
         this.validateEntityReference(mapId, entityId, "Setting entity collision");
         requireBoolean(collision, `Entity "${entityId}" collision`);
 
-        const state = this.getEntityState(mapId, entityId);
+        const state = this.getPersistentEntityState(mapId, entityId);
         const definition = this.entityDefinitionsByMap.get(mapId).get(entityId);
         this.validateEntityCollisionInteraction(
             collision,
@@ -2528,6 +2925,16 @@ export class Game {
         return { edge, rangeAxis, sourceAxis, movementDirection };
     }
 
+    resolveExitDestination(exit) {
+        if (exit.destination?.type !== "random") return exit;
+
+        const resolved = this.resolveRandomChoice(exit.destination, {
+            mapId: this.activeMap.id,
+            ownerId: `map:${this.activeMap.id}:exit:${exit.id}`,
+        });
+        return resolved?.choice ?? null;
+    }
+
     tryExecuteExit(exitAttempt) {
         const exit = this.activeMap.exits.find(
             (candidate) =>
@@ -2537,9 +2944,16 @@ export class Game {
         );
         if (!exit) return false;
 
-        if (exit.preserveAxis === true) {
-            const targetMap = this.mapsById.get(exit.targetMapId);
-            const targetPosition = this.getPreservedExitPosition(exit, exitAttempt.sourceAxis);
+        if (!this.runActiveMapExitEvents()) return true;
+        const destination = this.resolveExitDestination(exit);
+        if (!destination) return true;
+
+        if (destination.preserveAxis === true) {
+            const targetMap = this.mapsById.get(destination.targetMapId);
+            const targetPosition = this.getPreservedExitPosition(
+                destination,
+                exitAttempt.sourceAxis,
+            );
             const targetSpatialData = this.buildSpatialData(targetMap);
             const targetIsOpen = this.canFootboxOccupy(
                 targetSpatialData,
@@ -2551,41 +2965,50 @@ export class Game {
             if (!targetIsOpen) return false;
         }
 
-        this.executeEdgeExit(exit, exitAttempt.sourceAxis, exitAttempt.movementDirection);
+        this.executeEdgeExit(destination, exitAttempt.sourceAxis, exitAttempt.movementDirection);
         return true;
     }
 
-    executeEdgeExit(exit, sourceAxis, movementDirection) {
-        if (Object.hasOwn(exit, "entryId")) {
-            this.transitionTo({
-                mapId: exit.targetMapId,
-                entryId: exit.entryId,
-                musicTransition: exit.musicTransition,
-                musicTransitionMs: exit.musicTransitionMs,
-            });
+    executeEdgeExit(destination, sourceAxis, movementDirection) {
+        if (Object.hasOwn(destination, "entryId")) {
+            this.transitionTo(
+                {
+                    mapId: destination.targetMapId,
+                    entryId: destination.entryId,
+                    musicTransition: destination.musicTransition,
+                    musicTransitionMs: destination.musicTransitionMs,
+                },
+                { exitEventsHandled: true },
+            );
             return;
         }
 
-        if (Object.hasOwn(exit, "targetPosition")) {
-            this.transitionTo({
-                mapId: exit.targetMapId,
-                position: structuredClone(exit.targetPosition),
-                musicTransition: exit.musicTransition,
-                musicTransitionMs: exit.musicTransitionMs,
-            });
+        if (Object.hasOwn(destination, "targetPosition")) {
+            this.transitionTo(
+                {
+                    mapId: destination.targetMapId,
+                    position: structuredClone(destination.targetPosition),
+                    musicTransition: destination.musicTransition,
+                    musicTransitionMs: destination.musicTransitionMs,
+                },
+                { exitEventsHandled: true },
+            );
             return;
         }
 
-        const position = this.getPreservedExitPosition(exit, sourceAxis);
-        this.transitionTo({
-            mapId: exit.targetMapId,
-            musicTransition: exit.musicTransition,
-            musicTransitionMs: exit.musicTransitionMs,
-            position: {
-                ...position,
-                facing: { ...movementDirection },
+        const position = this.getPreservedExitPosition(destination, sourceAxis);
+        this.transitionTo(
+            {
+                mapId: destination.targetMapId,
+                musicTransition: destination.musicTransition,
+                musicTransitionMs: destination.musicTransitionMs,
+                position: {
+                    ...position,
+                    facing: { ...movementDirection },
+                },
             },
-        });
+            { exitEventsHandled: true },
+        );
     }
 
     handleActionInteraction() {
@@ -2653,7 +3076,7 @@ export class Game {
 
         this.canvas.dispatchEvent(
             new CustomEvent("game-interaction", {
-                detail: detail
+                detail: detail,
             }),
         );
 

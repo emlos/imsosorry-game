@@ -5,6 +5,7 @@ import {
 } from "./conditions.js";
 
 import {
+    requireArray,
     requireBoolean,
     requireExactKeys,
     requireInteger,
@@ -16,8 +17,15 @@ import {
     requireString,
 } from "./validation.js";
 
+import { RANDOM_SCOPES } from "./random.js";
+
 function effectKeys(...keys) {
     return new Set(["type", "condition", ...keys]);
+}
+
+function validateChoiceEffects(effects, label, randomIds) {
+    requireArray(effects, label);
+    validateEffectsDefinitionInternal(effects, label, randomIds, true);
 }
 
 const MUSIC_RESTART_POLICIES = new Set(["always", "if-different", "never"]);
@@ -187,20 +195,31 @@ const EFFECT_HANDLERS = new Map([
         "setEntityActive",
         {
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, effectKeys("mapId", "entityId", "active"), label);
+                requireExactKeys(
+                    effect,
+                    effectKeys("mapId", "entityId", "active", "persistence"),
+                    label,
+                );
                 if (effect.mapId !== undefined) requireString(effect.mapId, `${label}.mapId`);
                 requireString(effect.entityId, `${label}.entityId`);
                 requireBoolean(effect.active, `${label}.active`);
+                if (effect.persistence !== undefined && effect.persistence !== "roomVisit") {
+                    throw new Error(`${label}.persistence must be "roomVisit" when provided.`);
+                }
             },
             validateReferences({ game, effect, mapId, label }) {
-                game.validateEntityReference(
-                    getEffectMapId(effect, mapId, label),
-                    effect.entityId,
-                    label,
-                );
+                const effectMapId = getEffectMapId(effect, mapId, label);
+                game.validateEntityReference(effectMapId, effect.entityId, label);
+                if (effect.persistence === "roomVisit" && effectMapId !== mapId) {
+                    throw new Error(
+                        `${label} cannot apply roomVisit persistence outside the current map.`,
+                    );
+                }
             },
             execute({ game, effect, mapId }) {
-                game.setEntityActive(effect.mapId ?? mapId, effect.entityId, effect.active);
+                game.setEntityActive(effect.mapId ?? mapId, effect.entityId, effect.active, {
+                    persistence: effect.persistence ?? "persistent",
+                });
             },
         },
     ],
@@ -468,9 +487,52 @@ const EFFECT_HANDLERS = new Map([
         },
     ],
     [
+        "random",
+        {
+            validateDefinition({ effect, label, randomIds }) {
+                requireExactKeys(effect, effectKeys("id", "scope", "choices"), label);
+                requireString(effect.id, `${label}.id`);
+                if (randomIds.has(effect.id)) {
+                    throw new Error(
+                        `${label}.id duplicates random ID "${effect.id}" in this owner.`,
+                    );
+                }
+                randomIds.add(effect.id);
+
+                if (!RANDOM_SCOPES.has(effect.scope)) {
+                    throw new Error(
+                        `${label}.scope must be "save", "once", "roomVisit", "interaction", or "use".`,
+                    );
+                }
+
+                requireNonEmptyArray(effect.choices, `${label}.choices`);
+                effect.choices.forEach((choice, index) => {
+                    const choiceLabel = `${label}.choices[${index}]`;
+                    requireObject(choice, choiceLabel);
+                    requireExactKeys(choice, new Set(["weight", "effects"]), choiceLabel);
+                    requirePositiveNumber(choice.weight, `${choiceLabel}.weight`);
+                    validateChoiceEffects(choice.effects, `${choiceLabel}.effects`, randomIds);
+                });
+            },
+            validateReferences({ game, effect, mapId, label }) {
+                effect.choices.forEach((choice, index) => {
+                    validateEffectsReferences(
+                        game,
+                        choice.effects,
+                        mapId,
+                        `${label}.choices[${index}].effects`,
+                    );
+                });
+            },
+            execute({ game, effect, mapId, ownerId }) {
+                game.runRandomEffect(effect, { mapId, ownerId });
+            },
+        },
+    ],
+    [
         "showText",
         {
-            validateDefinition({ effect, label }) {
+            validateDefinition({ effect, label, randomIds }) {
                 requireExactKeys(effect, effectKeys("pages", "speaker", "afterClose"), label);
                 validatePages(effect.pages, `${label}.pages`);
 
@@ -479,7 +541,12 @@ const EFFECT_HANDLERS = new Map([
                 }
 
                 if (effect.afterClose !== undefined) {
-                    validateEffectsDefinition(effect.afterClose, `${label}.afterClose`);
+                    validateEffectsDefinitionInternal(
+                        effect.afterClose,
+                        `${label}.afterClose`,
+                        randomIds,
+                        false,
+                    );
                 }
             },
             validateReferences({ game, effect, mapId, label }) {
@@ -492,44 +559,54 @@ const EFFECT_HANDLERS = new Map([
                     );
                 }
             },
-            execute({ game, effect, mapId }) {
+            execute({ game, effect, mapId, ownerId }) {
                 game.showText({
                     pages: effect.pages,
                     speaker: effect.speaker ?? null,
                     afterClose: effect.afterClose ?? null,
                     mapId,
+                    ownerId,
                 });
             },
         },
     ],
 ]);
 
+function effectCanOpenDialogue(effect) {
+    if (effect.type === "showText") return true;
+    if (effect.type !== "random") return false;
+    return (effect.choices ?? []).some((choice) =>
+        (choice.effects ?? []).some((nestedEffect) => effectCanOpenDialogue(nestedEffect)),
+    );
+}
+
 function validateEffectSequence(effects, label) {
     effects.forEach((effect, index) => {
-        if (effect.type !== "showText") return;
+        if (!effectCanOpenDialogue(effect)) return;
 
         for (let laterIndex = index + 1; laterIndex < effects.length; laterIndex += 1) {
             const laterEffect = effects[laterIndex];
             if (!conditionsCanOverlap(effect.condition, laterEffect.condition)) continue;
 
             const laterLabel = `${label}[${laterIndex}]`;
-            if (laterEffect.type === "showText") {
+            if (effectCanOpenDialogue(laterEffect)) {
                 throw new Error(
-                    `${laterLabel} can open dialogue after ${label}[${index}] on the same condition path. ` +
+                    `${laterLabel} can open dialogue after ${label}[${index}] may already open it. ` +
                         "Only one showText may be reachable in an effect array; use afterClose for later dialogue.",
                 );
             }
 
             throw new Error(
-                `${laterLabel} can run after ${label}[${index}] opens dialogue. ` +
+                `${laterLabel} can run after ${label}[${index}] may open dialogue. ` +
                     "showText must be the final reachable effect; move later effects into afterClose.",
             );
         }
     });
 }
 
-export function validateEffectsDefinition(effects, label) {
-    requireNonEmptyArray(effects, label);
+function validateEffectsDefinitionInternal(effects, label, randomIds, allowEmpty) {
+    if (allowEmpty) requireArray(effects, label);
+    else requireNonEmptyArray(effects, label);
 
     effects.forEach((effect, index) => {
         const effectLabel = `${label}[${index}]`;
@@ -545,10 +622,14 @@ export function validateEffectsDefinition(effects, label) {
             throw new Error(`${effectLabel} references unknown effect type "${effect.type}".`);
         }
 
-        handler.validateDefinition({ effect, label: effectLabel });
+        handler.validateDefinition({ effect, label: effectLabel, randomIds });
     });
 
     validateEffectSequence(effects, label);
+}
+
+export function validateEffectsDefinition(effects, label) {
+    validateEffectsDefinitionInternal(effects, label, new Set(), false);
 }
 
 export function validateEffectsReferences(game, effects, mapId, label) {
@@ -574,16 +655,28 @@ export function visitEffects(effects, visitor) {
         if (effect.type === "showText" && effect.afterClose !== undefined) {
             visitEffects(effect.afterClose, visitor);
         }
+        if (effect.type === "random") {
+            for (const choice of effect.choices ?? []) {
+                visitEffects(choice.effects, visitor);
+            }
+        }
     }
 }
 
-export function runEffects(game, effects, mapId) {
+export function collectRandomEffectIds(effects, output = []) {
+    visitEffects(effects ?? [], (effect) => {
+        if (effect.type === "random") output.push(effect.id);
+    });
+    return output;
+}
+
+export function runEffects(game, effects, context) {
     for (const effect of effects) {
         if (effect.condition && !game.evaluateCondition(effect.condition)) {
             continue;
         }
 
         const handler = EFFECT_HANDLERS.get(effect.type);
-        handler.execute({ game, effect, mapId });
+        handler.execute({ game, effect, ...context });
     }
 }

@@ -26,7 +26,12 @@ function edgeId(kind, sourceMapId, targetMapId) {
         .join(":");
 }
 
-export function collectEffectTeleports(effects, output = [], inheritedConditional = false) {
+export function collectEffectTeleports(
+    effects,
+    output = [],
+    inheritedConditional = false,
+    inheritedProbabilistic = false,
+) {
     for (const effect of effects ?? []) {
         if (!effect || typeof effect !== "object") continue;
 
@@ -37,11 +42,18 @@ export function collectEffectTeleports(effects, output = [], inheritedConditiona
                 targetMapId: effect.mapId,
                 entryId: effect.entryId ?? null,
                 conditional,
+                probabilistic: inheritedProbabilistic,
             });
         }
 
         if (effect.type === "showText") {
-            collectEffectTeleports(effect.afterClose, output, conditional);
+            collectEffectTeleports(effect.afterClose, output, conditional, inheritedProbabilistic);
+        }
+
+        if (effect.type === "random") {
+            for (const choice of effect.choices ?? []) {
+                collectEffectTeleports(choice.effects, output, conditional, true);
+            }
         }
     }
 
@@ -57,6 +69,7 @@ export function collectInteractionTeleports(interaction) {
                 targetMapId: interaction.params.mapId,
                 entryId: interaction.params.entryId ?? null,
                 conditional: Boolean(interaction.condition),
+                probabilistic: false,
             },
         ];
     }
@@ -122,25 +135,34 @@ function collectRawLinks(maps) {
 
     for (const map of maps) {
         for (const [exitIndex, exit] of (map.exits ?? []).entries()) {
-            if (typeof exit?.targetMapId !== "string") continue;
+            const destinations =
+                exit?.destination?.type === "random" ? (exit.destination.choices ?? []) : [exit];
 
-            rawLinks.push({
-                sourceMapId: map.id,
-                targetMapId: exit.targetMapId,
-                kind: "exit",
-                conditional: Boolean(exit.condition),
-                origin: {
-                    originType: "exit",
-                    exitIndex,
-                    edge: exit.edge ?? null,
-                    range: Array.isArray(exit.range) ? [...exit.range] : null,
-                    targetEntryId: exit.entryId ?? null,
-                    targetEdge: exit.targetEdge ?? null,
-                    targetPosition: exit.targetPosition ? { ...exit.targetPosition } : null,
-                    preserveAxis: Boolean(exit.preserveAxis),
-                    offset: exit.offset ?? null,
-                },
-            });
+            for (const [choiceIndex, destination] of destinations.entries()) {
+                if (typeof destination?.targetMapId !== "string") continue;
+                const probabilistic = exit?.destination?.type === "random";
+                rawLinks.push({
+                    sourceMapId: map.id,
+                    targetMapId: destination.targetMapId,
+                    kind: probabilistic ? "random-exit" : "exit",
+                    conditional: Boolean(exit.condition),
+                    origin: {
+                        originType: probabilistic ? "random-exit" : "exit",
+                        exitIndex,
+                        choiceIndex: probabilistic ? choiceIndex : null,
+                        weight: probabilistic ? destination.weight : null,
+                        edge: exit.edge ?? null,
+                        range: Array.isArray(exit.range) ? [...exit.range] : null,
+                        targetEntryId: destination.entryId ?? null,
+                        targetEdge: destination.targetEdge ?? null,
+                        targetPosition: destination.targetPosition
+                            ? { ...destination.targetPosition }
+                            : null,
+                        preserveAxis: Boolean(destination.preserveAxis),
+                        offset: destination.offset ?? null,
+                    },
+                });
+            }
         }
 
         for (const entity of map.entities ?? []) {
@@ -150,7 +172,7 @@ function collectRawLinks(maps) {
                 rawLinks.push({
                     sourceMapId: map.id,
                     targetMapId: teleport.targetMapId,
-                    kind: "teleport",
+                    kind: teleport.probabilistic ? "random-teleport" : "teleport",
                     conditional: Boolean(entity.condition) || teleport.conditional,
                     origin: {
                         originType: "entity",
@@ -170,7 +192,7 @@ function collectRawLinks(maps) {
                 rawLinks.push({
                     sourceMapId: map.id,
                     targetMapId: teleport.targetMapId,
-                    kind: "teleport",
+                    kind: teleport.probabilistic ? "random-teleport" : "teleport",
                     conditional: Boolean(tile.condition) || teleport.conditional,
                     origin: {
                         originType: "tile",
@@ -183,6 +205,41 @@ function collectRawLinks(maps) {
                 });
             }
         });
+
+        for (const [eventType, effects] of [
+            ["onEnter", map.onEnter],
+            ["onExit", map.onExit],
+        ]) {
+            for (const teleport of collectEffectTeleports(effects)) {
+                rawLinks.push({
+                    sourceMapId: map.id,
+                    targetMapId: teleport.targetMapId,
+                    kind: teleport.probabilistic ? "random-teleport" : "teleport",
+                    conditional: teleport.conditional,
+                    origin: {
+                        originType: eventType,
+                        entryId: teleport.entryId,
+                    },
+                });
+            }
+        }
+
+        for (const [eventIndex, event] of (map.musicEvents ?? []).entries()) {
+            for (const teleport of collectEffectTeleports(event?.effects)) {
+                rawLinks.push({
+                    sourceMapId: map.id,
+                    targetMapId: teleport.targetMapId,
+                    kind: teleport.probabilistic ? "random-teleport" : "teleport",
+                    conditional: Boolean(event?.condition) || teleport.conditional,
+                    origin: {
+                        originType: "music-event",
+                        eventIndex,
+                        eventId: event?.id ?? null,
+                        entryId: teleport.entryId,
+                    },
+                });
+            }
+        }
     }
 
     return rawLinks;
@@ -292,6 +349,7 @@ export function createMapGraphStyles() {
         text: readGraphColour("--graph-text", "#f1f1f4"),
         exit: readGraphColour("--graph-exit", "#79aee3"),
         teleport: readGraphColour("--graph-teleport", "#c68ad8"),
+        random: readGraphColour("--graph-random", "#e0a85d"),
         missingBackground: readGraphColour("--graph-missing-background", "#4d2d35"),
         missingBorder: readGraphColour("--graph-missing-border", "#e1828e"),
         edgeLabelBackground: readGraphColour("--graph-edge-label-background", "#151821"),
@@ -389,6 +447,14 @@ export function createMapGraphStyles() {
                 "line-style": "dashed",
                 "line-color": colours.teleport,
                 "target-arrow-color": colours.teleport,
+            },
+        },
+        {
+            selector: "edge.random-teleport-link, edge.random-exit-link",
+            style: {
+                "line-style": "dotted",
+                "line-color": colours.random,
+                "target-arrow-color": colours.random,
             },
         },
         {

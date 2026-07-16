@@ -25,6 +25,7 @@ Maps may define an optional `editorGroup` string. The editor uses it to organize
 editor does not create tile or sprite assets, edit atlas coordinates, edit animation clips, visually construct conditions/effect sequences, simulate runtime mutations, or modify live save data.
 
 ## TODO
+
 - connected to TODO in sprite/tile.js - button to set whether current tile/entity should be mirrored
 
 ## Read-only map graph
@@ -38,3 +39,7 @@ The graph is read-only. Drag the background to pan, use the mouse wheel to zoom,
 Changing a map ID is an atomic reference refactor, not an ordinary label edit. The editor rewrites map-owned exits, teleport interactions, nested effects, cross-map entity effects, and map-specific tile interactions on a cloned document, validates the candidate, and commits only when the result is valid. References found in read-only source registries such as `ITEMS`, global `TILES`, `SPRITES`, or entity presets block the operation and report their source paths; update those source definitions before retrying.
 
 Development saves are not migrated when a map ID changes. Clear old development save slots after a successful ID refactor. Prefer keeping technical map IDs stable and use `editorGroup` or authored dialogue for human-readable organization.
+
+## Deterministic random branches
+
+Random effects, map `onEnter`/`onExit` sequences, and random edge destinations can be authored through the relevant JSON inspectors/imported map data. Random edge exits keep their edge/range controls in the inspector while their full `destination` definition remains in the JSON field. The graph displays probabilistic exits and teleports as dotted links. Rename refactors recurse through every random choice branch.

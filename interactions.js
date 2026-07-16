@@ -8,12 +8,7 @@ import {
 } from "./validation.js";
 
 export const INTERACTION_TRIGGERS = new Set(["action", "touch"]);
-const MUSIC_TRANSITION_POLICIES = new Set([
-    "inherit",
-    "replace",
-    "crossfade",
-    "silence",
-]);
+const MUSIC_TRANSITION_POLICIES = new Set(["inherit", "replace", "crossfade", "silence"]);
 
 function validateMusicTransitionOptions(value, label) {
     if (
@@ -82,8 +77,13 @@ export const INTERACTION_HANDLERS = new Map([
             },
 
             execute({ game, target, sourceMapId }) {
+                const ownerId =
+                    target.kind === "entity"
+                        ? `map:${sourceMapId}:entity:${target.entityId}`
+                        : `map:${sourceMapId}:tile-events`;
                 game.runEffects(target.interaction.effects, {
                     mapId: sourceMapId,
+                    ownerId,
                 });
             },
         },

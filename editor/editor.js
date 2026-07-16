@@ -35,14 +35,14 @@ import { EditorRenderer } from "./editor-renderer.js";
 import { EditorMapGraph } from "./editor-map-graph.js";
 
 const byId = (id) => document.getElementById(id);
-export const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3, 4]
+export const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
 
 const EXTERNAL_MAP_REFERENCE_REGISTRIES = {
     ITEMS,
     TILES,
     SPRITES,
     ENTITY_PRESETS,
-}
+};
 
 export function findExternalMapIdReferences(mapId) {
     return Object.entries(EXTERNAL_MAP_REFERENCE_REGISTRIES).flatMap(([name, registry]) =>
@@ -708,7 +708,11 @@ export class MapEditor {
         this.currentMap.exits.forEach((exit, index) => {
             const button = document.createElement("button");
             button.type = "button";
-            button.textContent = `${index}: ${exit.edge} ${exit.range[0]}–${exit.range[1]} → ${exit.targetMapId}`;
+            const targetLabel =
+                exit.destination?.type === "random"
+                    ? `random (${exit.destination.choices?.length ?? 0} choices)`
+                    : exit.targetMapId;
+            button.textContent = `${index}: ${exit.edge} ${exit.range[0]}–${exit.range[1]} → ${targetLabel}`;
             button.classList.toggle("selected", index === this.selectedExitIndex);
             button.addEventListener("click", () => {
                 this.selectedExitIndex = index;
@@ -1410,9 +1414,11 @@ export class MapEditor {
         byId("exit-range-end").value = exit.range[1];
         const targetMapSelect = byId("exit-target-map");
         targetMapSelect.replaceChildren(...this.maps.map((map) => new Option(map.id, map.id)));
-        targetMapSelect.value = exit.targetMapId;
-        this.populateExitEntryOptions(exit.entryId);
-        byId("exit-target-entry").disabled = !Object.hasOwn(exit, "entryId");
+        const isRandom = exit.destination?.type === "random";
+        targetMapSelect.disabled = isRandom;
+        targetMapSelect.value = isRandom ? (this.maps[0]?.id ?? "") : exit.targetMapId;
+        this.populateExitEntryOptions(isRandom ? null : exit.entryId);
+        byId("exit-target-entry").disabled = isRandom || !Object.hasOwn(exit, "entryId");
         byId("exit-json").value = JSON.stringify(exit, null, 4);
         this.exitJsonDirty = false;
     }
@@ -1434,6 +1440,13 @@ export class MapEditor {
             let replacement;
             if (this.exitJsonDirty) {
                 replacement = JSON.parse(byId("exit-json").value);
+            } else if (exit.destination?.type === "random") {
+                replacement = cloneData(exit);
+                replacement.edge = byId("exit-edge").value;
+                replacement.range = [
+                    Number(byId("exit-range-start").value),
+                    Number(byId("exit-range-end").value),
+                ];
             } else if (Object.hasOwn(exit, "entryId")) {
                 replacement = {
                     edge: byId("exit-edge").value,

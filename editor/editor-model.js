@@ -347,6 +347,18 @@ function rewriteMapIdInEffects(effects, oldId, newId, path, changedReferences) {
                 changedReferences,
             );
         }
+
+        if (effect.type === "random") {
+            for (const [choiceIndex, choice] of (effect.choices ?? []).entries()) {
+                rewriteMapIdInEffects(
+                    choice?.effects,
+                    oldId,
+                    newId,
+                    `${effectPath}.choices[${choiceIndex}].effects`,
+                    changedReferences,
+                );
+            }
+        }
     }
 }
 
@@ -385,9 +397,20 @@ export function refactorMapId(documentMaps, map, newId) {
         const mapPath = sourceMap.id;
 
         for (const [index, exit] of (sourceMap.exits ?? []).entries()) {
-            if (exit?.targetMapId !== oldId) continue;
-            exit.targetMapId = newId;
-            changedReferences.push(`${mapPath}.exits[${index}].targetMapId`);
+            if (exit?.targetMapId === oldId) {
+                exit.targetMapId = newId;
+                changedReferences.push(`${mapPath}.exits[${index}].targetMapId`);
+            }
+            for (const [choiceIndex, choice] of (exit?.destination?.type === "random"
+                ? (exit.destination.choices ?? [])
+                : []
+            ).entries()) {
+                if (choice?.targetMapId !== oldId) continue;
+                choice.targetMapId = newId;
+                changedReferences.push(
+                    `${mapPath}.exits[${index}].destination.choices[${choiceIndex}].targetMapId`,
+                );
+            }
         }
 
         for (const [index, entity] of (sourceMap.entities ?? []).entries()) {
@@ -419,6 +442,21 @@ export function refactorMapId(documentMaps, map, newId) {
                 changedReferences,
             );
         }
+
+        rewriteMapIdInEffects(
+            sourceMap.onEnter,
+            oldId,
+            newId,
+            `${mapPath}.onEnter`,
+            changedReferences,
+        );
+        rewriteMapIdInEffects(
+            sourceMap.onExit,
+            oldId,
+            newId,
+            `${mapPath}.onExit`,
+            changedReferences,
+        );
     }
 
     map.id = newId;
@@ -525,7 +563,20 @@ function validateEditorEntryReference(mapById, mapId, entryId, label, errors) {
     }
 }
 
-function validateEditorEffectsReferences(effects, sourceMap, path, mapById, errors) {
+function validateEditorEffectsReferences(
+    effects,
+    sourceMap,
+    path,
+    mapById,
+    errors,
+    randomIds = new Set(),
+) {
+    if (effects === undefined) return;
+    if (!Array.isArray(effects)) {
+        errors.push(`${path} must be an array.`);
+        return;
+    }
+
     for (const [index, effect] of (effects ?? []).entries()) {
         if (!effect || typeof effect !== "object" || Array.isArray(effect)) continue;
 
@@ -548,6 +599,14 @@ function validateEditorEffectsReferences(effects, sourceMap, path, mapById, erro
                     `${effectPath} targets missing entity "${effect.entityId}" in "${targetMapId}".`,
                 );
             }
+
+            if (
+                effect.type === "setEntityActive" &&
+                effect.persistence === "roomVisit" &&
+                targetMapId !== sourceMap.id
+            ) {
+                errors.push(`${effectPath} cannot use roomVisit persistence on another map.`);
+            }
         }
 
         if (effect.type === "showText") {
@@ -557,7 +616,43 @@ function validateEditorEffectsReferences(effects, sourceMap, path, mapById, erro
                 `${effectPath}.afterClose`,
                 mapById,
                 errors,
+                randomIds,
             );
+        }
+
+        if (effect.type === "random") {
+            if (typeof effect.id !== "string" || effect.id.length === 0) {
+                errors.push(`${effectPath} needs a nonempty random ID.`);
+            } else if (randomIds.has(effect.id)) {
+                errors.push(`${effectPath} duplicates random ID "${effect.id}" in this owner.`);
+            } else {
+                randomIds.add(effect.id);
+            }
+            if (!new Set(["save", "once", "roomVisit", "interaction", "use"]).has(effect.scope)) {
+                errors.push(
+                    `${effectPath} has unsupported random scope "${String(effect.scope)}".`,
+                );
+            }
+            if (!Array.isArray(effect.choices) || effect.choices.length === 0) {
+                errors.push(`${effectPath} needs at least one random choice.`);
+            }
+            for (const [choiceIndex, choice] of (effect.choices ?? []).entries()) {
+                if (!Number.isFinite(choice?.weight) || choice.weight <= 0) {
+                    errors.push(`${effectPath}.choices[${choiceIndex}] needs a positive weight.`);
+                }
+                if (!Array.isArray(choice?.effects)) {
+                    errors.push(`${effectPath}.choices[${choiceIndex}].effects must be an array.`);
+                    continue;
+                }
+                validateEditorEffectsReferences(
+                    choice?.effects,
+                    sourceMap,
+                    `${effectPath}.choices[${choiceIndex}].effects`,
+                    mapById,
+                    errors,
+                    randomIds,
+                );
+            }
         }
     }
 }
@@ -760,6 +855,7 @@ export function validateEditorDocument(maps) {
             }
         }
 
+        const randomExitIds = new Set();
         for (const [index, exit] of (map.exits ?? []).entries()) {
             if (!exit || typeof exit !== "object" || Array.isArray(exit)) {
                 errors.push(`Exit ${index} in "${map.id}" must be an object.`);
@@ -779,7 +875,51 @@ export function validateEditorDocument(maps) {
             ) {
                 errors.push(`Exit ${index} in "${map.id}" has an invalid range.`);
             }
-            if (typeof exit.targetMapId !== "string" || exit.targetMapId.length === 0) {
+            if (exit.destination?.type === "random") {
+                if (typeof exit.id !== "string" || exit.id.length === 0) {
+                    errors.push(`Random exit ${index} in "${map.id}" needs a stable ID.`);
+                } else if (randomExitIds.has(exit.id)) {
+                    errors.push(`Random exit ${index} in "${map.id}" duplicates ID "${exit.id}".`);
+                } else {
+                    randomExitIds.add(exit.id);
+                }
+                if (typeof exit.destination.id !== "string" || exit.destination.id.length === 0) {
+                    errors.push(
+                        `Random exit ${index} in "${map.id}" needs a destination random ID.`,
+                    );
+                }
+                if (
+                    !new Set(["save", "once", "roomVisit", "interaction", "use"]).has(
+                        exit.destination.scope,
+                    )
+                ) {
+                    errors.push(
+                        `Random exit ${index} in "${map.id}" has unsupported scope "${String(exit.destination.scope)}".`,
+                    );
+                }
+                if (
+                    !Array.isArray(exit.destination.choices) ||
+                    exit.destination.choices.length === 0
+                ) {
+                    errors.push(`Random exit ${index} in "${map.id}" needs destination choices.`);
+                } else {
+                    for (const [choiceIndex, choice] of exit.destination.choices.entries()) {
+                        if (!Number.isFinite(choice?.weight) || choice.weight <= 0) {
+                            errors.push(
+                                `Random exit ${index} choice ${choiceIndex} in "${map.id}" needs a positive weight.`,
+                            );
+                        }
+                        if (
+                            typeof choice?.targetMapId !== "string" ||
+                            choice.targetMapId.length === 0
+                        ) {
+                            errors.push(
+                                `Random exit ${index} choice ${choiceIndex} in "${map.id}" needs a target map ID.`,
+                            );
+                        }
+                    }
+                }
+            } else if (typeof exit.targetMapId !== "string" || exit.targetMapId.length === 0) {
                 errors.push(`Exit ${index} in "${map.id}" needs a target map ID.`);
             }
         }
@@ -787,17 +927,25 @@ export function validateEditorDocument(maps) {
 
     for (const map of maps) {
         for (const [index, exit] of (map.exits ?? []).entries()) {
-            const target = mapById.get(exit.targetMapId);
-            if (!target) {
-                errors.push(
-                    `Exit ${index} in "${map.id}" targets missing map "${exit.targetMapId}".`,
-                );
-                continue;
-            }
-            if (exit.entryId && !Object.hasOwn(target.entries ?? {}, exit.entryId)) {
-                errors.push(
-                    `Exit ${index} in "${map.id}" targets missing entry "${exit.entryId}" in "${target.id}".`,
-                );
+            const destinations =
+                exit.destination?.type === "random" ? (exit.destination.choices ?? []) : [exit];
+            for (const [choiceIndex, destination] of destinations.entries()) {
+                const suffix = exit.destination?.type === "random" ? ` choice ${choiceIndex}` : "";
+                const target = mapById.get(destination.targetMapId);
+                if (!target) {
+                    errors.push(
+                        `Exit ${index}${suffix} in "${map.id}" targets missing map "${destination.targetMapId}".`,
+                    );
+                    continue;
+                }
+                if (
+                    destination.entryId &&
+                    !Object.hasOwn(target.entries ?? {}, destination.entryId)
+                ) {
+                    errors.push(
+                        `Exit ${index}${suffix} in "${map.id}" targets missing entry "${destination.entryId}" in "${target.id}".`,
+                    );
+                }
             }
         }
 
@@ -830,6 +978,9 @@ export function validateEditorDocument(maps) {
                 errors,
             );
         }
+
+        validateEditorEffectsReferences(map.onEnter, map, `${map.id}.onEnter`, mapById, errors);
+        validateEditorEffectsReferences(map.onExit, map, `${map.id}.onExit`, mapById, errors);
     }
 
     return [...new Set(errors)];
