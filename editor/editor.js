@@ -1,3 +1,6 @@
+//TODO: editor bug - renaming a map breaks all references to that map in entities/possibly other locations. need to review
+
+import { findPrimaryShowTextEffect } from "../interactions.js";
 import { MAPS } from "../maps.js";
 import { SPRITES } from "../sprites.js";
 import { EMPTY_TILE_ID, TILE_IDS, TILE_SIZE } from "../tiles.js";
@@ -46,6 +49,17 @@ function facingName(facing) {
     if (facing.dr > 0) return "down";
     if (facing.dc < 0) return "left";
     return "right";
+}
+
+export function parseDialoguePages(text) {
+    const trimmed = text.trim();
+    if (!trimmed) return [];
+
+    return trimmed.split(/\r?\n[ \t]*\r?\n/).map((page) => page.trim());
+}
+
+export function formatDialoguePages(pages) {
+    return Array.isArray(pages) ? pages.join("\n\n") : "";
 }
 
 function downloadText(filename, text, type) {
@@ -361,6 +375,15 @@ export class MapEditor {
         });
         this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
+        byId("entity-interaction").addEventListener("input", () =>
+            this.syncSimpleDialogueFromInteractionJson(),
+        );
+        byId("entity-dialogue-speaker").addEventListener("input", () =>
+            this.syncInteractionJsonFromSimpleDialogue(),
+        );
+        byId("entity-dialogue-pages").addEventListener("input", () =>
+            this.syncInteractionJsonFromSimpleDialogue(),
+        );
         byId("apply-entity").addEventListener("click", () => this.applyEntityInspector());
         byId("delete-entity").addEventListener("click", () => this.deleteSelectedEntity());
         byId("apply-entry").addEventListener("click", () => this.applyEntryInspector());
@@ -1113,6 +1136,59 @@ export class MapEditor {
         byId("entity-interaction").value = entity.interaction
             ? JSON.stringify(entity.interaction, null, 4)
             : "";
+        this.renderSimpleDialogueInspector(entity.interaction);
+    }
+
+    renderSimpleDialogueInspector(interaction) {
+        const section = byId("entity-simple-dialogue");
+        const effect = findPrimaryShowTextEffect(interaction);
+        section.hidden = !effect;
+
+        if (!effect) {
+            byId("entity-dialogue-speaker").value = "";
+            byId("entity-dialogue-pages").value = "";
+            return;
+        }
+
+        byId("entity-dialogue-speaker").value =
+            typeof effect.speaker === "string" ? effect.speaker : "";
+        byId("entity-dialogue-pages").value = formatDialoguePages(effect.pages);
+    }
+
+    syncSimpleDialogueFromInteractionJson() {
+        const text = byId("entity-interaction").value.trim();
+        if (!text) {
+            this.renderSimpleDialogueInspector(null);
+            return;
+        }
+
+        try {
+            this.renderSimpleDialogueInspector(JSON.parse(text));
+        } catch {
+            byId("entity-simple-dialogue").hidden = true;
+        }
+    }
+
+    syncInteractionJsonFromSimpleDialogue() {
+        const interactionText = byId("entity-interaction").value.trim();
+        if (!interactionText) return;
+
+        let interaction;
+        try {
+            interaction = JSON.parse(interactionText);
+        } catch {
+            return;
+        }
+
+        const effect = findPrimaryShowTextEffect(interaction);
+        if (!effect) return;
+
+        const speaker = byId("entity-dialogue-speaker").value.trim();
+        if (speaker) effect.speaker = speaker;
+        else delete effect.speaker;
+        effect.pages = parseDialoguePages(byId("entity-dialogue-pages").value);
+
+        byId("entity-interaction").value = JSON.stringify(interaction, null, 4);
     }
 
     applyEntityInspector() {

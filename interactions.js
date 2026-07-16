@@ -9,24 +9,35 @@ import {
 
 export const INTERACTION_TRIGGERS = new Set(["action", "touch"]);
 
-export const COMMON_INTERACTIONS = {
-    //TODO for common interactions with text: allow for passing of custom text in editor/entity settings
-    SAVE_POINT: {
+//TODO: define a default for every common interaction tyoe, inside INTERACTION_HANDLERS
+const DEFAULT_SAVE_POINT_PAGES = [
+    "A small light holds perfectly still inside the glass.",
+    "For a moment, the shape of the dream becomes easy to remember.",
+];
+
+export function createSavePointInteraction({
+    speaker = "Save Point",
+    pages = DEFAULT_SAVE_POINT_PAGES,
+} = {}) {
+    return {
         handler: "effects",
         triggers: ["action"],
         effects: [
             {
                 type: "showText",
-                speaker: "Save Point",
-                pages: [
-                    "A small light holds perfectly still inside the glass.",
-                    "For a moment, the shape of the dream becomes easy to remember.",
-                ],
+                speaker,
+                pages: [...pages],
                 afterClose: [{ type: "saveGame" }],
             },
         ],
-    },
-};
+    };
+}
+
+export function findPrimaryShowTextEffect(interaction) {
+    if (interaction?.handler !== "effects" || !Array.isArray(interaction.effects)) return null;
+
+    return interaction.effects.find((effect) => effect?.type === "showText") ?? null;
+}
 
 export const INTERACTION_HANDLERS = new Map([
     [

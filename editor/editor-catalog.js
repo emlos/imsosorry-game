@@ -1,4 +1,4 @@
-import { COMMON_INTERACTIONS } from "../interactions.js";
+import { createSavePointInteraction } from "../interactions.js";
 import { TILE_IDS } from "../tiles.js";
 
 export const TILE_EDITOR_META = {
@@ -80,7 +80,7 @@ export const ENTITY_PRESETS = {
             active: true,
             spriteId: "save-point",
             collision: true,
-            interaction: COMMON_INTERACTIONS.SAVE_POINT,
+            interaction: createSavePointInteraction(),
         },
     },
     animatedSavePoint: {
@@ -89,7 +89,7 @@ export const ENTITY_PRESETS = {
             active: true,
             spriteId: "animated-save-point",
             collision: true,
-            interaction: COMMON_INTERACTIONS.SAVE_POINT,
+            interaction: createSavePointInteraction(),
         },
     },
 
