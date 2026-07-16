@@ -7,7 +7,7 @@ export const TILE_EDITOR_META = {
     [TILE_IDS.WALL]: { label: "Wall", category: "Architecture" },
     [TILE_IDS.WIDE_WALL]: { label: "Wide wall", category: "Architecture" },
     [TILE_IDS.TREE]: { label: "Tree", category: "Nature" },
-    [TILE_IDS.GLITTERING_CRYSTAL]: { label: "Glittering crystal", category: "Interactables" },
+    [TILE_IDS.GLITTERING_CRYSTAL]: { label: "Glittering crystal (decorative)", category: "Decor" },
     [TILE_IDS.PLACEHOLDER_OBSTACLE]: { label: "Placeholder obstacle", category: "Debug" },
 
     [TILE_IDS.FOREST_FLOOR_MOSS]: { label: "Forest floor", category: "Ground" },
@@ -19,7 +19,7 @@ export const TILE_EDITOR_META = {
     [TILE_IDS.WIDE_HEDGE]: { label: "Wide hedge", category: "Nature" },
     [TILE_IDS.CYPRESS_TREE]: { label: "Cypress tree", category: "Nature" },
     [TILE_IDS.RUIN_SHRINE]: { label: "Ruin shrine", category: "Architecture" },
-    [TILE_IDS.CRYSTAL_TOTEM]: { label: "Crystal totem", category: "Interactables" },
+    [TILE_IDS.CRYSTAL_TOTEM]: { label: "Crystal totem (decorative)", category: "Decor" },
     [TILE_IDS.DARK_TILE_FLOOR]: { label: "Dark tile floor", category: "Ground" },
     [TILE_IDS.METAL_GRATE_FLOOR]: { label: "Metal grate floor", category: "Ground" },
     [TILE_IDS.RED_CARPET_FLOOR]: { label: "Red carpet floor", category: "Ground" },
@@ -29,7 +29,7 @@ export const TILE_EDITOR_META = {
     [TILE_IDS.BOOKSHELF_WIDE]: { label: "Wide bookshelf", category: "Architecture" },
     [TILE_IDS.GIANT_MUSHROOM]: { label: "Giant mushroom", category: "Nature" },
     [TILE_IDS.STONE_FOUNTAIN]: { label: "Stone fountain", category: "Architecture" },
-    [TILE_IDS.ARCANE_VAT]: { label: "Arcane vat", category: "Interactables" },
+    [TILE_IDS.ARCANE_VAT]: { label: "Arcane vat (decorative)", category: "Decor" },
 };
 
 export const SPRITE_EDITOR_META = {
@@ -50,6 +50,9 @@ export const SPRITE_EDITOR_META = {
     "violet-orb": { label: "Violet orb", category: "Collectibles" },
     "robed-figure": { label: "Robed figure", category: "Characters" },
     "signal-beacon": { label: "Signal beacon", category: "Interactables" },
+    "glittering-crystal": { label: "Glittering crystal", category: "Interactables" },
+    "crystal-totem": { label: "Crystal totem", category: "Interactables" },
+    "arcane-vat": { label: "Arcane vat", category: "Interactables" },
 };
 
 export const ENTITY_PRESETS = {
@@ -87,6 +90,61 @@ export const ENTITY_PRESETS = {
             spriteId: "animated-save-point",
             collision: true,
             interaction: COMMON_INTERACTIONS.SAVE_POINT,
+        },
+    },
+
+    glitteringCrystal: {
+        label: "Glittering crystal",
+        entity: {
+            active: true,
+            spriteId: "glittering-crystal",
+            collision: true,
+            interaction: {
+                handler: "effects",
+                triggers: ["action"],
+                effects: [
+                    {
+                        type: "showText",
+                        pages: ["Light moves through the crystal."],
+                    },
+                ],
+            },
+        },
+    },
+    crystalTotem: {
+        label: "Crystal totem",
+        entity: {
+            active: true,
+            spriteId: "crystal-totem",
+            collision: true,
+            interaction: {
+                handler: "effects",
+                triggers: ["action"],
+                effects: [
+                    {
+                        type: "showText",
+                        pages: ["A cool shimmer passes through the crystal totem."],
+                    },
+                ],
+            },
+        },
+    },
+    arcaneVat: {
+        label: "Arcane vat",
+        entity: {
+            active: true,
+            spriteId: "arcane-vat",
+            collision: true,
+            interaction: {
+                handler: "effects",
+                triggers: ["action"],
+                effects: [
+                    {
+                        type: "showText",
+                        pages: ["The liquid bubbles with a soft glow."],
+                    },
+                ],
+            },
         },
     },
 

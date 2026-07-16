@@ -548,6 +548,9 @@ export class Game {
             label,
         );
         requireString(tile.path, `${label}.path`);
+        if (!Object.hasOwn(tile, "source")) {
+            throw new Error(`${label} must define an atlas source rectangle.`);
+        }
 
         if (tile.collision !== undefined) {
             requireBoolean(tile.collision, `${label}.collision`);
@@ -714,6 +717,9 @@ export class Game {
                 label,
             );
             requireString(sprite.path, `${label}.path`);
+            if (!Object.hasOwn(sprite, "source")) {
+                throw new Error(`${label} must define an atlas source rectangle.`);
+            }
             this.validateSize(sprite.size, label);
             this.validateVisualDefinition(sprite, label);
         }
@@ -752,6 +758,9 @@ export class Game {
                     label,
                 );
                 requireString(sprite.path, `${label}.path`);
+                if (!Object.hasOwn(sprite, "source")) {
+                    throw new Error(`${label} must define an atlas source rectangle.`);
+                }
                 this.validateSize(sprite.size, label);
                 this.validatePlayerFootprintDefinition(sprite.footprint, `${label}.footprint`);
                 this.validateVisualDefinition(sprite, label);

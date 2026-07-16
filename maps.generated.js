@@ -262,7 +262,7 @@ export const MAPS = [
         tiles: {
             100: {
                 path: "./assets/atlases/world.png",
-                source: [71, 5, 32, 32],
+                source: [444, 68, 32, 32],
                 condition: {
                     notFlag: "room03.orbCollected",
                 },
@@ -866,6 +866,24 @@ export const MAPS = [
                     message: "The door opens into the atlas test gallery.",
                 },
             },
+            {
+                id: "glittering-crystal",
+                active: true,
+                col: 5,
+                row: 4,
+                spriteId: "glittering-crystal",
+                collision: true,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            pages: ["Light moves through the crystal."],
+                        },
+                    ],
+                },
+            },
         ],
         layers: {
             base: [
@@ -885,7 +903,7 @@ export const MAPS = [
                 [2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 2],
                 [2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 2],
                 [2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 2],
-                [2, -1, 2, -1, -1, 5, -1, -1, 4, -1, -1, 2],
+                [2, -1, 2, -1, -1, -1, -1, -1, 4, -1, -1, 2],
                 [2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 2],
                 [2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 2],
                 [2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 2],
@@ -1075,6 +1093,42 @@ export const MAPS = [
                     ],
                 },
             },
+            {
+                id: "crystal-totem",
+                active: true,
+                col: 11,
+                row: 3,
+                spriteId: "crystal-totem",
+                collision: true,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            pages: ["A cool shimmer passes through the crystal totem."],
+                        },
+                    ],
+                },
+            },
+            {
+                id: "arcane-vat",
+                active: true,
+                col: 2,
+                row: 4,
+                spriteId: "arcane-vat",
+                collision: true,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            pages: ["The liquid bubbles with a soft glow."],
+                        },
+                    ],
+                },
+            },
         ],
         layers: {
             base: [
@@ -1093,8 +1147,8 @@ export const MAPS = [
                 [11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11],
                 [11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 11],
                 [11, -1, 13, -1, -1, -1, -1, -1, 15, -1, -1, -1, -1, 11],
-                [11, -1, -1, -1, -1, 14, -1, -1, -1, -1, -1, 16, -1, 11],
-                [11, -1, 26, -1, -1, -1, -1, -1, -1, -1, -1, -1, 12, 11],
+                [11, -1, -1, -1, -1, 14, -1, -1, -1, -1, -1, -1, -1, 11],
+                [11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 12, 11],
                 [11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 11],
                 [11, -1, 21, -1, 22, -1, 23, -1, -1, 24, 25, -1, -1, 11],
                 [11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 11],
@@ -1164,6 +1218,42 @@ export const MAPS = [
                 col: 5,
                 row: 4,
             },
+            {
+                id: "crystal-totem",
+                active: true,
+                col: 1,
+                row: 6,
+                spriteId: "crystal-totem",
+                collision: true,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            pages: ["A cool shimmer passes through the crystal totem."],
+                        },
+                    ],
+                },
+            },
+            {
+                id: "crystal-totem-2",
+                active: true,
+                col: 7,
+                row: 6,
+                spriteId: "crystal-totem",
+                collision: true,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "showText",
+                            pages: ["A cool shimmer passes through the crystal totem."],
+                        },
+                    ],
+                },
+            },
         ],
         layers: {
             base: [
@@ -1183,7 +1273,7 @@ export const MAPS = [
                 [11, -1, -1, -1, -1, -1, -1, -1, -1, 11],
                 [11, -1, 24, -1, -1, -1, -1, -1, -1, 11],
                 [11, -1, -1, -1, -1, -1, -1, -1, -1, 11],
-                [11, 16, -1, -1, -1, -1, -1, 16, -1, 11],
+                [11, -1, -1, -1, -1, -1, -1, -1, -1, 11],
                 [11, -1, -1, -1, -1, -1, -1, -1, -1, 11],
             ],
         },
