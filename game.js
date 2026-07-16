@@ -99,6 +99,7 @@ export class Game {
         this.entityDefinitionsByMap = new Map();
         this.itemDefinitions = new Map();
         this.activeSpatialData = null;
+        this.activeTouchTargets = new Set();
 
         this.state = createRuntimeState(authoredMaps);
 
@@ -983,6 +984,41 @@ export class Game {
         return this.playerSpriteDefinitions.get(spriteId).footprint;
     }
 
+    getTouchTargetKey(target) {
+        if (target.kind === "entity") {
+            return `entity:${target.mapId}:${target.entityId}`;
+        }
+
+        return `tile:${target.mapId}:${target.anchor.col},${target.anchor.row}`;
+    }
+
+    getPlayerTouchTargets() {
+        if (!this.activeSpatialData) return new Map();
+
+        const cells = this.getFootboxCells(
+            this.player.x,
+            this.player.y,
+            this.player.footprint,
+            this.activeMap,
+        );
+        if (!cells) return new Map();
+
+        const targets = new Map();
+
+        for (const { col, row } of cells) {
+            const target = this.activeSpatialData.interactions.get(`${col},${row}`);
+            if (!target || !target.interaction.triggers.includes("touch")) continue;
+
+            targets.set(this.getTouchTargetKey(target), target);
+        }
+
+        return targets;
+    }
+
+    syncTouchTargets() {
+        this.activeTouchTargets = new Set(this.getPlayerTouchTargets().keys());
+    }
+
     validatePlayerPosition(mapId, col, row, label) {
         const map =
             this.mapsById.get(mapId) ?? this.maps.find((candidate) => candidate.id === mapId);
@@ -1645,6 +1681,7 @@ export class Game {
         );
         this.resetPlayerAnimation();
         this.activeSpatialData = prepared.spatialData;
+        this.syncTouchTargets();
         this.selectedItemId = Object.keys(this.state.inventory)[0] ?? null;
         this.mode = "world";
         this.eventLogElement.textContent = "";
@@ -1725,6 +1762,7 @@ export class Game {
         this.player.setFacing(position.facing.dc, position.facing.dr);
         this.resetPlayerAnimation();
         this.activeSpatialData = spatialData;
+        this.syncTouchTargets();
 
         this.updateCamera();
         this.setStatus(`Map: ${mapId} -- ${statusTarget}`);
@@ -1732,6 +1770,7 @@ export class Game {
 
     rebuildActiveSpatialData() {
         this.activeSpatialData = this.buildSpatialData(this.activeMap);
+        this.syncTouchTargets();
     }
 
     refreshSpatialDataAfterMutation(mapId, label) {
@@ -1747,6 +1786,7 @@ export class Game {
             `${label} would invalidate the player position`,
         );
         this.activeSpatialData = spatialData;
+        this.syncTouchTargets();
     }
 
     get activeMap() {
@@ -2006,6 +2046,7 @@ export class Game {
         this.state.player.spriteId = spriteId;
         this.player.setFootprint(footprint);
         this.resetPlayerAnimation();
+        this.syncTouchTargets();
     }
 
     setPlayerMoveSpeed(tilesPerSecond) {
@@ -2290,7 +2331,7 @@ export class Game {
     handleActionInteraction() {
         if (this.mode !== "world") return false;
 
-        const target = this.player.getInteraction(this.activeSpatialData.interactions, "action");
+        const target = this.player.getActionInteraction(this.activeSpatialData.interactions);
 
         if (!target) {
             this.logEvent("Nothing responds.");
@@ -2300,13 +2341,21 @@ export class Game {
         return this.triggerInteraction(target, "action");
     }
 
-    handleTouchInteraction() {
+    handleTouchInteractions() {
         if (this.mode !== "world") return false;
 
-        const target = this.player.getInteraction(this.activeSpatialData.interactions, "touch");
-        if (!target) return false;
+        const targets = this.getPlayerTouchTargets();
+        const currentKeys = new Set(targets.keys());
 
-        return this.triggerInteraction(target, "touch");
+        for (const [key, target] of targets) {
+            if (this.activeTouchTargets.has(key)) continue;
+
+            this.activeTouchTargets = currentKeys;
+            return this.triggerInteraction(target, "touch");
+        }
+
+        this.activeTouchTargets = currentKeys;
+        return false;
     }
 
     triggerInteraction(target, triggerSource) {
@@ -2364,10 +2413,8 @@ export class Game {
 
                     if (!result.completed) break;
 
-                    if (result.tileChanged) {
-                        this.handleTouchInteraction();
-                        if (this.mode !== "world") break;
-                    }
+                    this.handleTouchInteractions();
+                    if (this.mode !== "world") break;
                 }
 
                 const movement = this.input.getMovementVector();

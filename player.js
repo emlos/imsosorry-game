@@ -186,17 +186,13 @@ export class Player {
         };
     }
 
-    getInteraction(interactionMap, triggerType) {
+    getActionInteraction(interactionMap) {
         if (this.isMoving) return null;
 
-        const currentTile = this.getCurrentTile();
-        const candidates =
-            triggerType === "touch" ? [currentTile] : this.getActionCandidateCells(currentTile);
-
-        for (const { col, row } of candidates) {
+        for (const { col, row } of this.getActionCandidateCells()) {
             const target = interactionMap.get(`${col},${row}`);
 
-            if (target && target.interaction.triggers.includes(triggerType)) {
+            if (target && target.interaction.triggers.includes("action")) {
                 return target;
             }
         }
