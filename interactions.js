@@ -8,6 +8,29 @@ import {
 } from "./validation.js";
 
 export const INTERACTION_TRIGGERS = new Set(["action", "touch"]);
+const MUSIC_TRANSITION_POLICIES = new Set([
+    "inherit",
+    "replace",
+    "crossfade",
+    "silence",
+]);
+
+function validateMusicTransitionOptions(value, label) {
+    if (
+        value.musicTransition !== undefined &&
+        !MUSIC_TRANSITION_POLICIES.has(value.musicTransition)
+    ) {
+        throw new Error(
+            `${label}.musicTransition must be "inherit", "replace", "crossfade", or "silence".`,
+        );
+    }
+    if (
+        value.musicTransitionMs !== undefined &&
+        (!Number.isFinite(value.musicTransitionMs) || value.musicTransitionMs < 0)
+    ) {
+        throw new Error(`${label}.musicTransitionMs must be a non-negative number.`);
+    }
+}
 
 //TODO: define a default for every common interaction tyoe, inside INTERACTION_HANDLERS
 const DEFAULT_SAVE_POINT_PAGES = [
@@ -77,8 +100,14 @@ export const INTERACTION_HANDLERS = new Map([
                 requireObject(interaction.params, `${label}.params`);
 
                 const { mapId, entryId } = interaction.params;
+                requireExactKeys(
+                    interaction.params,
+                    new Set(["mapId", "entryId", "musicTransition", "musicTransitionMs"]),
+                    `${label}.params`,
+                );
                 requireString(mapId, `${label}.params.mapId`);
                 requireString(entryId, `${label}.params.entryId`);
+                validateMusicTransitionOptions(interaction.params, `${label}.params`);
             },
 
             validateReferences({ game, interaction, sourceMapId, label }) {

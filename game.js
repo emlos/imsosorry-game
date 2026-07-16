@@ -11,7 +11,14 @@ import {
     validateInteractionReferences,
 } from "./interactions.js";
 import { MOVEMENT_SUBDIVISIONS, Player } from "./player.js";
-import { MUSIC, SOUNDS } from "./sounds.js";
+import {
+    MUSIC_EVENT_FREQUENCIES,
+    MUSIC_TRANSITION_POLICIES,
+    resolveMapMusic,
+    validateMapMusicDefinition,
+    validateMapMusicReferences,
+} from "./music.js";
+import { MUSIC, MUSIC_EFFECTS, SOUNDS } from "./sounds.js";
 import { PLAYER_SPRITES, SPRITES } from "./sprites.js";
 import { TILE_SIZE, EMPTY_TILE_ID, TILES } from "./tiles.js";
 import { SAVE_VERSION } from "./saves.js";
@@ -100,13 +107,16 @@ export class Game {
         this.itemDefinitions = new Map();
         this.activeSpatialData = null;
         this.activeTouchTargets = new Set();
+        this.sessionMusicEventIds = new Set();
+        this.saveMusicEventIds = new Set();
+        this.audioDebugElapsedMs = 0;
 
         this.state = createRuntimeState(authoredMaps);
 
         this.images = new Map();
         this.spriteDefinitions = new Map(Object.entries(SPRITES));
         this.playerSpriteDefinitions = new Map(Object.entries(PLAYER_SPRITES));
-        this.audio = new AudioSystem(SOUNDS, MUSIC);
+        this.audio = new AudioSystem(SOUNDS, MUSIC, MUSIC_EFFECTS);
         this.dialogueBox = new DialogueBox(document.querySelector("#dialogue"));
         this.mode = "world";
         this.selectedItemId = null;
@@ -127,6 +137,15 @@ export class Game {
 
         this.statusElement = document.querySelector("#status");
         this.eventLogElement = document.querySelector("#event-log");
+        this.audioDebugElement = document.querySelector("#audio-debug");
+        this.audioDebugFields = this.audioDebugElement
+            ? Object.fromEntries(
+                  [...this.audioDebugElement.querySelectorAll("[data-audio-field]")].map(
+                      (element) => [element.dataset.audioField, element],
+                  ),
+              )
+            : {};
+        this.bindAudioDebugControls();
         this.inventoryPanel = new InventoryPanel({
             rootElement: document.querySelector("#inventory"),
             openButton: document.querySelector("#open-inventory"),
@@ -255,6 +274,7 @@ export class Game {
         requireObject(map.layers, `Map "${map.id}" layers`);
         requireArray(map.entities, `Map "${map.id}" entities`);
         requireArray(map.exits, `Map "${map.id}" exits`);
+        validateMapMusicDefinition(map);
 
         for (const layerName of Object.keys(map.layers)) {
             if (!RENDER_LAYER_NAMES.has(layerName)) {
@@ -350,9 +370,27 @@ export class Game {
         this.validateExitRangeOverlaps(map);
     }
 
+    validateMusicTransitionOptions(value, label) {
+        if (
+            value.musicTransition !== undefined &&
+            !MUSIC_TRANSITION_POLICIES.has(value.musicTransition)
+        ) {
+            throw new Error(
+                `${label}.musicTransition must be "inherit", "replace", "crossfade", or "silence".`,
+            );
+        }
+        if (
+            value.musicTransitionMs !== undefined &&
+            (!Number.isFinite(value.musicTransitionMs) || value.musicTransitionMs < 0)
+        ) {
+            throw new Error(`${label}.musicTransitionMs must be a non-negative number.`);
+        }
+    }
+
     validateExitDefinition(exit, map, index) {
         const label = `Exit ${index} in "${map.id}"`;
         requireObject(exit, label);
+        this.validateMusicTransitionOptions(exit, label);
 
         const edges = new Set(["north", "south", "east", "west"]);
         if (!edges.has(exit.edge)) {
@@ -378,7 +416,18 @@ export class Game {
         requireString(exit.targetMapId, `${label}.targetMapId`);
 
         if (Object.hasOwn(exit, "entryId")) {
-            requireExactKeys(exit, new Set(["edge", "range", "targetMapId", "entryId"]), label);
+            requireExactKeys(
+                exit,
+                new Set([
+                    "edge",
+                    "range",
+                    "targetMapId",
+                    "entryId",
+                    "musicTransition",
+                    "musicTransitionMs",
+                ]),
+                label,
+            );
             requireString(exit.entryId, `${label}.entryId`);
             return;
         }
@@ -386,7 +435,14 @@ export class Game {
         if (Object.hasOwn(exit, "targetPosition")) {
             requireExactKeys(
                 exit,
-                new Set(["edge", "range", "targetMapId", "targetPosition"]),
+                new Set([
+                    "edge",
+                    "range",
+                    "targetMapId",
+                    "targetPosition",
+                    "musicTransition",
+                    "musicTransitionMs",
+                ]),
                 label,
             );
             requireObject(exit.targetPosition, `${label}.targetPosition`);
@@ -401,7 +457,16 @@ export class Game {
 
         requireExactKeys(
             exit,
-            new Set(["edge", "range", "targetMapId", "targetEdge", "preserveAxis", "offset"]),
+            new Set([
+                "edge",
+                "range",
+                "targetMapId",
+                "targetEdge",
+                "preserveAxis",
+                "offset",
+                "musicTransition",
+                "musicTransitionMs",
+            ]),
             label,
         );
 
@@ -675,6 +740,8 @@ export class Game {
                 }
             }
         }
+
+        validateMapMusicReferences(this, map);
 
         for (const entity of map.entities) {
             if (entity.condition) {
@@ -1195,6 +1262,12 @@ export class Game {
         }
     }
 
+    validateMusicEffectReference(musicEffectId, label) {
+        if (!this.audio.hasMusicEffect(musicEffectId)) {
+            throw new Error(`${label} references missing music effect "${musicEffectId}".`);
+        }
+    }
+
     layerCreatesCollision(layerName, tile) {
         if (layerName === "base") return false;
         if (layerName === "obstacles") return tile.collision !== false;
@@ -1433,6 +1506,10 @@ export class Game {
             flags: structuredClone(this.state.flags),
             inventory: structuredClone(this.state.inventory),
             maps,
+            music: {
+                playback: this.audio.createSaveState(),
+                playedEventIds: [...this.saveMusicEventIds].sort(),
+            },
         };
 
         return saveData;
@@ -1442,7 +1519,7 @@ export class Game {
         requirePlainObject(rawSaveData, "Save data");
         requireExactKeys(
             rawSaveData,
-            new Set(["version", "savedAt", "player", "flags", "inventory", "maps"]),
+            new Set(["version", "savedAt", "player", "flags", "inventory", "maps", "music"]),
             "Save data",
         );
 
@@ -1461,6 +1538,7 @@ export class Game {
         this.applySavedFlags(candidate, rawSaveData.flags);
         this.applySavedInventory(candidate, rawSaveData.inventory);
         this.applySavedMaps(candidate, rawSaveData.maps);
+        const music = this.prepareSavedMusic(rawSaveData.music);
 
         const activeMap = this.mapsById.get(candidate.player.mapId);
         const spatialData = this.buildSpatialData(activeMap, candidate);
@@ -1477,7 +1555,40 @@ export class Game {
             saveData: structuredClone(rawSaveData),
             state: candidate,
             spatialData,
+            music,
         };
+    }
+
+    prepareSavedMusic(music) {
+        requirePlainObject(music, "Save data.music");
+        requireExactKeys(music, new Set(["playback", "playedEventIds"]), "Save data.music");
+
+        const playback = this.audio.validateSaveState(music.playback, "Save data.music.playback");
+        requireArray(music.playedEventIds, "Save data.music.playedEventIds");
+
+        const validEventIds = new Set(
+            this.maps.flatMap((map) =>
+                (map.musicEvents ?? [])
+                    .filter((event) => (event.frequency ?? "once-per-visit") === "once-per-save")
+                    .map((event) => `${map.id}:${event.id}`),
+            ),
+        );
+        const seen = new Set();
+        const playedEventIds = music.playedEventIds.map((eventId, index) => {
+            requireString(eventId, `Save data.music.playedEventIds[${index}]`);
+            if (seen.has(eventId)) {
+                throw new Error(`Save data.music.playedEventIds contains duplicate "${eventId}".`);
+            }
+            if (!validEventIds.has(eventId)) {
+                throw new Error(
+                    `Save data.music.playedEventIds references missing once-per-save event "${eventId}".`,
+                );
+            }
+            seen.add(eventId);
+            return eventId;
+        });
+
+        return { playback, playedEventIds };
     }
 
     applySavedPlayer(candidate, player) {
@@ -1672,14 +1783,13 @@ export class Game {
         }
     }
 
-    applyPreparedSave(prepared) {
-        if (!prepared || !prepared.state || !prepared.spatialData) {
+    async applyPreparedSave(prepared) {
+        if (!prepared || !prepared.state || !prepared.spatialData || !prepared.music) {
             throw new Error("Prepared save data is invalid.");
         }
 
         this.dialogueBox.reset();
         this.inventoryPanel.hide();
-        this.audio.stopMusic();
         this.input.clearMovement();
 
         this.state = prepared.state;
@@ -1694,22 +1804,84 @@ export class Game {
         this.selectedItemId = Object.keys(this.state.inventory)[0] ?? null;
         this.mode = "world";
         this.eventLogElement.textContent = "";
+        this.saveMusicEventIds = new Set(prepared.music.playedEventIds);
+        await this.audio.restoreSaveState(prepared.music.playback);
 
         this.refreshInventoryPanel();
         this.updateCamera();
         this.setStatus(`Map: ${this.state.player.mapId} -- Save loaded`);
     }
 
+    bindAudioDebugControls() {
+        if (!this.audioDebugElement) return;
+
+        this.audioDebugElement
+            .querySelector("[data-audio-debug-fade]")
+            ?.addEventListener("click", () => {
+                const next = this.audio.debugFadeMultiplier < 1 ? 1 : 0.2;
+                this.audio.setDebugFade(next, 400);
+                this.updateAudioDebug();
+            });
+        this.audioDebugElement
+            .querySelector("[data-audio-debug-restart]")
+            ?.addEventListener("click", () => {
+                void this.audio.restartMusic({ fadeOutMs: 250, fadeInMs: 250 });
+            });
+        this.audioDebugElement
+            .querySelector("[data-audio-debug-stop]")
+            ?.addEventListener("click", () => {
+                void this.audio.stopMusic({ fadeOutMs: 400 });
+            });
+    }
+
+    formatAudioTime(seconds) {
+        return Number.isFinite(seconds) ? `${seconds.toFixed(1)} s` : "--";
+    }
+
+    updateAudioDebug() {
+        if (!this.audioDebugElement) return;
+        const debug = this.audio.getDebugState();
+        const current = debug.current;
+        const values = {
+            bgm: current ? `${debug.title} (${current.trackId})` : "Silence",
+            position: current
+                ? `${this.formatAudioTime(current.position)} / ` +
+                  this.formatAudioTime(debug.duration)
+                : "--",
+            volume: current ? debug.effectiveVolume.toFixed(2) : "0.00",
+            rate: current ? current.playbackRate.toFixed(2) : "--",
+            continuity: current?.continuityId ?? "--",
+            stack: String(debug.stackDepth),
+            me: debug.musicEffectId ?? "--",
+        };
+
+        for (const [field, value] of Object.entries(values)) {
+            if (this.audioDebugFields[field]) this.audioDebugFields[field].textContent = value;
+        }
+    }
+
     playSound(soundId) {
         this.audio.playSound(soundId);
     }
 
-    async playMusic(musicId) {
-        return this.audio.playMusic(musicId);
+    playMusic(options) {
+        void this.audio.playMusic(options);
     }
 
-    stopMusic() {
-        this.audio.stopMusic();
+    stopMusic(options = {}) {
+        void this.audio.stopMusic(options);
+    }
+
+    pushMusic(options) {
+        void this.audio.pushMusic(options);
+    }
+
+    popMusic(options = {}) {
+        void this.audio.popMusic(options);
+    }
+
+    playMusicEffect(musicEffectId, options = {}) {
+        void this.audio.playMusicEffect(musicEffectId, options);
     }
 
     showText({ pages, speaker, afterClose, mapId }) {
@@ -1739,6 +1911,71 @@ export class Game {
         }
 
         this.dialogueBox.advance();
+    }
+
+    getMusicTransitionPolicy(map, transition) {
+        return transition.musicTransition ?? map.musicTransition ?? null;
+    }
+
+    getMusicTransitionDuration(map, transition) {
+        return transition.musicTransitionMs ?? map.musicTransitionMs ?? 700;
+    }
+
+    applyMapMusic(map, transition = {}) {
+        const policy = this.getMusicTransitionPolicy(map, transition);
+        const durationMs = this.getMusicTransitionDuration(map, transition);
+
+        if (policy === "inherit") return;
+        if (policy === "silence") {
+            this.stopMusic({ fadeOutMs: durationMs });
+            return;
+        }
+
+        const resolved = resolveMapMusic(map.music, (condition) =>
+            this.evaluateCondition(condition),
+        );
+
+        if (resolved.kind === "inherit") return;
+        if (resolved.kind === "silence") {
+            this.stopMusic({ fadeOutMs: durationMs });
+            return;
+        }
+
+        const options = { ...resolved.options };
+        if (policy === "crossfade" && options.crossfadeMs === undefined) {
+            options.crossfadeMs = durationMs;
+        }
+
+        this.playMusic(options);
+    }
+
+    refreshActiveMapMusic() {
+        if (!this.activeMap) return;
+        this.applyMapMusic(this.activeMap, { musicTransition: "replace" });
+    }
+
+    runMapMusicEntryEvents(map, entryId) {
+        for (const event of map.musicEvents ?? []) {
+            if (event.entryId !== undefined && event.entryId !== entryId) continue;
+            if (event.condition && !this.evaluateCondition(event.condition)) continue;
+            if (event.probability !== undefined && Math.random() >= event.probability) continue;
+
+            const eventKey = `${map.id}:${event.id}`;
+            const frequency = event.frequency ?? "once-per-visit";
+            if (!MUSIC_EVENT_FREQUENCIES.has(frequency)) {
+                throw new Error(`Unknown music event frequency "${frequency}".`);
+            }
+            if (frequency === "first-entry" && this.sessionMusicEventIds.has(eventKey)) {
+                continue;
+            }
+            if (frequency === "once-per-save" && this.saveMusicEventIds.has(eventKey)) {
+                continue;
+            }
+
+            if (frequency === "first-entry") this.sessionMusicEventIds.add(eventKey);
+            if (frequency === "once-per-save") this.saveMusicEventIds.add(eventKey);
+            this.runEffects(event.effects, { mapId: map.id });
+        }
     }
 
     transitionTo(transition) {
@@ -1773,6 +2010,8 @@ export class Game {
         this.activeSpatialData = spatialData;
         this.syncTouchTargets();
 
+        this.applyMapMusic(map, transition);
+        this.runMapMusicEntryEvents(map, usesEntry ? transition.entryId : null);
         this.updateCamera();
         this.setStatus(`Map: ${mapId} -- ${statusTarget}`);
     }
@@ -1836,6 +2075,7 @@ export class Game {
                 }
             },
         );
+        this.refreshActiveMapMusic();
     }
 
     toggleFlag(flag) {
@@ -1877,6 +2117,7 @@ export class Game {
             },
         );
 
+        this.refreshActiveMapMusic();
         this.refreshInventoryPanel();
     }
 
@@ -1909,6 +2150,7 @@ export class Game {
             },
         );
 
+        this.refreshActiveMapMusic();
         this.refreshInventoryPanel();
     }
 
@@ -2315,7 +2557,12 @@ export class Game {
 
     executeEdgeExit(exit, sourceAxis, movementDirection) {
         if (Object.hasOwn(exit, "entryId")) {
-            this.transitionTo({ mapId: exit.targetMapId, entryId: exit.entryId });
+            this.transitionTo({
+                mapId: exit.targetMapId,
+                entryId: exit.entryId,
+                musicTransition: exit.musicTransition,
+                musicTransitionMs: exit.musicTransitionMs,
+            });
             return;
         }
 
@@ -2323,6 +2570,8 @@ export class Game {
             this.transitionTo({
                 mapId: exit.targetMapId,
                 position: structuredClone(exit.targetPosition),
+                musicTransition: exit.musicTransition,
+                musicTransitionMs: exit.musicTransitionMs,
             });
             return;
         }
@@ -2330,6 +2579,8 @@ export class Game {
         const position = this.getPreservedExitPosition(exit, sourceAxis);
         this.transitionTo({
             mapId: exit.targetMapId,
+            musicTransition: exit.musicTransition,
+            musicTransitionMs: exit.musicTransitionMs,
             position: {
                 ...position,
                 facing: { ...movementDirection },
@@ -2402,7 +2653,7 @@ export class Game {
 
         this.canvas.dispatchEvent(
             new CustomEvent("game-interaction", {
-                detail: Object.freeze(detail),
+                detail: detail
             }),
         );
 
@@ -2601,6 +2852,11 @@ export class Game {
 
         this.update(deltaMs);
         this.render();
+        this.audioDebugElapsedMs += deltaMs;
+        if (this.audioDebugElapsedMs >= 200) {
+            this.audioDebugElapsedMs = 0;
+            this.updateAudioDebug();
+        }
     }
 
     setStatus(text) {

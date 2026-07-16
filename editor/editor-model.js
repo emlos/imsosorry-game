@@ -409,6 +409,16 @@ export function refactorMapId(documentMaps, map, newId) {
                 changedReferences,
             );
         }
+
+        for (const [index, event] of (sourceMap.musicEvents ?? []).entries()) {
+            rewriteMapIdInEffects(
+                event?.effects,
+                oldId,
+                newId,
+                `${mapPath}.musicEvents[${index}].effects`,
+                changedReferences,
+            );
+        }
     }
 
     map.id = newId;
@@ -806,6 +816,16 @@ export function validateEditorDocument(maps) {
                 tile?.interaction,
                 map,
                 `${map.id}.tiles.${tileId}.interaction`,
+                mapById,
+                errors,
+            );
+        }
+
+        for (const [index, event] of (map.musicEvents ?? []).entries()) {
+            validateEditorEffectsReferences(
+                event?.effects,
+                map,
+                `${map.id}.musicEvents[${index}].effects`,
                 mapById,
                 errors,
             );

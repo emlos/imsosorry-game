@@ -321,3 +321,50 @@ h1 {
     justify-items: center;
     gap: 0.75rem;
 }
+
+.audio-debug {
+    margin-top: 18px;
+    padding: 12px;
+    border: 1px solid #3b4559;
+    background: #0d1119;
+}
+
+.audio-debug h2 {
+    margin: 0 0 10px;
+    font-size: 1rem;
+}
+
+.audio-debug dl {
+    display: grid;
+    gap: 5px;
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+}
+
+.audio-debug dl div {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 8px;
+}
+
+.audio-debug dt {
+    color: #9fa9bd;
+}
+
+.audio-debug dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.audio-debug-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.audio-debug-actions button {
+    padding: 5px 8px;
+    font-size: 0.76rem;
+}

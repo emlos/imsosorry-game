@@ -2,11 +2,11 @@ import cytoscape from "../vendor/cytoscape.esm.min.mjs";
 import { EMPTY_TILE_ID } from "../tiles.js";
 import { getMapSize, mergeTileDefinitions } from "./editor-model.js";
 
-const GRAPH_ID_PREFIX = Object.freeze({
+const GRAPH_ID_PREFIX = {
     map: "map:",
     group: "group:",
     missing: "missing:",
-});
+};
 
 function mapNodeId(mapId) {
     return `${GRAPH_ID_PREFIX.map}${mapId}`;
@@ -400,7 +400,7 @@ export function createMapGraphStyles() {
     ];
 }
 
-const DEFAULT_LAYOUT_OPTIONS = Object.freeze({
+const DEFAULT_LAYOUT_OPTIONS = {
     name: "cose",
     animate: false,
     fit: true,
@@ -412,7 +412,7 @@ const DEFAULT_LAYOUT_OPTIONS = Object.freeze({
     gravity: 0.25,
     nestingFactor: 1.2,
     numIter: 1200,
-});
+};
 
 export class EditorMapGraph {
     constructor(root, { onSelectMap, onStatus } = {}) {

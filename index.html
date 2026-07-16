@@ -75,6 +75,45 @@
         <p class="save-status" data-save-status aria-live="polite">No save action yet.</p>
       </section>
 
+      <section id="audio-debug" class="audio-debug" aria-labelledby="audio-debug-title">
+        <h2 id="audio-debug-title">Audio debug</h2>
+        <dl>
+          <div>
+            <dt>BGM</dt>
+            <dd data-audio-field="bgm">Silence</dd>
+          </div>
+          <div>
+            <dt>Position</dt>
+            <dd data-audio-field="position">--</dd>
+          </div>
+          <div>
+            <dt>Volume</dt>
+            <dd data-audio-field="volume">0.00</dd>
+          </div>
+          <div>
+            <dt>Rate</dt>
+            <dd data-audio-field="rate">--</dd>
+          </div>
+          <div>
+            <dt>Continuity</dt>
+            <dd data-audio-field="continuity">--</dd>
+          </div>
+          <div>
+            <dt>Stack</dt>
+            <dd data-audio-field="stack">0</dd>
+          </div>
+          <div>
+            <dt>ME</dt>
+            <dd data-audio-field="me">--</dd>
+          </div>
+        </dl>
+        <div class="audio-debug-actions">
+          <button type="button" data-audio-debug-fade>Fade / restore</button>
+          <button type="button" data-audio-debug-restart>Restart</button>
+          <button type="button" data-audio-debug-stop>Stop</button>
+        </div>
+      </section>
+
       <p id="status">Loading…</p>
       <pre id="event-log" aria-live="polite"></pre>
     </aside>

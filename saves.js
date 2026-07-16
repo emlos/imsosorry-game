@@ -1,4 +1,4 @@
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 export const SAVE_SLOT_ID = "slot-1";
 export const SAVE_SLOT_NAME = "Bedroom";
 
@@ -39,9 +39,13 @@ export class SaveStore {
 
             request.addEventListener("success", () => resolve(request.result), { once: true });
             request.addEventListener("error", () => reject(request.error), { once: true });
-            request.addEventListener("blocked", () => {
-                reject(new Error("Save database upgrade is blocked by another open tab."));
-            }, { once: true });
+            request.addEventListener(
+                "blocked",
+                () => {
+                    reject(new Error("Save database upgrade is blocked by another open tab."));
+                },
+                { once: true },
+            );
         });
 
         return this.databasePromise;

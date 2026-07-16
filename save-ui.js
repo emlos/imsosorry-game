@@ -54,7 +54,7 @@ export class SaveControls {
         }
 
         const prepared = this.game.prepareSaveData(record.data);
-        this.game.applyPreparedSave(prepared);
+        await this.game.applyPreparedSave(prepared);
         this.setStatus(`${record.name} loaded.`);
     }
 
@@ -87,7 +87,7 @@ export class SaveControls {
 
         const prepared = this.game.prepareSaveData(parsed);
         const record = await this.store.write(prepared.saveData);
-        this.game.applyPreparedSave(prepared);
+        await this.game.applyPreparedSave(prepared);
         this.setStatus(`${file.name} imported into ${record.name}.`);
     }
 

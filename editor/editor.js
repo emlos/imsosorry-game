@@ -35,14 +35,14 @@ import { EditorRenderer } from "./editor-renderer.js";
 import { EditorMapGraph } from "./editor-map-graph.js";
 
 const byId = (id) => document.getElementById(id);
-export const ZOOM_LEVELS = Object.freeze([0.5, 0.75, 1, 1.5, 2, 3, 4]);
+export const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3, 4]
 
-const EXTERNAL_MAP_REFERENCE_REGISTRIES = Object.freeze({
+const EXTERNAL_MAP_REFERENCE_REGISTRIES = {
     ITEMS,
     TILES,
     SPRITES,
     ENTITY_PRESETS,
-});
+}
 
 export function findExternalMapIdReferences(mapId) {
     return Object.entries(EXTERNAL_MAP_REFERENCE_REGISTRIES).flatMap(([name, registry]) =>

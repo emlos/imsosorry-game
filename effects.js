@@ -20,6 +20,65 @@ function effectKeys(...keys) {
     return new Set(["type", "condition", ...keys]);
 }
 
+const MUSIC_RESTART_POLICIES = new Set(["always", "if-different", "never"]);
+const MUSIC_TRANSITION_POLICIES = new Set(["inherit", "replace", "crossfade", "silence"]);
+
+function requireFiniteNumber(value, label) {
+    if (!Number.isFinite(value)) {
+        throw new Error(`${label} must be a finite number.`);
+    }
+}
+
+function requireNonNegativeNumber(value, label) {
+    requireFiniteNumber(value, label);
+    if (value < 0) throw new Error(`${label} must be non-negative.`);
+}
+
+function requireRange(value, minimum, maximum, label) {
+    requireFiniteNumber(value, label);
+    if (value < minimum || value > maximum) {
+        throw new Error(`${label} must be between ${minimum} and ${maximum}.`);
+    }
+}
+
+function validateMusicPlaybackEffect(effect, label) {
+    requireString(effect.trackId, `${label}.trackId`);
+    if (effect.continuityId !== undefined) {
+        requireString(effect.continuityId, `${label}.continuityId`);
+    }
+    for (const key of ["fadeInMs", "fadeOutMs", "crossfadeMs"]) {
+        if (effect[key] !== undefined) {
+            requireNonNegativeNumber(effect[key], `${label}.${key}`);
+        }
+    }
+    if (effect.restart !== undefined && !MUSIC_RESTART_POLICIES.has(effect.restart)) {
+        throw new Error(`${label}.restart must be "always", "if-different", or "never".`);
+    }
+    if (effect.resume !== undefined) {
+        requireBoolean(effect.resume, `${label}.resume`);
+    }
+    if (effect.volume !== undefined) {
+        requireRange(effect.volume, 0, 1, `${label}.volume`);
+    }
+    if (effect.playbackRate !== undefined) {
+        requireRange(effect.playbackRate, 0.25, 4, `${label}.playbackRate`);
+    }
+}
+
+function musicPlaybackKeys() {
+    return effectKeys(
+        "trackId",
+        "continuityId",
+        "fadeInMs",
+        "fadeOutMs",
+        "crossfadeMs",
+        "restart",
+        "resume",
+        "volume",
+        "playbackRate",
+    );
+}
+
 function validatePages(pages, label) {
     requireNonEmptyArray(pages, label);
 
@@ -255,15 +314,38 @@ const EFFECT_HANDLERS = new Map([
         "teleport",
         {
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, effectKeys("mapId", "entryId"), label);
+                requireExactKeys(
+                    effect,
+                    effectKeys("mapId", "entryId", "musicTransition", "musicTransitionMs"),
+                    label,
+                );
                 requireString(effect.mapId, `${label}.mapId`);
                 requireString(effect.entryId, `${label}.entryId`);
+                if (
+                    effect.musicTransition !== undefined &&
+                    !MUSIC_TRANSITION_POLICIES.has(effect.musicTransition)
+                ) {
+                    throw new Error(
+                        `${label}.musicTransition must be "inherit", "replace", "crossfade", or "silence".`,
+                    );
+                }
+                if (effect.musicTransitionMs !== undefined) {
+                    requireNonNegativeNumber(
+                        effect.musicTransitionMs,
+                        `${label}.musicTransitionMs`,
+                    );
+                }
             },
             validateReferences({ game, effect, label }) {
                 game.validateEntryReference(effect.mapId, effect.entryId, label);
             },
             execute({ game, effect }) {
-                game.transitionTo({ mapId: effect.mapId, entryId: effect.entryId });
+                game.transitionTo({
+                    mapId: effect.mapId,
+                    entryId: effect.entryId,
+                    musicTransition: effect.musicTransition,
+                    musicTransitionMs: effect.musicTransitionMs,
+                });
             },
         },
     ],
@@ -297,14 +379,15 @@ const EFFECT_HANDLERS = new Map([
         "playMusic",
         {
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, effectKeys("musicId"), label);
-                requireString(effect.musicId, `${label}.musicId`);
+                requireExactKeys(effect, musicPlaybackKeys(), label);
+                validateMusicPlaybackEffect(effect, label);
             },
             validateReferences({ game, effect, label }) {
-                game.validateMusicReference(effect.musicId, label);
+                game.validateMusicReference(effect.trackId, label);
             },
             execute({ game, effect }) {
-                game.playMusic(effect.musicId);
+                const { type, condition, ...options } = effect;
+                game.playMusic(options);
             },
         },
     ],
@@ -312,10 +395,75 @@ const EFFECT_HANDLERS = new Map([
         "stopMusic",
         {
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, effectKeys(), label);
+                requireExactKeys(effect, effectKeys("fadeOutMs"), label);
+                if (effect.fadeOutMs !== undefined) {
+                    requireNonNegativeNumber(effect.fadeOutMs, `${label}.fadeOutMs`);
+                }
             },
-            execute({ game }) {
-                game.stopMusic();
+            execute({ game, effect }) {
+                game.stopMusic({ fadeOutMs: effect.fadeOutMs ?? 0 });
+            },
+        },
+    ],
+    [
+        "pushMusic",
+        {
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, musicPlaybackKeys(), label);
+                validateMusicPlaybackEffect(effect, label);
+            },
+            validateReferences({ game, effect, label }) {
+                game.validateMusicReference(effect.trackId, label);
+            },
+            execute({ game, effect }) {
+                const { type, condition, ...options } = effect;
+                game.pushMusic(options);
+            },
+        },
+    ],
+    [
+        "popMusic",
+        {
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, effectKeys("fadeInMs", "fadeOutMs", "crossfadeMs"), label);
+                for (const key of ["fadeInMs", "fadeOutMs", "crossfadeMs"]) {
+                    if (effect[key] !== undefined) {
+                        requireNonNegativeNumber(effect[key], `${label}.${key}`);
+                    }
+                }
+            },
+            execute({ game, effect }) {
+                const { type, condition, ...options } = effect;
+                game.popMusic(options);
+            },
+        },
+    ],
+    [
+        "playMusicEffect",
+        {
+            validateDefinition({ effect, label }) {
+                requireExactKeys(
+                    effect,
+                    effectKeys("musicEffectId", "duckMusicTo", "volume", "playbackRate"),
+                    label,
+                );
+                requireString(effect.musicEffectId, `${label}.musicEffectId`);
+                if (effect.duckMusicTo !== undefined) {
+                    requireRange(effect.duckMusicTo, 0, 1, `${label}.duckMusicTo`);
+                }
+                if (effect.volume !== undefined) {
+                    requireRange(effect.volume, 0, 1, `${label}.volume`);
+                }
+                if (effect.playbackRate !== undefined) {
+                    requireRange(effect.playbackRate, 0.25, 4, `${label}.playbackRate`);
+                }
+            },
+            validateReferences({ game, effect, label }) {
+                game.validateMusicEffectReference(effect.musicEffectId, label);
+            },
+            execute({ game, effect }) {
+                const { type, condition, musicEffectId, ...options } = effect;
+                game.playMusicEffect(musicEffectId, options);
             },
         },
     ],
