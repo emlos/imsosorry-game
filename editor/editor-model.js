@@ -292,13 +292,150 @@ function visitObjects(value, visitor) {
     Object.values(value).forEach((entry) => visitObjects(entry, visitor));
 }
 
-export function renameMap(documentMaps, map, newId) {
+const MAP_SCOPED_EFFECT_TYPES = new Set([
+    "setEntityActive",
+    "setEntityPosition",
+    "setEntitySprite",
+    "setEntityCollision",
+    "setTile",
+    "teleport",
+]);
+
+const ENTITY_REFERENCE_EFFECT_TYPES = new Set([
+    "setEntityActive",
+    "setEntityPosition",
+    "setEntitySprite",
+    "setEntityCollision",
+]);
+
+export function findMapIdReferences(value, mapId, path = "value", output = []) {
+    if (Array.isArray(value)) {
+        value.forEach((entry, index) => {
+            findMapIdReferences(entry, mapId, `${path}[${index}]`, output);
+        });
+        return output;
+    }
+
+    if (!value || typeof value !== "object") return output;
+
+    if (value.mapId === mapId) output.push(`${path}.mapId`);
+    if (value.targetMapId === mapId) output.push(`${path}.targetMapId`);
+
+    for (const [key, child] of Object.entries(value)) {
+        findMapIdReferences(child, mapId, `${path}.${key}`, output);
+    }
+
+    return output;
+}
+
+function rewriteMapIdInEffects(effects, oldId, newId, path, changedReferences) {
+    for (const [index, effect] of (effects ?? []).entries()) {
+        if (!effect || typeof effect !== "object" || Array.isArray(effect)) continue;
+
+        const effectPath = `${path}[${index}]`;
+        if (MAP_SCOPED_EFFECT_TYPES.has(effect.type) && effect.mapId === oldId) {
+            effect.mapId = newId;
+            changedReferences.push(`${effectPath}.mapId`);
+        }
+
+        if (effect.type === "showText") {
+            rewriteMapIdInEffects(
+                effect.afterClose,
+                oldId,
+                newId,
+                `${effectPath}.afterClose`,
+                changedReferences,
+            );
+        }
+    }
+}
+
+function rewriteMapIdInInteraction(interaction, oldId, newId, path, changedReferences) {
+    if (!interaction || typeof interaction !== "object" || Array.isArray(interaction)) return;
+
+    if (interaction.handler === "teleport" && interaction.params?.mapId === oldId) {
+        interaction.params.mapId = newId;
+        changedReferences.push(`${path}.params.mapId`);
+        return;
+    }
+
+    if (interaction.handler === "effects") {
+        rewriteMapIdInEffects(
+            interaction.effects,
+            oldId,
+            newId,
+            `${path}.effects`,
+            changedReferences,
+        );
+    }
+}
+
+export function refactorMapId(documentMaps, map, newId) {
+    if (!Array.isArray(documentMaps) || !documentMaps.includes(map)) {
+        throw new Error("The map being renamed is not part of the editor document.");
+    }
+    if (typeof newId !== "string" || newId.length === 0) {
+        throw new Error("The new map ID must be a nonempty string.");
+    }
+
     const oldId = map.id;
+    const changedReferences = [];
+
+    for (const sourceMap of documentMaps) {
+        const mapPath = sourceMap.id;
+
+        for (const [index, exit] of (sourceMap.exits ?? []).entries()) {
+            if (exit?.targetMapId !== oldId) continue;
+            exit.targetMapId = newId;
+            changedReferences.push(`${mapPath}.exits[${index}].targetMapId`);
+        }
+
+        for (const [index, entity] of (sourceMap.entities ?? []).entries()) {
+            rewriteMapIdInInteraction(
+                entity?.interaction,
+                oldId,
+                newId,
+                `${mapPath}.entities[${index}].interaction`,
+                changedReferences,
+            );
+        }
+
+        for (const [tileId, tile] of Object.entries(sourceMap.tiles ?? {})) {
+            rewriteMapIdInInteraction(
+                tile?.interaction,
+                oldId,
+                newId,
+                `${mapPath}.tiles.${tileId}.interaction`,
+                changedReferences,
+            );
+        }
+    }
+
     map.id = newId;
-    visitObjects(documentMaps, (object) => {
-        if (object.targetMapId === oldId) object.targetMapId = newId;
-        if (object.mapId === oldId) object.mapId = newId;
-    });
+
+    return {
+        oldId,
+        newId,
+        changedReferences,
+    };
+}
+
+export function createMapIdRefactorCandidate(documentMaps, oldId, newId) {
+    const candidateMaps = cloneData(documentMaps);
+    const candidateMap = candidateMaps.find((map) => map.id === oldId);
+
+    if (!candidateMap) {
+        throw new Error(`Map "${oldId}" does not exist in the editor document.`);
+    }
+
+    const report = refactorMapId(candidateMaps, candidateMap, newId);
+    const errors = validateEditorDocument(candidateMaps);
+
+    if (errors.length > 0) {
+        throw new Error(`The rename produced invalid map data: ${errors.join(" ")}`);
+    }
+
+    return { candidateMaps, report };
 }
 
 export function renameEntry(documentMaps, map, oldId, newId) {
@@ -364,6 +501,80 @@ function isInsideMap(map, col, row) {
         col < width &&
         row < height
     );
+}
+
+function validateEditorEntryReference(mapById, mapId, entryId, label, errors) {
+    const targetMap = mapById.get(mapId);
+    if (!targetMap) {
+        errors.push(`${label} targets missing map "${String(mapId)}".`);
+        return;
+    }
+
+    if (typeof entryId !== "string" || !Object.hasOwn(targetMap.entries ?? {}, entryId)) {
+        errors.push(`${label} targets missing entry "${String(entryId)}" in "${mapId}".`);
+    }
+}
+
+function validateEditorEffectsReferences(effects, sourceMap, path, mapById, errors) {
+    for (const [index, effect] of (effects ?? []).entries()) {
+        if (!effect || typeof effect !== "object" || Array.isArray(effect)) continue;
+
+        const effectPath = `${path}[${index}]`;
+
+        if (effect.type === "teleport" && typeof effect.mapId === "string") {
+            validateEditorEntryReference(mapById, effect.mapId, effect.entryId, effectPath, errors);
+        }
+
+        if (ENTITY_REFERENCE_EFFECT_TYPES.has(effect.type) && typeof effect.entityId === "string") {
+            const targetMapId = effect.mapId ?? sourceMap.id;
+            const targetMap = mapById.get(targetMapId);
+
+            if (!targetMap) {
+                errors.push(`${effectPath} targets missing map "${String(targetMapId)}".`);
+            } else if (
+                !(targetMap.entities ?? []).some((entity) => entity?.id === effect.entityId)
+            ) {
+                errors.push(
+                    `${effectPath} targets missing entity "${effect.entityId}" in "${targetMapId}".`,
+                );
+            }
+        }
+
+        if (effect.type === "showText") {
+            validateEditorEffectsReferences(
+                effect.afterClose,
+                sourceMap,
+                `${effectPath}.afterClose`,
+                mapById,
+                errors,
+            );
+        }
+    }
+}
+
+function validateEditorInteractionReferences(interaction, sourceMap, path, mapById, errors) {
+    if (!interaction || typeof interaction !== "object" || Array.isArray(interaction)) return;
+
+    if (interaction.handler === "teleport" && typeof interaction.params?.mapId === "string") {
+        validateEditorEntryReference(
+            mapById,
+            interaction.params.mapId,
+            interaction.params.entryId,
+            `${path}.params`,
+            errors,
+        );
+        return;
+    }
+
+    if (interaction.handler === "effects") {
+        validateEditorEffectsReferences(
+            interaction.effects,
+            sourceMap,
+            `${path}.effects`,
+            mapById,
+            errors,
+        );
+    }
 }
 
 export function validateEditorDocument(maps) {
@@ -578,6 +789,26 @@ export function validateEditorDocument(maps) {
                     `Exit ${index} in "${map.id}" targets missing entry "${exit.entryId}" in "${target.id}".`,
                 );
             }
+        }
+
+        for (const [index, entity] of (map.entities ?? []).entries()) {
+            validateEditorInteractionReferences(
+                entity?.interaction,
+                map,
+                `${map.id}.entities[${index}].interaction`,
+                mapById,
+                errors,
+            );
+        }
+
+        for (const [tileId, tile] of Object.entries(map.tiles ?? {})) {
+            validateEditorInteractionReferences(
+                tile?.interaction,
+                map,
+                `${map.id}.tiles.${tileId}.interaction`,
+                mapById,
+                errors,
+            );
         }
     }
 

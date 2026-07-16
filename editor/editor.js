@@ -1,9 +1,8 @@
-//TODO: editor bug - renaming a map breaks all references to that map in entities/possibly other locations. need to review
-
 import { findPrimaryShowTextEffect } from "../interactions.js";
+import { ITEMS } from "../items.js";
 import { MAPS } from "../maps.js";
 import { SPRITES } from "../sprites.js";
-import { EMPTY_TILE_ID, TILE_IDS, TILE_SIZE } from "../tiles.js";
+import { EMPTY_TILE_ID, TILE_IDS, TILE_SIZE, TILES } from "../tiles.js";
 import { ENTITY_PRESETS, SPRITE_EDITOR_META, TILE_EDITOR_META } from "./editor-catalog.js";
 import {
     EDITOR_BACKUP_KEY,
@@ -13,8 +12,10 @@ import {
     canPlaceTile,
     cloneData,
     createMap,
+    createMapIdRefactorCandidate,
     createReciprocalEdgeConnection,
     fillRectangle,
+    findMapIdReferences,
     floodFill,
     getEdgeAxisLength,
     getMapSize,
@@ -25,7 +26,6 @@ import {
     parseImportedMaps,
     renameEntity,
     renameEntry,
-    renameMap,
     resizeMap,
     serializeGeneratedMaps,
     setTile,
@@ -36,6 +36,19 @@ import { EditorMapGraph } from "./editor-map-graph.js";
 
 const byId = (id) => document.getElementById(id);
 export const ZOOM_LEVELS = Object.freeze([0.5, 0.75, 1, 1.5, 2, 3, 4]);
+
+const EXTERNAL_MAP_REFERENCE_REGISTRIES = Object.freeze({
+    ITEMS,
+    TILES,
+    SPRITES,
+    ENTITY_PRESETS,
+});
+
+export function findExternalMapIdReferences(mapId) {
+    return Object.entries(EXTERNAL_MAP_REFERENCE_REGISTRIES).flatMap(([name, registry]) =>
+        findMapIdReferences(registry, mapId, name),
+    );
+}
 
 const directionVectors = {
     up: { dc: 0, dr: -1 },
@@ -234,19 +247,54 @@ export class MapEditor {
             await this.refreshDocumentUI();
         });
         byId("map-id").addEventListener("change", async (event) => {
+            const oldId = this.currentMap.id;
             const newId = event.target.value.trim();
-            if (
-                !newId ||
-                (newId !== this.currentMap.id && this.maps.some((map) => map.id === newId))
-            ) {
+            if (!newId || (newId !== oldId && this.maps.some((map) => map.id === newId))) {
                 this.setStatus("Map IDs must be nonempty and unique.", true);
-                event.target.value = this.currentMap.id;
+                event.target.value = oldId;
                 return;
             }
-            const map = this.currentMap;
-            this.commitMutation("Rename map", () => renameMap(this.maps, map, newId));
-            this.selectedMapId = newId;
-            await this.refreshDocumentUI();
+            if (newId === oldId) {
+                event.target.value = oldId;
+                return;
+            }
+
+            const externalReferences = findExternalMapIdReferences(oldId);
+            if (externalReferences.length > 0) {
+                this.setStatus(
+                    `This map is referenced outside generated map data: ${externalReferences.join(
+                        ", ",
+                    )}. Update those source definitions before renaming the map.`,
+                    true,
+                );
+                event.target.value = oldId;
+                return;
+            }
+
+            try {
+                const { candidateMaps, report } = createMapIdRefactorCandidate(
+                    this.maps,
+                    oldId,
+                    newId,
+                );
+
+                this.commitMutation("Rename map", () => {
+                    this.maps = candidateMaps;
+                    this.selectedMapId = newId;
+                });
+                this.mapGraph.invalidatePositions();
+                await this.refreshDocumentUI();
+
+                const count = report.changedReferences.length;
+                this.setStatus(
+                    `Renamed "${oldId}" to "${newId}" and updated ${count} map ${
+                        count === 1 ? "reference" : "references"
+                    }. Existing development saves using the old ID are not migrated and should be cleared.`,
+                );
+            } catch (error) {
+                event.target.value = oldId;
+                this.setStatus(error.message, true);
+            }
         });
         byId("map-group").addEventListener("change", async (event) => {
             const group = event.target.value.trim();
@@ -432,6 +480,7 @@ export class MapEditor {
         this.selectedMapId = this.maps.some((map) => map.id === snapshot.selectedMapId)
             ? snapshot.selectedMapId
             : this.maps[0].id;
+        this.mapGraph.invalidatePositions();
         this.clearSelection();
     }
 
@@ -508,6 +557,7 @@ export class MapEditor {
         this.renderInspectors();
         this.validateAndDisplay();
         this.updateUndoButtons();
+        this.refreshOpenMapGraph();
     }
 
     async refreshAfterMutation() {
@@ -1524,15 +1574,22 @@ export class MapEditor {
         }
     }
 
+    refreshOpenMapGraph() {
+        const dialog = byId("map-graph-dialog");
+        if (!dialog.open) return;
+
+        this.mapGraph.render(this.maps, {
+            selectedMapId: this.selectedMapId,
+        });
+        this.mapGraph.resize();
+    }
+
     showMapGraph() {
         const dialog = byId("map-graph-dialog");
         dialog.showModal();
 
         requestAnimationFrame(() => {
-            this.mapGraph.render(this.maps, {
-                selectedMapId: this.selectedMapId,
-            });
-            this.mapGraph.resize();
+            this.refreshOpenMapGraph();
             this.mapGraph.fit();
         });
     }

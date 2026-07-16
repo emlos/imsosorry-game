@@ -13,7 +13,13 @@ export const ITEMS = {
                     "The orb grows warm in your hands.",
                     "Its light folds the room inward until distance stops making sense.",
                 ],
-                afterClose: [{ type: "teleport", mapId: "room-04", entryId: "fromPinkOrb" }],
+                afterClose: [
+                    {
+                        type: "teleport",
+                        mapId: "room-conditional-entity-test",
+                        entryId: "fromPinkOrb",
+                    },
+                ],
             },
         ],
     },

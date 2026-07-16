@@ -32,3 +32,9 @@ editor does not create tile or sprite assets, edit atlas coordinates, edit anima
 Use **Map graph** in the top toolbar to open a derived project overview. The graph contains one node per map, compound regions for `editorGroup` values, solid arrows for edge exits, and dashed arrows for entity or tile teleports. Repeated links of the same type are aggregated and labelled with a count. Broken map references appear as explicit missing-destination nodes.
 
 The graph is read-only. Drag the background to pan, use the mouse wheel to zoom, use **Fit** to recenter all nodes, and use **Relayout** to generate a new force-directed arrangement. Clicking a map node closes the graph and selects that map in the normal editor. Graph positions exist only for the current editor session and are never exported with map data.
+
+## Map ID refactors
+
+Changing a map ID is an atomic reference refactor, not an ordinary label edit. The editor rewrites map-owned exits, teleport interactions, nested effects, cross-map entity effects, and map-specific tile interactions on a cloned document, validates the candidate, and commits only when the result is valid. References found in read-only source registries such as `ITEMS`, global `TILES`, `SPRITES`, or entity presets block the operation and report their source paths; update those source definitions before retrying.
+
+Development saves are not migrated when a map ID changes. Clear old development save slots after a successful ID refactor. Prefer keeping technical map IDs stable and use `editorGroup` or authored dialogue for human-readable organization.
