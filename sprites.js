@@ -2,6 +2,7 @@
 import { EDITOR_TEST_ATLAS_A_PATH, EDITOR_TEST_ATLAS_B_PATH, WORLD_ATLAS_PATH } from "./tiles.js";
 
 //TODO: keep sprites in atlases instead of individual images - remove the ability to use individual images for sprites, no backwards compatibility needed
+//TODO: figure out a neat way to allow to reuse sprites with mirroring - same for tiles
 export const SPRITES = {
     door: {
         path: WORLD_ATLAS_PATH,

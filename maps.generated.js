@@ -129,6 +129,7 @@ export const MAPS = [
                 [2, -1, -1, -1, -1, -1, -1, -1, -1, 2],
             ],
         },
+        editorGroup: "test",
     },
     {
         id: "room-02",
@@ -235,6 +236,7 @@ export const MAPS = [
                 [2, 2, 2, 2, 2, 2, 2],
             ],
         },
+        editorGroup: "test",
     },
     {
         id: "room-03",
@@ -349,6 +351,7 @@ export const MAPS = [
                 [2, 2, 2, 2, 2, 2, 2, 2, 2],
             ],
         },
+        editorGroup: "test",
     },
     {
         id: "room-04",
@@ -483,6 +486,7 @@ export const MAPS = [
                 [2, 2, 2, 2, 2, 2, 2, 2, 2],
             ],
         },
+        editorGroup: "test",
     },
     {
         id: "room-05",
@@ -623,6 +627,7 @@ export const MAPS = [
                 [2, 2, 2, 2, 2, 2, 2, 2],
             ],
         },
+        editorGroup: "test",
     },
     {
         id: "room-06",
@@ -706,6 +711,7 @@ export const MAPS = [
                 [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
             ],
         },
+        editorGroup: "test",
     },
     {
         id: "room-animation-test",
@@ -887,6 +893,7 @@ export const MAPS = [
                 [2, -1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
             ],
         },
+        editorGroup: "test",
     },
     {
         id: "room-atlas-test",
@@ -1095,6 +1102,7 @@ export const MAPS = [
                 [11, 11, 11, 11, 11, 11, -1, 11, 11, 11, 11, 11, 11, 11],
             ],
         },
+        editorGroup: "test",
     },
     {
         id: "room-01-east",
@@ -1115,6 +1123,14 @@ export const MAPS = [
                 range: [1, 8],
                 targetMapId: "room-01",
                 targetEdge: "south",
+                preserveAxis: true,
+                offset: 0,
+            },
+            {
+                edge: "south",
+                range: [2, 8],
+                targetMapId: "room-editor-edgetest",
+                targetEdge: "north",
                 preserveAxis: true,
                 offset: 0,
             },
@@ -1161,15 +1177,59 @@ export const MAPS = [
                 [9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
             ],
             obstacles: [
-                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
-                [-1, -1, -1, -1, 24, -1, -1, -1, -1, -1],
-                [-1, -1, -1, -1, -1, -1, -1, 24, -1, -1],
-                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
-                [-1, -1, 24, -1, -1, -1, -1, -1, -1, -1],
-                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
-                [-1, 16, -1, -1, -1, -1, -1, 16, -1, -1],
-                [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [11, -1, -1, -1, -1, -1, -1, -1, -1, 11],
+                [11, -1, -1, -1, 24, -1, -1, -1, -1, 11],
+                [11, -1, -1, -1, -1, -1, -1, 24, -1, 11],
+                [11, -1, -1, -1, -1, -1, -1, -1, -1, 11],
+                [11, -1, 24, -1, -1, -1, -1, -1, -1, 11],
+                [11, -1, -1, -1, -1, -1, -1, -1, -1, 11],
+                [11, 16, -1, -1, -1, -1, -1, 16, -1, 11],
+                [11, -1, -1, -1, -1, -1, -1, -1, -1, 11],
             ],
         },
+        editorGroup: "test",
+    },
+    {
+        id: "room-editor-edgetest",
+        initialEntryId: "start",
+        entries: {
+            start: {
+                col: 1,
+                row: 1,
+                facing: {
+                    dc: 0,
+                    dr: 1,
+                },
+            },
+        },
+        exits: [
+            {
+                edge: "north",
+                range: [1, 8],
+                targetMapId: "room-01-east",
+                targetEdge: "south",
+                preserveAxis: true,
+                offset: 0,
+            },
+        ],
+        tiles: {},
+        entities: [],
+        layers: {
+            base: [
+                [0, 9, 8, 20, 20, 20, 20, 8, 17, 0],
+                [0, 9, 0, 8, 20, 20, 8, 17, 9, 0],
+                [0, 9, 17, 17, 8, 8, 17, 0, 9, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [-1, -1, 0, 0, 0, 0, 0, 0, -1, -1],
+            ],
+            obstacles: [
+                [2, -1, -1, -1, -1, -1, -1, -1, -1, 2],
+                [2, -1, -1, -1, -1, -1, -1, -1, -1, 2],
+                [2, -1, -1, -1, -1, -1, -1, -1, -1, 2],
+                [3, -1, -1, -1, -1, -1, -1, -1, 3, -1],
+                [-1, -1, 2, 2, 2, 2, 2, 2, -1, -1],
+            ],
+        },
+        editorGroup: "test",
     },
 ];

@@ -29,6 +29,7 @@ import {
     validateEditorDocument,
 } from "./editor-model.js";
 import { EditorRenderer } from "./editor-renderer.js";
+import { EditorMapGraph } from "./editor-map-graph.js";
 
 const byId = (id) => document.getElementById(id);
 export const ZOOM_LEVELS = Object.freeze([0.5, 0.75, 1, 1.5, 2, 3, 4]);
@@ -108,6 +109,10 @@ export class MapEditor {
         this.canvas = byId("editor-canvas");
         this.canvasStage = byId("canvas-stage");
         this.canvasScroll = byId("canvas-scroll");
+        this.mapGraph = new EditorMapGraph(byId("map-graph-root"), {
+            onSelectMap: (mapId) => this.openMapFromGraph(mapId),
+            onStatus: (message, error = false) => this.setStatus(message, error),
+        });
     }
 
     get currentMap() {
@@ -173,6 +178,10 @@ export class MapEditor {
             }
         });
         byId("playtest").addEventListener("click", () => this.playtest());
+        byId("open-map-graph").addEventListener("click", () => this.showMapGraph());
+        byId("map-graph-fit").addEventListener("click", () => this.mapGraph.fit());
+        byId("map-graph-relayout").addEventListener("click", () => this.mapGraph.relayout());
+        byId("map-graph-close").addEventListener("click", () => byId("map-graph-dialog").close());
 
         byId("map-select").addEventListener("change", async (event) => {
             this.selectedMapId = event.target.value;
@@ -224,6 +233,29 @@ export class MapEditor {
             this.commitMutation("Rename map", () => renameMap(this.maps, map, newId));
             this.selectedMapId = newId;
             await this.refreshDocumentUI();
+        });
+        byId("map-group").addEventListener("change", async (event) => {
+            const group = event.target.value.trim();
+            const map = this.currentMap;
+            const previousGroup = typeof map.editorGroup === "string" ? map.editorGroup.trim() : "";
+            const storedGroupIsCanonical = map.editorGroup === previousGroup;
+
+            if (
+                group === previousGroup &&
+                (group ? storedGroupIsCanonical : !Object.hasOwn(map, "editorGroup"))
+            ) {
+                event.target.value = previousGroup;
+                return;
+            }
+
+            this.commitMutation("Change map group", () => {
+                if (group) {
+                    map.editorGroup = group;
+                } else {
+                    delete map.editorGroup;
+                }
+            });
+            await this.refreshAfterMutation();
         });
         byId("resize-map").addEventListener("click", async () => {
             const width = Number(byId("map-width").value);
@@ -468,9 +500,41 @@ export class MapEditor {
 
     renderMapControls() {
         const mapSelect = byId("map-select");
-        mapSelect.replaceChildren(...this.maps.map((map) => new Option(map.id, map.id)));
+        const groupedMaps = new Map();
+
+        for (const map of this.maps) {
+            const authoredGroup = typeof map.editorGroup === "string" ? map.editorGroup.trim() : "";
+            const groupName = authoredGroup || "Ungrouped";
+
+            if (!groupedMaps.has(groupName)) {
+                groupedMaps.set(groupName, []);
+            }
+            groupedMaps.get(groupName).push(map);
+        }
+
+        const groupNames = [...groupedMaps.keys()].sort((first, second) => {
+            if (first === second) return 0;
+            if (first === "Ungrouped") return 1;
+            if (second === "Ungrouped") return -1;
+            return first.localeCompare(second);
+        });
+
+        const optionGroups = groupNames.map((groupName) => {
+            const optionGroup = document.createElement("optgroup");
+            optionGroup.label = groupName;
+            optionGroup.append(
+                ...groupedMaps.get(groupName).map((map) => new Option(map.id, map.id)),
+            );
+            return optionGroup;
+        });
+
+        mapSelect.replaceChildren(...optionGroups);
         mapSelect.value = this.currentMap.id;
         byId("map-id").value = this.currentMap.id;
+        byId("map-group").value =
+            typeof this.currentMap.editorGroup === "string"
+                ? this.currentMap.editorGroup.trim()
+                : "";
         const { width, height } = getMapSize(this.currentMap);
         byId("map-width").value = width;
         byId("map-height").value = height;
@@ -603,9 +667,7 @@ export class MapEditor {
         const targetMapSelect = byId("connection-target-map");
         const previousTargetId = targetMapSelect.value;
         const targetMaps = this.maps.filter((map) => map.id !== sourceMap.id);
-        targetMapSelect.replaceChildren(
-            ...targetMaps.map((map) => new Option(map.id, map.id)),
-        );
+        targetMapSelect.replaceChildren(...targetMaps.map((map) => new Option(map.id, map.id)));
 
         if (targetMaps.some((map) => map.id === previousTargetId)) {
             targetMapSelect.value = previousTargetId;
@@ -1331,6 +1393,7 @@ export class MapEditor {
         if (!confirm("Replace the working document with the local recovery copy?")) return;
         localStorage.setItem(EDITOR_BACKUP_KEY, JSON.stringify(this.maps));
         this.maps = JSON.parse(raw);
+        this.mapGraph.invalidatePositions();
         this.selectedMapId = this.maps[0].id;
         this.undoStack = [];
         this.redoStack = [];
@@ -1345,6 +1408,7 @@ export class MapEditor {
         if (!raw) return;
         if (!confirm("Replace the working document with the pre-import backup?")) return;
         this.maps = JSON.parse(raw);
+        this.mapGraph.invalidatePositions();
         this.selectedMapId = this.maps[0].id;
         this.undoStack = [];
         this.redoStack = [];
@@ -1360,6 +1424,7 @@ export class MapEditor {
         localStorage.setItem(EDITOR_BACKUP_KEY, JSON.stringify(this.maps));
         this.updateRecoveryButton();
         this.maps = cloneData(imported);
+        this.mapGraph.invalidatePositions();
         this.selectedMapId = this.maps[0]?.id ?? null;
         this.undoStack = [];
         this.redoStack = [];
@@ -1381,6 +1446,35 @@ export class MapEditor {
         } catch {
             this.setStatus("The browser did not allow clipboard access.", true);
         }
+    }
+
+    showMapGraph() {
+        const dialog = byId("map-graph-dialog");
+        dialog.showModal();
+
+        requestAnimationFrame(() => {
+            this.mapGraph.render(this.maps, {
+                selectedMapId: this.selectedMapId,
+            });
+            this.mapGraph.resize();
+            this.mapGraph.fit();
+        });
+    }
+
+    async openMapFromGraph(mapId) {
+        if (!this.maps.some((map) => map.id === mapId)) {
+            this.setStatus(`Map "${mapId}" does not exist.`, true);
+            return;
+        }
+
+        this.selectedMapId = mapId;
+        this.clearSelection();
+
+        const dialog = byId("map-graph-dialog");
+        if (dialog.open) dialog.close();
+
+        await this.refreshDocumentUI();
+        this.setStatus(`Opened map "${mapId}" from the map graph.`);
     }
 
     playtest() {

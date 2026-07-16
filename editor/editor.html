@@ -25,6 +25,7 @@
             <label class="file-button">Import<input id="import-file" type="file"
                     accept=".js,.json,application/json,text/javascript"></label>
             <button id="playtest" type="button" class="primary">Playtest</button>
+            <button id="open-map-graph" type="button">Map graph</button>
             <a href="../index.html">Game</a>
         </div>
     </header>
@@ -41,6 +42,7 @@
                     <button id="delete-map" type="button">Delete</button>
                 </div>
                 <label>Map ID<input id="map-id" type="text"></label>
+                <label>Group<input id="map-group" type="text"></label>
                 <div class="field-pair">
                     <label>Width<input id="map-width" type="number" min="1" step="1"></label>
                     <label>Height<input id="map-height" type="number" min="1" step="1"></label>
@@ -229,6 +231,27 @@
             </section>
         </aside>
     </main>
+
+    <dialog id="map-graph-dialog" class="map-graph-dialog">
+        <header class="map-graph-header">
+            <div>
+                <strong>Map graph</strong>
+                <span>Read-only project connections</span>
+            </div>
+            <div class="map-graph-actions">
+                <button id="map-graph-fit" type="button">Fit</button>
+                <button id="map-graph-relayout" type="button">Relayout</button>
+                <button id="map-graph-close" type="button">Close</button>
+            </div>
+        </header>
+        <div class="map-graph-legend" aria-label="Map graph legend">
+            <span><i class="legend-line exit"></i> Edge exit</span>
+            <span><i class="legend-line teleport"></i> Interactable teleport</span>
+            <span><i class="legend-node selected"></i> Selected map</span>
+            <span><i class="legend-node missing"></i> Missing destination</span>
+        </div>
+        <div id="map-graph-root" class="map-graph-root"></div>
+    </dialog>
 
     <script type="module" src="./editor.js"></script>
 </body>

@@ -6,6 +6,7 @@ export const WORLD_ATLAS_PATH = "./assets/atlases/world.png";
 export const EDITOR_TEST_ATLAS_A_PATH = "./assets/atlases/editor-test-atlas-a.png";
 export const EDITOR_TEST_ATLAS_B_PATH = "./assets/atlases/editor-test-atlas-b.png";
 
+//TODO: figure out a neat way to allow to reuse tiles with mirroring - same for sprites
 export const TILE_IDS = {
     FLOOR: 0,
     FLOOR_ALT: 1,
