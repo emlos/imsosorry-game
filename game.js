@@ -3117,6 +3117,7 @@ export class Game {
         this.updateCamera();
     }
 
+    //TODO: expand camera system, indroduce hooks for camera movement, and allow for camera to be moved independently of player movement for example: zoom in when interacting with entity, room based zoom levels, etc.
     updateCamera() {
         const desiredX = this.player.x + TILE_SIZE / 2 - this.canvas.width / 2;
         const desiredY = this.player.y + TILE_SIZE / 2 - this.canvas.height / 2;

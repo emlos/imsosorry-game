@@ -1,6 +1,6 @@
 import { ATLAS_PATHS } from "./tiles.js";
 
-//TODO: figure out a neat way to allow to reuse sprites with mirroring - same for tiles
+//TODO: figure out a neat way to allow to reuse sprites with mirroring - same for tiles; transform property? but how to save it to the map?
 export const SPRITES = {
     door: {
         path: ATLAS_PATHS.entities,

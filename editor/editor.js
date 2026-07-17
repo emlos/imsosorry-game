@@ -1,3 +1,5 @@
+//TODO: entities should be displayed graphically, like tiles, not a dropdown. reuse system?
+
 import { findPrimaryShowTextEffect } from "../interactions.js";
 import { ITEMS } from "../items.js";
 import { MAPS } from "../maps.js";

@@ -1,41 +1,14 @@
 export const ITEMS = {
-    "pink-orb": {
-        name: "Pink Orb",
-        icon: "./assets/items/pink-orb.png",
-        description: "A warm pink sphere. Its surface seems deeper than its size allows.",
-        usable: true,
-        effects: [
-            { type: "playSound", soundId: "item-use" },
-            {
-                type: "showText",
-                speaker: "Pink Orb",
-                pages: [
-                    "The orb grows warm in your hands.",
-                    "Its light folds the room inward until distance stops making sense.",
-                ],
-                afterClose: [
-                    {
-                        type: "teleport",
-                        mapId: "room-conditional-entity-test",
-                        entryId: "fromPinkOrb",
-                    },
-                ],
-            },
-        ],
-    },
-
-    "room05-possession-collectible": {
-        name: "Possession Collectible",
-        icon: "./assets/items/pink-orb.png",
-        description: "A test collectible whose current inventory ownership is authoritative.",
-        usable: false,
-    },
-
-    //TODO: future; allow animated icons in inventory
-    "animation-test-token": {
-        name: "Animation Test Token",
-        icon: "./assets/items/orb_gold.png",
-        description: "A bright token used to keep the animation-test inventory available.",
-        usable: false,
-    },
+ 
 };
+
+//TODO: dont hardcode room destination here, it should be specified in map data/passed to a function from maps.generated.js
+//reason: when designing the map, removing a room breaks the item, and the item should not be responsible for knowing about the map structure
+// afterClose: [
+//                     {
+//                         type: "teleport",
+//                         mapId: "room-conditional-entity-test",
+//                         entryId: "fromPinkOrb",
+//                     },
+//                 ],
+//teleport could be a callback?

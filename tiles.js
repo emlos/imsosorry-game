@@ -8,6 +8,10 @@ export const ATLAS_PATHS = {
     player: "./assets/atlases/player.png",
 };
 
+//TODO: we need to asses whather the current tile/interactable make sense. maybe id want for most trees to not have any interactions/effects - but one specific tree could be a switch for example - but for that id have to create an extra entity. 
+// is a sprite that different from a tile? both have a position, a size, and a source in an atlas. but a tile is part of the map, while a sprite is not
+// so - need to brainstorm this, it feels a bit cumbersome to be this limited in what can be done with tiles, and to have to create a separate entity for every interactable objectW
+
 //TODO: figure out a neat way to allow to reuse tiles with mirroring - same for sprites
 export const TILE_IDS = {
     FLOOR: 0,
