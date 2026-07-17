@@ -18,6 +18,7 @@ import {
     createReciprocalEdgeConnection,
     fillRectangle,
     findMapIdReferences,
+    findReciprocalEdgeExit,
     floodFill,
     getEdgeAxisLength,
     getMapSize,
@@ -30,6 +31,7 @@ import {
     renameEntry,
     resizeMap,
     serializeGeneratedMaps,
+    updateReciprocalEdgeExitGeometry,
     setTile,
     validateEditorDocument,
 } from "./editor-model.js";
@@ -409,6 +411,13 @@ export class MapEditor {
         byId("connection-target-map").addEventListener("change", () =>
             this.renderConnectionControls(),
         );
+        for (const id of [
+            "connection-source-range-start",
+            "connection-source-range-end",
+            "connection-target-range-start",
+        ]) {
+            byId(id).addEventListener("input", () => this.renderConnectionControls());
+        }
         byId("create-reciprocal-connection").addEventListener("click", () =>
             this.createReciprocalConnection(),
         );
@@ -713,7 +722,9 @@ export class MapEditor {
             const targetLabel =
                 exit.destination?.type === "random"
                     ? `random (${exit.destination.choices?.length ?? 0} choices)`
-                    : exit.targetMapId;
+                    : Object.hasOwn(exit, "targetEdge")
+                      ? `${exit.targetMapId} ${exit.targetEdge} ${exit.targetRange?.[0] ?? "?"}–${exit.targetRange?.[1] ?? "?"}`
+                      : exit.targetMapId;
             button.textContent = `${index}: ${exit.edge} ${exit.range[0]}–${exit.range[1]} → ${targetLabel}`;
             button.classList.toggle("selected", index === this.selectedExitIndex);
             button.addEventListener("click", () => {
@@ -758,42 +769,58 @@ export class MapEditor {
         byId("connection-target-edge").value = targetEdge;
 
         const targetMap = targetMaps.find((map) => map.id === targetMapSelect.value) ?? null;
-        const maximumAxis = targetMap
-            ? Math.min(
-                  getEdgeAxisLength(sourceMap, sourceEdge),
-                  getEdgeAxisLength(targetMap, targetEdge),
-              ) - 1
-            : -1;
+        const sourceLimit = getEdgeAxisLength(sourceMap, sourceEdge);
+        const targetLimit = targetMap ? getEdgeAxisLength(targetMap, targetEdge) : 0;
+        const disabled = !targetMap || sourceLimit <= 0 || targetLimit <= 0;
 
-        const startInput = byId("connection-range-start");
-        const endInput = byId("connection-range-end");
+        const sourceStartInput = byId("connection-source-range-start");
+        const sourceEndInput = byId("connection-source-range-end");
+        const targetStartInput = byId("connection-target-range-start");
+        const targetEndInput = byId("connection-target-range-end");
         const button = byId("create-reciprocal-connection");
-        const disabled = maximumAxis < 0;
 
-        startInput.disabled = disabled;
-        endInput.disabled = disabled;
+        for (const input of [sourceStartInput, sourceEndInput, targetStartInput]) {
+            input.disabled = disabled;
+        }
+        targetEndInput.disabled = disabled;
         button.disabled = disabled;
         targetMapSelect.disabled = targetMaps.length === 0;
-        startInput.max = String(Math.max(0, maximumAxis));
-        endInput.max = String(Math.max(0, maximumAxis));
 
-        const currentStart = Number(startInput.value);
-        const currentEnd = Number(endInput.value);
-        if (sourceChanged || !Number.isInteger(currentStart) || currentStart < 0) {
-            startInput.value = "0";
-        } else if (currentStart > maximumAxis) {
-            startInput.value = String(Math.max(0, maximumAxis));
-        }
+        sourceStartInput.max = String(Math.max(0, sourceLimit - 1));
 
-        const normalizedStart = Number(startInput.value);
-        if (
-            sourceChanged ||
-            !Number.isInteger(currentEnd) ||
-            currentEnd < normalizedStart ||
-            currentEnd > maximumAxis
-        ) {
-            endInput.value = String(Math.max(normalizedStart, maximumAxis));
+        let sourceStart = Number(sourceStartInput.value);
+        if (sourceChanged || !Number.isInteger(sourceStart) || sourceStart < 0) sourceStart = 0;
+        sourceStart = Math.min(sourceStart, Math.max(0, sourceLimit - 1));
+
+        const maximumSourceEnd = Math.min(
+            Math.max(sourceStart, sourceLimit - 1),
+            sourceStart + Math.max(0, targetLimit - 1),
+        );
+        sourceEndInput.max = String(maximumSourceEnd);
+
+        let sourceEnd = Number(sourceEndInput.value);
+        if (sourceChanged || !Number.isInteger(sourceEnd) || sourceEnd < sourceStart) {
+            sourceEnd = sourceStart;
         }
+        sourceEnd = Math.min(sourceEnd, maximumSourceEnd);
+
+        const sourceLengthDelta = sourceEnd - sourceStart;
+        const maximumTargetStart = Math.max(0, targetLimit - sourceLengthDelta - 1);
+        targetStartInput.max = String(maximumTargetStart);
+
+        let targetStart = Number(targetStartInput.value);
+        if (sourceChanged || !Number.isInteger(targetStart) || targetStart < 0) targetStart = 0;
+        targetStart = Math.min(targetStart, maximumTargetStart);
+        const targetEnd = targetStart + sourceLengthDelta;
+
+        sourceStartInput.value = String(sourceStart);
+        sourceEndInput.value = String(sourceEnd);
+        targetStartInput.value = String(targetStart);
+        targetEndInput.value = String(targetEnd);
+
+        byId("connection-preview").textContent = targetMap
+            ? `${sourceMap.id} ${sourceEdge} ${sourceStart}–${sourceEnd}\n        ↓\n${targetMap.id} ${targetEdge} ${targetStart}–${targetEnd}`
+            : "Choose a target map.";
     }
 
     async createReciprocalConnection() {
@@ -805,16 +832,21 @@ export class MapEditor {
 
             const sourceEdge = byId("connection-source-edge").value;
             const targetEdge = byId("connection-target-edge").value;
-            const range = [
-                Number(byId("connection-range-start").value),
-                Number(byId("connection-range-end").value),
+            const sourceRange = [
+                Number(byId("connection-source-range-start").value),
+                Number(byId("connection-source-range-end").value),
+            ];
+            const targetRange = [
+                Number(byId("connection-target-range-start").value),
+                Number(byId("connection-target-range-end").value),
             ];
             const { sourceExit, targetExit } = createReciprocalEdgeConnection(
                 sourceMap,
                 targetMap,
                 sourceEdge,
                 targetEdge,
-                range,
+                sourceRange,
+                targetRange,
             );
             const sourceExitIndex = sourceMap.exits.length;
 
@@ -830,7 +862,7 @@ export class MapEditor {
             await this.refreshAfterMutation();
             this.updateModeUI();
             this.setStatus(
-                `Connected "${sourceMap.id}" ${sourceEdge} to "${targetMap.id}" ${targetEdge}. Unsaved editor changes.`,
+                `Connected "${sourceMap.id}" ${sourceEdge} ${sourceRange[0]}–${sourceRange[1]} to "${targetMap.id}" ${targetEdge} ${targetRange[0]}–${targetRange[1]}. Unsaved editor changes.`,
             );
         } catch (error) {
             this.setStatus(error.message, true);
@@ -1419,8 +1451,17 @@ export class MapEditor {
         const isRandom = exit.destination?.type === "random";
         targetMapSelect.disabled = isRandom;
         targetMapSelect.value = isRandom ? (this.maps[0]?.id ?? "") : exit.targetMapId;
-        this.populateExitEntryOptions(isRandom ? null : exit.entryId);
-        byId("exit-target-entry").disabled = isRandom || !Object.hasOwn(exit, "entryId");
+        const isEntryTarget = !isRandom && Object.hasOwn(exit, "entryId");
+        const isEdgeTarget = !isRandom && Object.hasOwn(exit, "targetEdge");
+        this.populateExitEntryOptions(isEntryTarget ? exit.entryId : null);
+        byId("exit-entry-target-fields").hidden = !isEntryTarget;
+        byId("exit-edge-target-fields").hidden = !isEdgeTarget;
+        byId("exit-target-entry").disabled = !isEntryTarget;
+        if (isEdgeTarget) {
+            byId("exit-target-edge").value = exit.targetEdge;
+            byId("exit-target-range-start").value = exit.targetRange?.[0] ?? 0;
+            byId("exit-target-range-end").value = exit.targetRange?.[1] ?? 0;
+        }
         byId("exit-json").value = JSON.stringify(exit, null, 4);
         this.exitJsonDirty = false;
     }
@@ -1439,6 +1480,7 @@ export class MapEditor {
         const exit = this.currentMap.exits[this.selectedExitIndex];
         if (!exit) return;
         try {
+            const reciprocal = findReciprocalEdgeExit(this.maps, this.currentMap, exit);
             let replacement;
             if (this.exitJsonDirty) {
                 replacement = JSON.parse(byId("exit-json").value);
@@ -1467,6 +1509,13 @@ export class MapEditor {
                     Number(byId("exit-range-end").value),
                 ];
                 replacement.targetMapId = byId("exit-target-map").value;
+                if (Object.hasOwn(exit, "targetEdge")) {
+                    replacement.targetEdge = byId("exit-target-edge").value;
+                    replacement.targetRange = [
+                        Number(byId("exit-target-range-start").value),
+                        Number(byId("exit-target-range-end").value),
+                    ];
+                }
             }
             if (
                 !Array.isArray(replacement.range) ||
@@ -1475,8 +1524,99 @@ export class MapEditor {
             ) {
                 throw new Error("Exit range must contain two integers.");
             }
+            if (replacement.range[0] < 0 || replacement.range[1] < replacement.range[0]) {
+                throw new Error("Exit range must contain ordered non-negative integers.");
+            }
+            const sourceLimit = getEdgeAxisLength(this.currentMap, replacement.edge);
+            if (replacement.range[1] >= sourceLimit) {
+                throw new Error(`Exit range exceeds the ${replacement.edge} edge.`);
+            }
+
+            const destinations =
+                replacement.destination?.type === "random"
+                    ? replacement.destination.choices ?? []
+                    : [replacement];
+            for (const [choiceIndex, destination] of destinations.entries()) {
+                if (!Object.hasOwn(destination, "targetEdge")) continue;
+                const choiceLabel =
+                    replacement.destination?.type === "random"
+                        ? `Random destination choice ${choiceIndex}`
+                        : "Target doorway";
+                if (
+                    !Array.isArray(destination.targetRange) ||
+                    destination.targetRange.length !== 2 ||
+                    !destination.targetRange.every(Number.isInteger) ||
+                    destination.targetRange[0] < 0 ||
+                    destination.targetRange[1] < destination.targetRange[0]
+                ) {
+                    throw new Error(`${choiceLabel} range must contain ordered non-negative integers.`);
+                }
+                if (destination.targetEdge !== OPPOSITE_EDGE[replacement.edge]) {
+                    throw new Error(`${choiceLabel} edge must be opposite the source edge.`);
+                }
+                const sourceLength = replacement.range[1] - replacement.range[0];
+                const targetLength = destination.targetRange[1] - destination.targetRange[0];
+                if (sourceLength !== targetLength) {
+                    throw new Error(`${choiceLabel} must contain the same number of cells as the source range.`);
+                }
+                const targetMap = this.maps.find((map) => map.id === destination.targetMapId);
+                if (!targetMap) throw new Error(`${choiceLabel} targets a missing map.`);
+                const targetLimit = getEdgeAxisLength(targetMap, destination.targetEdge);
+                if (destination.targetRange[1] >= targetLimit) {
+                    throw new Error(`${choiceLabel} range exceeds the target edge.`);
+                }
+            }
+            const replacementIsDirectEdgeExit =
+                replacement.destination?.type !== "random" &&
+                Object.hasOwn(replacement, "targetEdge");
+            let reciprocalReplacement = null;
+            let reciprocalTargetMap = null;
+
+            if (reciprocal && replacementIsDirectEdgeExit) {
+                reciprocalTargetMap = this.maps.find(
+                    (map) => map.id === replacement.targetMapId,
+                );
+                if (!reciprocalTargetMap) {
+                    throw new Error("The reciprocal exit's new target map does not exist.");
+                }
+                reciprocalReplacement = updateReciprocalEdgeExitGeometry(
+                    reciprocal.exit,
+                    this.currentMap.id,
+                    replacement,
+                );
+
+                const overlap = (reciprocalTargetMap.exits ?? []).findIndex(
+                    (candidate, index) =>
+                        !(reciprocal.map === reciprocalTargetMap && index === reciprocal.index) &&
+                        candidate?.edge === reciprocalReplacement.edge &&
+                        Array.isArray(candidate.range) &&
+                        candidate.range.length === 2 &&
+                        candidate.range[0] <= reciprocalReplacement.range[1] &&
+                        reciprocalReplacement.range[0] <= candidate.range[1],
+                );
+                if (overlap >= 0) {
+                    throw new Error(
+                        `The linked target doorway overlaps exit ${overlap} in "${reciprocalTargetMap.id}".`,
+                    );
+                }
+            }
+
             this.commitMutation("Edit exit", () => {
                 this.currentMap.exits[this.selectedExitIndex] = replacement;
+
+                if (!reciprocal) return;
+                if (!replacementIsDirectEdgeExit) {
+                    reciprocal.map.exits.splice(reciprocal.index, 1);
+                    return;
+                }
+
+                if (reciprocal.map === reciprocalTargetMap) {
+                    reciprocal.map.exits[reciprocal.index] = reciprocalReplacement;
+                    return;
+                }
+
+                reciprocal.map.exits.splice(reciprocal.index, 1);
+                reciprocalTargetMap.exits.push(reciprocalReplacement);
             });
             this.refreshAfterMutation();
         } catch (error) {

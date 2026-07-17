@@ -320,8 +320,7 @@ musicEvents: [
                 weight: 9,
                 targetMapId: "room-normal",
                 targetEdge: "west",
-                preserveAxis: true,
-                offset: 0,
+                targetRange: [6, 8],
             },
             {
                 weight: 1,

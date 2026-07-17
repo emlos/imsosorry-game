@@ -140,8 +140,7 @@ Map `musicEvents[].effects`
     range: [1, 4],
     targetMapId: "room-b",
     targetEdge: "west",
-    preserveAxis: true,
-    offset: 0,
+    targetRange: [2, 5],
 }
 ```
 
@@ -1246,7 +1245,9 @@ Rules:
 
 The target position must be walkable and non-colliding.
 
-## Static edge exit: preserve axis
+Edge-to-edge geometry is shared by the game and editor through `map-edges.js`. Authored exits store both doorway ranges; the runtime derives the axis delta and never stores an offset.
+
+## Static edge exit: connected doorway
 
 ```js
 {
@@ -1254,16 +1255,17 @@ The target position must be walkable and non-colliding.
     range: [1, 5],
     targetMapId: "room-b",
     targetEdge: "west",
-    preserveAxis: true,
-    offset: 0,
+    targetRange: [3, 7],
 }
 ```
 
 Rules:
 
 - `targetEdge` must be the opposite of `edge`.
-- `offset` is an integer added to the source row/column.
-- Every possible target position across the range must fit and be walkable.
+- `targetRange` describes the corresponding opening on the target edge.
+- `range` and `targetRange` must contain the same number of cells.
+- The player keeps the exact relative, including fractional, position within the opening.
+- Every target doorway cell must fit and be walkable.
 
 ## Random edge destination
 
@@ -1281,8 +1283,7 @@ Rules:
                 weight: 95,
                 targetMapId: "forest-normal",
                 targetEdge: "south",
-                preserveAxis: true,
-                offset: 0,
+                targetRange: [1, 4],
             },
             {
                 weight: 5,
@@ -2555,8 +2556,7 @@ musicEvents: [
                 weight: 9,
                 targetMapId: "room-normal",
                 targetEdge: "west",
-                preserveAxis: true,
-                offset: 0,
+                targetRange: [6, 8],
             },
             {
                 weight: 1,
@@ -2782,6 +2782,10 @@ Update all of:
 
 Otherwise the game may run while editor renaming or graphing silently misses the new route.
 
+## Shared edge geometry
+
+Keep doorway geometry in `map-edges.js`. The game and editor both import `OPPOSITE_EDGE`, `getRangeLength()`, `mapAxisBetweenRanges()`, and `getEdgePosition()`. Schema validation remains local to each subsystem; do not reintroduce stored offsets or duplicate the coordinate mapping.
+
 ---
 
 # Validation and Gotchas
@@ -2931,3 +2935,10 @@ Clear or migrate development saves after:
 - Changing the random algorithm/version.
 - Changing persistent state schema.
 - Incrementing save format requirements.
+
+## Edge doorway ranges
+
+- Edge-to-edge exits require `targetRange`; `preserveAxis` and `offset` are not supported.
+- Source and target ranges must have equal inclusive lengths.
+- Room resizing leaves ranges unchanged so invalid connections remain visible to editor validation.
+- Startup validation checks every integer target doorway cell; runtime footbox validation remains authoritative for fractional placement.

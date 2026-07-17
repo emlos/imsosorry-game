@@ -17,7 +17,7 @@ Maps may define an optional `editorGroup` string. The editor uses it to organize
 - CSS-only canvas zoom from 50% to 400%, with buttons and Ctrl/Cmd-wheel cursor anchoring.
 - Entity presets, placement, dragging, deletion, and basic property editing.
 - Entry placement, facing, renaming, reference display, and deletion.
-- Exit range display, entry-target form editing, reciprocal opposite-edge room connections, and raw JSON editing for advanced forms.
+- Exit range display, entry-target and edge-target form editing, reciprocal equal-length doorway connections, and raw JSON editing for advanced forms.
 - Full-document undo/redo snapshots grouped by completed action.
 - Generated JavaScript and JSON export, import, local recovery, and pre-import backup.
 - Real-game playtesting with the editor document and validation result reporting.
@@ -30,7 +30,7 @@ editor does not create tile or sprite assets, edit atlas coordinates, edit anima
 
 ## Read-only map graph
 
-Use **Map graph** in the top toolbar to open a derived project overview. The graph contains one node per map, compound regions for `editorGroup` values, solid arrows for edge exits, and dashed arrows for entity or tile teleports. Repeated links of the same type are aggregated and labelled with a count. Broken map references appear as explicit missing-destination nodes.
+Use **Map graph** in the top toolbar to open a derived project overview. The graph contains one node per map, compound regions for `editorGroup` values, solid arrows for edge exits, and dashed arrows for entity or tile teleports. Edge links display their source and target doorway ranges; repeated non-exit links of the same type are aggregated and labelled with a count. Broken map references appear as explicit missing-destination nodes.
 
 The graph is read-only. Drag the background to pan, use the mouse wheel to zoom, use **Fit** to recenter all nodes, and use **Relayout** to generate a new force-directed arrangement. Clicking a map node closes the graph and selects that map in the normal editor. Graph positions exist only for the current editor session and are never exported with map data.
 
@@ -43,3 +43,7 @@ Development saves are not migrated when a map ID changes. Clear old development 
 ## Deterministic random branches
 
 Random effects, map `onEnter`/`onExit` sequences, and random edge destinations can be authored through the relevant JSON inspectors/imported map data. Random edge exits keep their edge/range controls in the inspector while their full `destination` definition remains in the JSON field. The graph displays probabilistic exits and teleports as dotted links. Rename refactors recurse through every random choice branch.
+
+## Reciprocal doorway connections
+
+The connection form authors separate source and target ranges. After choosing the source range, enter the target start; the editor derives the target end so both openings always have equal length. The generated reciprocal exits swap the two ranges. Editing either linked exit in the inspector updates the reciprocal exit in the same undoable mutation: its source range mirrors the edited target range, and its target range mirrors the edited source range. Resizing a room does not silently clamp exit ranges; structural validation reports any opening that no longer fits.

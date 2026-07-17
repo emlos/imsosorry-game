@@ -28,6 +28,12 @@ import { PLAYER_SPRITES, SPRITES } from "./sprites.js";
 import { TILE_SIZE, EMPTY_TILE_ID, TILES } from "./tiles.js";
 import { SAVE_VERSION } from "./saves.js";
 import {
+    OPPOSITE_EDGE,
+    getEdgePosition,
+    getRangeLength,
+    mapAxisBetweenRanges,
+} from "./map-edges.js";
+import {
     RANDOM_SCOPES,
     RANDOM_STATE_VERSION,
     chooseWeightedIndex,
@@ -48,15 +54,20 @@ import {
     requireString,
 } from "./validation.js";
 
-const OPPOSITE_EDGE = {
-    north: "south",
-    south: "north",
-    east: "west",
-    west: "east",
-};
-
 const RENDER_LAYER_NAMES = new Set(["base", "obstacles", "foreground"]);
 const COLLISION_EPSILON = 1e-7;
+
+function validateEdgeRange(range, label) {
+    if (
+        !Array.isArray(range) ||
+        range.length !== 2 ||
+        !range.every(Number.isInteger) ||
+        range[0] < 0 ||
+        range[1] < range[0]
+    ) {
+        throw new Error(`${label} must contain two ordered non-negative integers.`);
+    }
+}
 
 function cloneLayers(layers) {
     return Object.fromEntries(
@@ -421,7 +432,7 @@ export class Game {
         }
     }
 
-    validateExitDestinationDefinition(destination, sourceEdge, label) {
+    validateExitDestinationDefinition(destination, sourceEdge, sourceRange, label) {
         requireObject(destination, label);
         this.validateMusicTransitionOptions(destination, label);
         requireString(destination.targetMapId, `${label}.targetMapId`);
@@ -470,17 +481,12 @@ export class Game {
                 "weight",
                 "targetMapId",
                 "targetEdge",
-                "preserveAxis",
-                "offset",
+                "targetRange",
                 "musicTransition",
                 "musicTransitionMs",
             ]),
             label,
         );
-
-        if (destination.preserveAxis !== true) {
-            throw new Error(`${label}.preserveAxis must be true.`);
-        }
 
         const edges = new Set(["north", "south", "east", "west"]);
         if (!edges.has(destination.targetEdge)) {
@@ -492,7 +498,13 @@ export class Game {
                     `${OPPOSITE_EDGE[sourceEdge]}).`,
             );
         }
-        requireInteger(destination.offset, `${label}.offset`);
+        validateEdgeRange(destination.targetRange, `${label}.targetRange`);
+        if (getRangeLength(sourceRange) !== getRangeLength(destination.targetRange)) {
+            throw new Error(
+                `${label} connects a ${getRangeLength(sourceRange)}-cell source range to a ` +
+                    `${getRangeLength(destination.targetRange)}-cell target range.`,
+            );
+        }
     }
 
     validateExitDefinition(exit, map, index) {
@@ -504,15 +516,7 @@ export class Game {
             throw new Error(`${label}.edge must be north, south, east, or west.`);
         }
 
-        if (
-            !Array.isArray(exit.range) ||
-            exit.range.length !== 2 ||
-            !exit.range.every(Number.isInteger) ||
-            exit.range[0] < 0 ||
-            exit.range[1] < exit.range[0]
-        ) {
-            throw new Error(`${label}.range must contain two ordered non-negative integers.`);
-        }
+        validateEdgeRange(exit.range, `${label}.range`);
 
         const axisLimit =
             exit.edge === "east" || exit.edge === "west" ? map.gridSize.height : map.gridSize.width;
@@ -546,6 +550,7 @@ export class Game {
                 this.validateExitDestinationDefinition(
                     choice,
                     exit.edge,
+                    exit.range,
                     `${label}.destination.choices[${choiceIndex}]`,
                 );
             });
@@ -554,7 +559,7 @@ export class Game {
 
         this.validateMusicTransitionOptions(exit, label);
         const { edge, range, ...destination } = exit;
-        this.validateExitDestinationDefinition(destination, edge, label);
+        this.validateExitDestinationDefinition(destination, edge, range, label);
     }
 
     validateExitRangeOverlaps(map) {
@@ -612,20 +617,21 @@ export class Game {
             destination.targetEdge === "east" || destination.targetEdge === "west"
                 ? targetMap.gridSize.height
                 : targetMap.gridSize.width;
-        const firstTargetAxis = exit.range[0] + destination.offset;
-        const lastTargetAxis = exit.range[1] + destination.offset;
-        if (firstTargetAxis < 0 || lastTargetAxis >= targetAxisLimit) {
-            throw new Error(`${label} preserves its axis outside "${destination.targetMapId}".`);
+        if (destination.targetRange[1] >= targetAxisLimit) {
+            throw new Error(
+                `${label}.targetRange exceeds the ${destination.targetEdge} edge of ` +
+                    `"${destination.targetMapId}".`,
+            );
         }
 
         const targetSpatialData = initialSpatialDataByMap.get(destination.targetMapId);
-        for (let sourceAxis = exit.range[0]; sourceAxis <= exit.range[1]; sourceAxis += 1) {
-            const targetPosition = this.getPreservedExitPosition(destination, sourceAxis);
+        for (let axis = destination.targetRange[0]; axis <= destination.targetRange[1]; axis += 1) {
+            const position = getEdgePosition(targetMap.gridSize, destination.targetEdge, axis);
             this.validateTransitionCell(
                 targetSpatialData,
-                targetPosition.col,
-                targetPosition.row,
-                `${label} destination for source axis ${sourceAxis}`,
+                position.col,
+                position.row,
+                `${label} destination axis ${axis}`,
             );
         }
     }
@@ -658,22 +664,15 @@ export class Game {
         }
     }
 
-    getEdgePosition(map, edge, axis) {
-        if (edge === "west") return { col: 0, row: axis };
-        if (edge === "east") return { col: map.gridSize.width - 1, row: axis };
-        if (edge === "north") return { col: axis, row: 0 };
-        return { col: axis, row: map.gridSize.height - 1 };
-    }
-
-    getPreservedExitPosition(exit, sourceAxis) {
-        const targetMap = this.mapsById.get(exit.targetMapId);
-        const targetAxis = sourceAxis + exit.offset;
-        const position = this.getEdgePosition(targetMap, exit.targetEdge, targetAxis);
+    getEdgeExitPosition(exit, destination, sourceAxis) {
+        const targetMap = this.mapsById.get(destination.targetMapId);
+        const targetAxis = mapAxisBetweenRanges(sourceAxis, exit.range, destination.targetRange);
+        const position = getEdgePosition(targetMap.gridSize, destination.targetEdge, targetAxis);
         this.validatePlayerPosition(
-            exit.targetMapId,
+            destination.targetMapId,
             position.col,
             position.row,
-            `Preserved exit target`,
+            "Edge exit target",
         );
         return position;
     }
@@ -2948,9 +2947,10 @@ export class Game {
         const destination = this.resolveExitDestination(exit);
         if (!destination) return true;
 
-        if (destination.preserveAxis === true) {
+        if (Object.hasOwn(destination, "targetEdge")) {
             const targetMap = this.mapsById.get(destination.targetMapId);
-            const targetPosition = this.getPreservedExitPosition(
+            const targetPosition = this.getEdgeExitPosition(
+                exit,
                 destination,
                 exitAttempt.sourceAxis,
             );
@@ -2965,11 +2965,16 @@ export class Game {
             if (!targetIsOpen) return false;
         }
 
-        this.executeEdgeExit(destination, exitAttempt.sourceAxis, exitAttempt.movementDirection);
+        this.executeEdgeExit(
+            exit,
+            destination,
+            exitAttempt.sourceAxis,
+            exitAttempt.movementDirection,
+        );
         return true;
     }
 
-    executeEdgeExit(destination, sourceAxis, movementDirection) {
+    executeEdgeExit(exit, destination, sourceAxis, movementDirection) {
         if (Object.hasOwn(destination, "entryId")) {
             this.transitionTo(
                 {
@@ -2996,7 +3001,7 @@ export class Game {
             return;
         }
 
-        const position = this.getPreservedExitPosition(destination, sourceAxis);
+        const position = this.getEdgeExitPosition(exit, destination, sourceAxis);
         this.transitionTo(
             {
                 mapId: destination.targetMapId,

@@ -114,15 +114,20 @@
                             <option value="east">East</option>
                         </select></label>
                     <div class="field-pair">
-                        <label>Range start<input id="connection-range-start" type="number" min="0" step="1"></label>
-                        <label>Range end<input id="connection-range-end" type="number" min="0" step="1"></label>
+                        <label>Source range start<input id="connection-source-range-start" type="number" min="0" step="1"></label>
+                        <label>Source range end<input id="connection-source-range-end" type="number" min="0" step="1"></label>
                     </div>
                     <label>Target map<select id="connection-target-map"></select></label>
                     <label>Target edge<input id="connection-target-edge" type="text" readonly></label>
+                    <div class="field-pair">
+                        <label>Target range start<input id="connection-target-range-start" type="number" min="0" step="1"></label>
+                        <label>Target range end<input id="connection-target-range-end" type="number" min="0" step="1" readonly></label>
+                    </div>
+                    <pre id="connection-preview" class="connection-preview"></pre>
                     <button id="create-reciprocal-connection" type="button">
                         Create reciprocal connection
                     </button>
-                    <p class="hint">Creates zero-offset preserved-axis exits on opposite edges.</p>
+                    <p class="hint">Creates reciprocal exits that preserve the exact relative position within equal-length openings.</p>
                 </div>
             </section>
 
@@ -218,7 +223,22 @@
                     <label>Range end<input id="exit-range-end" type="number" min="0"></label>
                 </div>
                 <label>Target map<select id="exit-target-map"></select></label>
-                <label>Target entry<select id="exit-target-entry"></select></label>
+                <div id="exit-entry-target-fields">
+                    <label>Target entry<select id="exit-target-entry"></select></label>
+                </div>
+                <div id="exit-edge-target-fields" hidden>
+                    <label>Target edge<select id="exit-target-edge">
+                            <option value="north">North</option>
+                            <option value="south">South</option>
+                            <option value="west">West</option>
+                            <option value="east">East</option>
+                        </select></label>
+                    <div class="field-pair">
+                        <label>Target range start<input id="exit-target-range-start" type="number" min="0"></label>
+                        <label>Target range end<input id="exit-target-range-end" type="number" min="0"></label>
+                    </div>
+                    <p class="hint">Source and target ranges must contain the same number of cells. Applying changes to a reciprocal connection updates its linked exit too.</p>
+                </div>
                 <details>
                     <summary>Advanced raw exit JSON</summary>
                     <textarea id="exit-json" rows="12" spellcheck="false"></textarea>

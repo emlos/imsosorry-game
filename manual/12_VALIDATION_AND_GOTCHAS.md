@@ -145,3 +145,10 @@ Clear or migrate development saves after:
 - Changing the random algorithm/version.
 - Changing persistent state schema.
 - Incrementing save format requirements.
+
+## Edge doorway ranges
+
+- Edge-to-edge exits require `targetRange`; `preserveAxis` and `offset` are not supported.
+- Source and target ranges must have equal inclusive lengths.
+- Room resizing leaves ranges unchanged so invalid connections remain visible to editor validation.
+- Startup validation checks every integer target doorway cell; runtime footbox validation remains authoritative for fractional placement.

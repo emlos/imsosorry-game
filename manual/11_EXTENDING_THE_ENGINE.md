@@ -185,3 +185,7 @@ Update all of:
 - Documentation.
 
 Otherwise the game may run while editor renaming or graphing silently misses the new route.
+
+## Shared edge geometry
+
+Keep doorway geometry in `map-edges.js`. The game and editor both import `OPPOSITE_EDGE`, `getRangeLength()`, `mapAxisBetweenRanges()`, and `getEdgePosition()`. Schema validation remains local to each subsystem; do not reintroduce stored offsets or duplicate the coordinate mapping.

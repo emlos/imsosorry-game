@@ -1,3 +1,4 @@
+import { OPPOSITE_EDGE, getEdgePosition, getRangeLength } from "../map-edges.js";
 import { SPRITES } from "../sprites.js";
 import { EMPTY_TILE_ID, TILE_IDS, TILES } from "../tiles.js";
 
@@ -22,12 +23,7 @@ export function getMapSize(map) {
     };
 }
 
-export const OPPOSITE_EDGE = {
-    north: "south",
-    south: "north",
-    east: "west",
-    west: "east",
-};
+export { OPPOSITE_EDGE };
 
 export function getEdgeAxisLength(map, edge) {
     if (!Object.hasOwn(OPPOSITE_EDGE, edge)) {
@@ -40,6 +36,85 @@ export function getEdgeAxisLength(map, edge) {
 
 export function rangesOverlap(first, second) {
     return first[0] <= second[1] && second[0] <= first[1];
+}
+
+export function rangesEqual(first, second) {
+    return (
+        Array.isArray(first) &&
+        Array.isArray(second) &&
+        first.length === 2 &&
+        second.length === 2 &&
+        first[0] === second[0] &&
+        first[1] === second[1]
+    );
+}
+
+function isDirectEdgeExit(exit) {
+    return (
+        exit &&
+        typeof exit === "object" &&
+        exit.destination?.type !== "random" &&
+        typeof exit.targetMapId === "string" &&
+        Object.hasOwn(OPPOSITE_EDGE, exit.edge) &&
+        Object.hasOwn(OPPOSITE_EDGE, exit.targetEdge) &&
+        Array.isArray(exit.range) &&
+        Array.isArray(exit.targetRange)
+    );
+}
+
+export function findReciprocalEdgeExit(maps, sourceMap, sourceExit) {
+    if (!Array.isArray(maps) || !sourceMap || !isDirectEdgeExit(sourceExit)) return null;
+
+    const targetMap = maps.find((map) => map.id === sourceExit.targetMapId);
+    if (!targetMap) return null;
+
+    const candidates = (targetMap.exits ?? [])
+        .map((exit, index) => ({ exit, index }))
+        .filter(
+            ({ exit }) =>
+                isDirectEdgeExit(exit) &&
+                exit.edge === sourceExit.targetEdge &&
+                exit.targetMapId === sourceMap.id &&
+                exit.targetEdge === sourceExit.edge,
+        );
+
+    const exactMatches = candidates.filter(
+        ({ exit }) =>
+            rangesEqual(exit.range, sourceExit.targetRange) &&
+            rangesEqual(exit.targetRange, sourceExit.range),
+    );
+    if (exactMatches.length === 1) {
+        return { map: targetMap, ...exactMatches[0] };
+    }
+
+    const partialMatches = candidates.filter(
+        ({ exit }) =>
+            rangesEqual(exit.range, sourceExit.targetRange) ||
+            rangesEqual(exit.targetRange, sourceExit.range),
+    );
+    if (partialMatches.length === 1) {
+        return { map: targetMap, ...partialMatches[0] };
+    }
+
+    if (candidates.length === 1) {
+        return { map: targetMap, ...candidates[0] };
+    }
+
+    return null;
+}
+
+export function updateReciprocalEdgeExitGeometry(reciprocalExit, sourceMapId, sourceExit) {
+    if (!isDirectEdgeExit(sourceExit)) {
+        throw new Error("A reciprocal exit can only mirror a direct edge-to-edge exit.");
+    }
+
+    const updated = cloneData(reciprocalExit);
+    updated.edge = sourceExit.targetEdge;
+    updated.range = [...sourceExit.targetRange];
+    updated.targetMapId = sourceMapId;
+    updated.targetEdge = sourceExit.edge;
+    updated.targetRange = [...sourceExit.range];
+    return updated;
 }
 
 function validateConnectionRange(range) {
@@ -75,7 +150,8 @@ export function createReciprocalEdgeConnection(
     targetMap,
     sourceEdge,
     targetEdge,
-    range,
+    sourceRange,
+    targetRange,
 ) {
     if (!sourceMap || !targetMap || sourceMap === targetMap || sourceMap.id === targetMap.id) {
         throw new Error("Source and target maps must be different.");
@@ -92,40 +168,44 @@ export function createReciprocalEdgeConnection(
         );
     }
 
-    validateConnectionRange(range);
+    validateConnectionRange(sourceRange);
+    validateConnectionRange(targetRange);
+    if (getRangeLength(sourceRange) !== getRangeLength(targetRange)) {
+        throw new Error(
+            `Source and target connection ranges must contain the same number of cells.`,
+        );
+    }
 
     const sourceLimit = getEdgeAxisLength(sourceMap, sourceEdge);
     const targetLimit = getEdgeAxisLength(targetMap, targetEdge);
-    if (range[1] >= sourceLimit) {
+    if (sourceRange[1] >= sourceLimit) {
         throw new Error(
-            `Connection range ${range[0]}–${range[1]} exceeds the ${sourceEdge} edge of "${sourceMap.id}".`,
+            `Connection range ${sourceRange[0]}–${sourceRange[1]} exceeds the ${sourceEdge} edge of "${sourceMap.id}".`,
         );
     }
-    if (range[1] >= targetLimit) {
+    if (targetRange[1] >= targetLimit) {
         throw new Error(
-            `Connection range ${range[0]}–${range[1]} exceeds the ${targetEdge} edge of "${targetMap.id}".`,
+            `Connection range ${targetRange[0]}–${targetRange[1]} exceeds the ${targetEdge} edge of "${targetMap.id}".`,
         );
     }
 
-    assertNoOverlappingExit(sourceMap, sourceEdge, range);
-    assertNoOverlappingExit(targetMap, targetEdge, range);
+    assertNoOverlappingExit(sourceMap, sourceEdge, sourceRange);
+    assertNoOverlappingExit(targetMap, targetEdge, targetRange);
 
     return {
         sourceExit: {
             edge: sourceEdge,
-            range: [...range],
+            range: [...sourceRange],
             targetMapId: targetMap.id,
             targetEdge,
-            preserveAxis: true,
-            offset: 0,
+            targetRange: [...targetRange],
         },
         targetExit: {
             edge: targetEdge,
-            range: [...range],
+            range: [...targetRange],
             targetMapId: sourceMap.id,
             targetEdge: sourceEdge,
-            preserveAxis: true,
-            offset: 0,
+            targetRange: [...sourceRange],
         },
     };
 }
@@ -183,11 +263,6 @@ export function resizeMap(map, width, height) {
     Object.values(map.entries).forEach(clampPosition);
     map.entities.forEach(clampPosition);
 
-    for (const exit of map.exits) {
-        const limit = exit.edge === "east" || exit.edge === "west" ? height : width;
-        exit.range[0] = Math.min(exit.range[0], limit - 1);
-        exit.range[1] = Math.min(Math.max(exit.range[0], exit.range[1]), limit - 1);
-    }
 }
 
 export function mergeTileDefinitions(map) {
@@ -657,6 +732,52 @@ function validateEditorEffectsReferences(
     }
 }
 
+function isValidEdgeRange(range) {
+    return (
+        Array.isArray(range) &&
+        range.length === 2 &&
+        range.every(Number.isInteger) &&
+        range[0] >= 0 &&
+        range[1] >= range[0]
+    );
+}
+
+function validateEditorExitDestinationShape(exit, destination, label, errors) {
+    if (!destination || typeof destination !== "object" || Array.isArray(destination)) {
+        errors.push(`${label} must be an object.`);
+        return;
+    }
+
+    if (typeof destination.targetMapId !== "string" || destination.targetMapId.length === 0) {
+        errors.push(`${label} needs a target map ID.`);
+    }
+
+    if (Object.hasOwn(destination, "preserveAxis") || Object.hasOwn(destination, "offset")) {
+        errors.push(`${label} uses removed preserveAxis/offset fields; author targetRange instead.`);
+    }
+
+    if (Object.hasOwn(destination, "entryId")) {
+        if (typeof destination.entryId !== "string" || destination.entryId.length === 0) {
+            errors.push(`${label} needs a nonempty entryId.`);
+        }
+        return;
+    }
+
+    if (Object.hasOwn(destination, "targetPosition")) return;
+
+    if (!Object.hasOwn(OPPOSITE_EDGE, destination.targetEdge)) {
+        errors.push(`${label} has an invalid target edge.`);
+    } else if (destination.targetEdge !== OPPOSITE_EDGE[exit.edge]) {
+        errors.push(`${label}.targetEdge must be opposite ${exit.edge}.`);
+    }
+
+    if (!isValidEdgeRange(destination.targetRange)) {
+        errors.push(`${label} has an invalid targetRange.`);
+    } else if (isValidEdgeRange(exit.range) && getRangeLength(exit.range) !== getRangeLength(destination.targetRange)) {
+        errors.push(`${label} connects ranges with different lengths.`);
+    }
+}
+
 function validateEditorInteractionReferences(interaction, sourceMap, path, mapById, errors) {
     if (!interaction || typeof interaction !== "object" || Array.isArray(interaction)) return;
 
@@ -698,6 +819,43 @@ export function validateEditorDocument(maps) {
         if (layerName === "base") return false;
         if (layerName === "obstacles") return tile.collision !== false;
         return tile.collision === true;
+    };
+    const transitionCellProblem = (map, col, row) => {
+        const baseTileId = map.layers?.base?.[row]?.[col];
+        if (baseTileId === undefined || baseTileId === EMPTY_TILE_ID) return "is not on the walkable base";
+
+        const tiles = mergeTileDefinitions(map);
+        for (const [layerName, layer] of Object.entries(map.layers ?? {})) {
+            if (!Array.isArray(layer) || layerName === "base") continue;
+            for (let anchorRow = 0; anchorRow < layer.length; anchorRow += 1) {
+                for (let anchorCol = 0; anchorCol < (layer[anchorRow]?.length ?? 0); anchorCol += 1) {
+                    const tileId = layer[anchorRow][anchorCol];
+                    if (tileId === EMPTY_TILE_ID) continue;
+                    const tile = tiles[tileId];
+                    if (!tile || !layerCreatesCollision(layerName, tile)) continue;
+                    if (
+                        getOccupiedTileCells(anchorCol, anchorRow, tile).some(
+                            (cell) => cell.col === col && cell.row === row,
+                        )
+                    ) {
+                        return "is blocked by collision";
+                    }
+                }
+            }
+        }
+
+        if (
+            (map.entities ?? []).some(
+                (entity) =>
+                    entity?.active !== false &&
+                    entity?.collision === true &&
+                    entity.col === col &&
+                    entity.row === row,
+            )
+        ) {
+            return "is blocked by collision";
+        }
+        return null;
     };
 
     const mapIds = new Set();
@@ -909,18 +1067,21 @@ export function validateEditorDocument(maps) {
                                 `Random exit ${index} choice ${choiceIndex} in "${map.id}" needs a positive weight.`,
                             );
                         }
-                        if (
-                            typeof choice?.targetMapId !== "string" ||
-                            choice.targetMapId.length === 0
-                        ) {
-                            errors.push(
-                                `Random exit ${index} choice ${choiceIndex} in "${map.id}" needs a target map ID.`,
-                            );
-                        }
+                        validateEditorExitDestinationShape(
+                            exit,
+                            choice,
+                            `Random exit ${index} choice ${choiceIndex} in "${map.id}"`,
+                            errors,
+                        );
                     }
                 }
-            } else if (typeof exit.targetMapId !== "string" || exit.targetMapId.length === 0) {
-                errors.push(`Exit ${index} in "${map.id}" needs a target map ID.`);
+            } else {
+                validateEditorExitDestinationShape(
+                    exit,
+                    exit,
+                    `Exit ${index} in "${map.id}"`,
+                    errors,
+                );
             }
         }
     }
@@ -945,6 +1106,46 @@ export function validateEditorDocument(maps) {
                     errors.push(
                         `Exit ${index}${suffix} in "${map.id}" targets missing entry "${destination.entryId}" in "${target.id}".`,
                     );
+                }
+
+                if (Object.hasOwn(destination, "targetEdge") && isValidEdgeRange(destination.targetRange)) {
+                    const { width: targetWidth, height: targetHeight } = getMapSize(target);
+                    const targetLimit =
+                        destination.targetEdge === "east" || destination.targetEdge === "west"
+                            ? targetHeight
+                            : targetWidth;
+                    if (destination.targetRange[1] >= targetLimit) {
+                        errors.push(
+                            `Exit ${index}${suffix} in "${map.id}" has a targetRange beyond the ${destination.targetEdge} edge of "${target.id}".`,
+                        );
+                    } else {
+                        for (
+                            let axis = destination.targetRange[0];
+                            axis <= destination.targetRange[1];
+                            axis += 1
+                        ) {
+                            const position = getEdgePosition(
+                                { width: targetWidth, height: targetHeight },
+                                destination.targetEdge,
+                                axis,
+                            );
+                            const problem = transitionCellProblem(target, position.col, position.row);
+                            if (problem) {
+                                errors.push(
+                                    `Exit ${index}${suffix} in "${map.id}" target doorway axis ${axis} ${problem} in "${target.id}".`,
+                                );
+                            }
+                        }
+                    }
+                }
+
+                if (Object.hasOwn(destination, "targetPosition")) {
+                    const position = destination.targetPosition;
+                    if (!isInsideMap(target, position?.col, position?.row)) {
+                        errors.push(
+                            `Exit ${index}${suffix} in "${map.id}" has a targetPosition outside "${target.id}".`,
+                        );
+                    }
                 }
             }
         }

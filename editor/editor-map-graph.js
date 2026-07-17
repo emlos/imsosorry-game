@@ -155,11 +155,12 @@ function collectRawLinks(maps) {
                         range: Array.isArray(exit.range) ? [...exit.range] : null,
                         targetEntryId: destination.entryId ?? null,
                         targetEdge: destination.targetEdge ?? null,
+                        targetRange: Array.isArray(destination.targetRange)
+                            ? [...destination.targetRange]
+                            : null,
                         targetPosition: destination.targetPosition
                             ? { ...destination.targetPosition }
                             : null,
-                        preserveAxis: Boolean(destination.preserveAxis),
-                        offset: destination.offset ?? null,
                     },
                 });
             }
@@ -245,6 +246,27 @@ function collectRawLinks(maps) {
     return rawLinks;
 }
 
+function formatExitRangeLabel(origins, count) {
+    const labels = origins
+        .filter(
+            (origin) =>
+                origin.edge &&
+                Array.isArray(origin.range) &&
+                origin.targetEdge &&
+                Array.isArray(origin.targetRange),
+        )
+        .map(
+            (origin) =>
+                `${origin.edge} ${origin.range[0]}–${origin.range[1]} → ` +
+                `${origin.targetEdge} ${origin.targetRange[0]}–${origin.targetRange[1]}`,
+        );
+
+    const uniqueLabels = [...new Set(labels)];
+    if (uniqueLabels.length === 1) return uniqueLabels[0];
+    if (uniqueLabels.length > 1) return `${uniqueLabels.slice(0, 2).join("\n")}${uniqueLabels.length > 2 ? `\n+${uniqueLabels.length - 2} more` : ""}`;
+    return count > 1 ? `×${count}` : "";
+}
+
 export function buildMapGraphElements(maps) {
     const nodes = [];
     const edges = [];
@@ -309,7 +331,12 @@ export function buildMapGraphElements(maps) {
                 targetMapId: link.targetMapId,
                 kind: link.kind,
                 count: link.count,
-                countLabel: link.count > 1 ? `×${link.count}` : "",
+                countLabel:
+                    link.kind === "exit" || link.kind === "random-exit"
+                        ? formatExitRangeLabel(link.origins, link.count)
+                        : link.count > 1
+                          ? `×${link.count}`
+                          : "",
                 conditional: link.conditional,
                 origins: link.origins,
             },

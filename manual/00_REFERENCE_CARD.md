@@ -134,8 +134,7 @@ Map `musicEvents[].effects`
     range: [1, 4],
     targetMapId: "room-b",
     targetEdge: "west",
-    preserveAxis: true,
-    offset: 0,
+    targetRange: [2, 5],
 }
 ```
 

@@ -180,7 +180,9 @@ Rules:
 
 The target position must be walkable and non-colliding.
 
-## Static edge exit: preserve axis
+Edge-to-edge geometry is shared by the game and editor through `map-edges.js`. Authored exits store both doorway ranges; the runtime derives the axis delta and never stores an offset.
+
+## Static edge exit: connected doorway
 
 ```js
 {
@@ -188,16 +190,17 @@ The target position must be walkable and non-colliding.
     range: [1, 5],
     targetMapId: "room-b",
     targetEdge: "west",
-    preserveAxis: true,
-    offset: 0,
+    targetRange: [3, 7],
 }
 ```
 
 Rules:
 
 - `targetEdge` must be the opposite of `edge`.
-- `offset` is an integer added to the source row/column.
-- Every possible target position across the range must fit and be walkable.
+- `targetRange` describes the corresponding opening on the target edge.
+- `range` and `targetRange` must contain the same number of cells.
+- The player keeps the exact relative, including fractional, position within the opening.
+- Every target doorway cell must fit and be walkable.
 
 ## Random edge destination
 
@@ -215,8 +218,7 @@ Rules:
                 weight: 95,
                 targetMapId: "forest-normal",
                 targetEdge: "south",
-                preserveAxis: true,
-                offset: 0,
+                targetRange: [1, 4],
             },
             {
                 weight: 5,
