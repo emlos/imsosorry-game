@@ -1,0 +1,370 @@
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    min-height: 100%;
+    background: #12141a;
+    color: #e8eaf0;
+    font-family: system-ui, sans-serif;
+}
+
+button {
+    border: 1px solid #69738a;
+    background: #242a37;
+    color: #f2f4fa;
+    font: inherit;
+    cursor: pointer;
+}
+
+button:hover:not(:disabled),
+button:focus-visible {
+    background: #31394a;
+    outline: 2px solid #dce3f4;
+    outline-offset: 2px;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+body {
+    display: grid;
+    place-items: center;
+    padding: 24px;
+}
+
+.start-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    background: #12141a;
+}
+
+.start-screen button {
+    padding: 10px 24px;
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: minmax(0, 960px) minmax(220px, 320px);
+    gap: 24px;
+    width: min(1320px, 100%);
+}
+
+.game-viewport {
+    position: relative;
+}
+
+canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #000;
+    border: 1px solid #3a4050;
+    image-rendering: pixelated;
+}
+
+.dialogue {
+    position: absolute;
+    left: 4%;
+    right: 4%;
+    bottom: 4%;
+    min-height: 138px;
+    padding: 22px 24px 36px;
+    background: rgba(8, 10, 16, 0.96);
+    border: 3px solid #e8eaf0;
+    box-shadow: 0 0 0 3px #171b24;
+    color: #f5f6fa;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: clamp(0.9rem, 1.7vw, 1.2rem);
+    line-height: 1.5;
+    pointer-events: none;
+}
+
+.dialogue[hidden],
+.inventory[hidden] {
+    display: none;
+}
+
+.dialogue-speaker {
+    margin-bottom: 8px;
+    font-weight: 700;
+    color: #9fd5df;
+}
+
+.dialogue-text {
+    white-space: pre-wrap;
+}
+
+.dialogue-prompt {
+    position: absolute;
+    right: 18px;
+    bottom: 10px;
+    color: #aeb6c7;
+    font-size: 0.72em;
+}
+
+.inventory {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 5%;
+    background: rgba(5, 7, 12, 0.86);
+}
+
+.inventory-window {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    width: min(760px, 100%);
+    min-height: min(470px, 90%);
+    max-height: 90%;
+    padding: 20px;
+    background: #131823;
+    border: 3px solid #e8eaf0;
+    box-shadow: 0 0 0 3px #171b24;
+}
+
+.inventory-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #465067;
+}
+
+.inventory-header h2,
+.inventory-details h3 {
+    margin: 0;
+}
+
+.inventory-header button,
+.inventory-details button,
+#open-inventory {
+    padding: 8px 14px;
+}
+
+.inventory-content {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(240px, 1fr);
+    gap: 20px;
+    min-height: 0;
+    padding: 20px 0;
+}
+
+.inventory-list-panel,
+.inventory-details {
+    min-height: 0;
+    padding: 14px;
+    background: #0d1119;
+    border: 1px solid #3b4559;
+}
+
+.inventory-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+    gap: 10px;
+    overflow: auto;
+}
+
+.inventory-item {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    grid-template-rows: 1fr auto;
+    gap: 4px 8px;
+    min-height: 70px;
+    padding: 8px;
+    text-align: left;
+}
+
+.inventory-item[aria-pressed="true"] {
+    border-color: #f6d2e6;
+    background: #4a3044;
+    box-shadow: inset 0 0 0 1px #f6d2e6;
+}
+
+.inventory-item img {
+    grid-row: 1 / 3;
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+.inventory-item-quantity {
+    color: #b8c0d2;
+    font-size: 0.85rem;
+}
+
+.inventory-empty {
+    margin: 0;
+    color: #aeb6c7;
+}
+
+.inventory-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.inventory-details-icon {
+    width: 96px;
+    height: 96px;
+    margin-bottom: 12px;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
+.inventory-quantity {
+    color: #b8c0d2;
+}
+
+.inventory-details button {
+    margin-top: auto;
+}
+
+.inventory-help {
+    margin: 0;
+    padding-top: 12px;
+    border-top: 1px solid #465067;
+    color: #aeb6c7;
+    font-size: 0.86rem;
+}
+
+aside {
+    padding: 16px;
+    background: #1a1e27;
+    border: 1px solid #3a4050;
+}
+
+h1 {
+    margin-top: 0;
+    font-size: 1.1rem;
+}
+
+#event-log {
+    min-height: 180px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: #cbd2e2;
+}
+
+@media (max-width: 1000px) {
+    .layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 650px) {
+    .inventory-content {
+        grid-template-columns: 1fr;
+        overflow: auto;
+    }
+
+    .inventory-window {
+        min-height: 90%;
+    }
+}
+
+.save-controls {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid #3a4050;
+}
+
+.save-controls h2 {
+    margin: 0 0 10px;
+    font-size: 0.95rem;
+}
+
+.save-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.save-actions button {
+    min-height: 38px;
+    padding: 7px 9px;
+}
+
+.save-actions button:last-child {
+    grid-column: 1 / -1;
+}
+
+.save-status {
+    min-height: 2.8em;
+    margin: 10px 0 0;
+    color: #b8c0d2;
+    font-size: 0.86rem;
+}
+
+.save-status[data-error="true"] {
+    color: #ffb8b8;
+}
+
+.editor-link {
+    display: inline-block;
+    margin-top: 0.75rem;
+    color: inherit;
+}
+
+.start-actions {
+    display: grid;
+    justify-items: center;
+    gap: 0.75rem;
+}
+
+.audio-debug {
+    margin-top: 18px;
+    padding: 12px;
+    border: 1px solid #3b4559;
+    background: #0d1119;
+}
+
+.audio-debug h2 {
+    margin: 0 0 10px;
+    font-size: 1rem;
+}
+
+.audio-debug dl {
+    display: grid;
+    gap: 5px;
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+}
+
+.audio-debug dl div {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 8px;
+}
+
+.audio-debug dt {
+    color: #9fa9bd;
+}
+
+.audio-debug dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.audio-debug-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.audio-debug-actions button {
+    padding: 5px 8px;
+    font-size: 0.76rem;
+}

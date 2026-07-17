@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Quiet Line</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+
+<body>
+  <div id="start-screen" class="start-screen">
+    <div class="start-actions">
+      <button id="start-game" type="button">Enter the platform</button>
+      <a class="editor-link" href="./editor/editor.html">Open map editor</a>
+    </div>
+  </div>
+
+  <main class="layout">
+    <section>
+      <div class="game-viewport">
+        <canvas id="game" width="960" height="640" aria-label="Game canvas"></canvas>
+
+        <div id="dialogue" class="dialogue" role="dialog" aria-live="polite" hidden>
+          <div class="dialogue-speaker" data-dialogue-speaker hidden></div>
+          <div class="dialogue-text" data-dialogue-text></div>
+          <div class="dialogue-prompt" data-dialogue-prompt></div>
+        </div>
+
+        <div id="inventory" class="inventory" role="dialog" aria-modal="true" aria-labelledby="inventory-title" hidden>
+          <section class="inventory-window">
+            <header class="inventory-header">
+              <h2 id="inventory-title">Inventory</h2>
+              <button type="button" data-inventory-close>Close</button>
+            </header>
+
+            <div class="inventory-content">
+              <div class="inventory-list-panel">
+                <div class="inventory-list" data-inventory-list></div>
+                <p class="inventory-empty" data-inventory-empty>Inventory is empty.</p>
+              </div>
+
+              <section class="inventory-details" aria-live="polite">
+                <img class="inventory-details-icon" data-inventory-icon alt="" hidden>
+                <h3 data-inventory-name>No item selected</h3>
+                <p class="inventory-quantity" data-inventory-quantity></p>
+                <p data-inventory-description>Select an item to inspect it.</p>
+                <button type="button" data-inventory-use disabled>Use</button>
+              </section>
+            </div>
+
+            <p class="inventory-help">Arrow keys / WASD: select · Z / Enter: use · Escape / I: close</p>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <aside>
+      <h1>The Quiet Line</h1>
+      <p>Move: Arrow keys or WASD</p>
+      <p>Interact / advance text: Z or Enter</p>
+      <p>Inventory: I or Escape</p>
+      <button id="open-inventory" type="button" aria-controls="inventory" aria-expanded="false">Open inventory</button>
+
+      <section id="save-controls" class="save-controls" aria-labelledby="save-title">
+        <h2 id="save-title">Save slot: Quiet Line</h2>
+        <div class="save-actions">
+          <button type="button" data-save-write>Save</button>
+          <button type="button" data-save-load>Load</button>
+          <button type="button" data-save-export>Export</button>
+          <button type="button" data-save-import>Import</button>
+          <button type="button" data-save-delete>Delete save</button>
+        </div>
+        <input type="file" data-save-import-file accept=".yume-save,application/json" hidden>
+        <p class="save-status" data-save-status aria-live="polite">No save action yet.</p>
+      </section>
+
+      <section id="audio-debug" class="audio-debug" aria-labelledby="audio-debug-title">
+        <h2 id="audio-debug-title">Audio debug</h2>
+        <dl>
+          <div>
+            <dt>BGM</dt>
+            <dd data-audio-field="bgm">Silence</dd>
+          </div>
+          <div>
+            <dt>Position</dt>
+            <dd data-audio-field="position">--</dd>
+          </div>
+          <div>
+            <dt>Volume</dt>
+            <dd data-audio-field="volume">0.00</dd>
+          </div>
+          <div>
+            <dt>Rate</dt>
+            <dd data-audio-field="rate">--</dd>
+          </div>
+          <div>
+            <dt>Continuity</dt>
+            <dd data-audio-field="continuity">--</dd>
+          </div>
+          <div>
+            <dt>Stack</dt>
+            <dd data-audio-field="stack">0</dd>
+          </div>
+          <div>
+            <dt>ME</dt>
+            <dd data-audio-field="me">--</dd>
+          </div>
+        </dl>
+        <div class="audio-debug-actions">
+          <button type="button" data-audio-debug-fade>Fade / restore</button>
+          <button type="button" data-audio-debug-restart>Restart</button>
+          <button type="button" data-audio-debug-stop>Stop</button>
+        </div>
+      </section>
+
+      <p id="status">Loading…</p>
+      <pre id="event-log" aria-live="polite"></pre>
+    </aside>
+  </main>
+
+  <script type="module" src="./main.js"></script>
+</body>
+
+</html>

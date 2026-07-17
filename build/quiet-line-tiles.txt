@@ -1,0 +1,197 @@
+// ATLAS_PATHS
+world: "./assets/atlases/world.png",
+
+// TILE_IDS
+STATION_FLOOR: 0,
+STATION_WALL: 1,
+STATION_WATER: 2,
+OFFICE_FLOOR: 3,
+OFFICE_WALL: 4,
+OFFICE_WATER: 5,
+ORCHARD_FLOOR: 6,
+ORCHARD_WALL: 7,
+GLASS_FLOOR: 8,
+SERVICE_FLOOR: 9,
+SERVICE_WALL: 10,
+RED_FLOOR: 11,
+TRAIN_FLOOR: 12,
+TRAIN_WALL: 13,
+FINAL_FLOOR: 14,
+TRACK_WATER: 15,
+
+// TILES
+[TILE_IDS.STATION_FLOOR]: {
+    path: ATLAS_PATHS.world,
+    source: [0, 0, 32, 32],
+},
+
+[TILE_IDS.STATION_WALL]: {
+    path: ATLAS_PATHS.world,
+    source: [32, 0, 32, 32],
+},
+
+[TILE_IDS.STATION_WATER]: {
+    path: ATLAS_PATHS.world,
+    source: [64, 0, 32, 32],
+},
+
+[TILE_IDS.OFFICE_FLOOR]: {
+    path: ATLAS_PATHS.world,
+    source: [96, 0, 32, 32],
+},
+
+[TILE_IDS.OFFICE_WALL]: {
+    path: ATLAS_PATHS.world,
+    source: [128, 0, 32, 32],
+},
+
+[TILE_IDS.OFFICE_WATER]: {
+    path: ATLAS_PATHS.world,
+    source: [160, 0, 32, 32],
+},
+
+[TILE_IDS.ORCHARD_FLOOR]: {
+    path: ATLAS_PATHS.world,
+    source: [192, 0, 32, 32],
+},
+
+[TILE_IDS.ORCHARD_WALL]: {
+    path: ATLAS_PATHS.world,
+    source: [224, 0, 32, 32],
+},
+
+[TILE_IDS.GLASS_FLOOR]: {
+    path: ATLAS_PATHS.world,
+    source: [256, 0, 32, 32],
+},
+
+[TILE_IDS.SERVICE_FLOOR]: {
+    path: ATLAS_PATHS.world,
+    source: [288, 0, 32, 32],
+},
+
+[TILE_IDS.SERVICE_WALL]: {
+    path: ATLAS_PATHS.world,
+    source: [320, 0, 32, 32],
+},
+
+[TILE_IDS.RED_FLOOR]: {
+    path: ATLAS_PATHS.world,
+    source: [352, 0, 32, 32],
+},
+
+[TILE_IDS.TRAIN_FLOOR]: {
+    path: ATLAS_PATHS.world,
+    source: [384, 0, 32, 32],
+},
+
+[TILE_IDS.TRAIN_WALL]: {
+    path: ATLAS_PATHS.world,
+    source: [416, 0, 32, 32],
+},
+
+[TILE_IDS.FINAL_FLOOR]: {
+    path: ATLAS_PATHS.world,
+    source: [448, 0, 32, 32],
+},
+
+[TILE_IDS.TRACK_WATER]: {
+    path: ATLAS_PATHS.world,
+    source: [0, 32, 32, 32],
+    size: [32, 32],
+    defaultAnimation: "drift",
+    animations: {
+        drift: {
+            fps: 5,
+            frames: [
+                [0, 0],
+                [1, 0],
+                [2, 0],
+                [3, 0],
+                [2, 0],
+                [1, 0],
+            ],
+        },
+    },
+},
+
+// TILE_EDITOR_META
+[TILE_IDS.STATION_FLOOR]: {
+    label: "Station floor",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.STATION_WALL]: {
+    label: "Station wall",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.STATION_WATER]: {
+    label: "Station water",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.OFFICE_FLOOR]: {
+    label: "Office floor",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.OFFICE_WALL]: {
+    label: "Office wall",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.OFFICE_WATER]: {
+    label: "Office water",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.ORCHARD_FLOOR]: {
+    label: "Orchard floor",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.ORCHARD_WALL]: {
+    label: "Orchard wall",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.GLASS_FLOOR]: {
+    label: "Glass floor",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.SERVICE_FLOOR]: {
+    label: "Service floor",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.SERVICE_WALL]: {
+    label: "Service wall",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.RED_FLOOR]: {
+    label: "Red floor",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.TRAIN_FLOOR]: {
+    label: "Train floor",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.TRAIN_WALL]: {
+    label: "Train wall",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.FINAL_FLOOR]: {
+    label: "Final floor",
+    category: "Quiet Line",
+},
+
+[TILE_IDS.TRACK_WATER]: {
+    label: "Track water",
+    category: "Quiet Line",
+},

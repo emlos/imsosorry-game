@@ -1,0 +1,667 @@
+{
+  "artificial-sun-changed.png": {
+    "category": "Quiet Line",
+    "size": [
+      64,
+      64
+    ],
+    "frameSize": [
+      64,
+      64
+    ],
+    "defaultAnimation": "turn",
+    "animations": {
+      "turn": {
+        "fps": 6,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    }
+  },
+  "artificial-sun.png": {
+    "category": "Quiet Line",
+    "size": [
+      64,
+      64
+    ],
+    "frameSize": [
+      64,
+      64
+    ],
+    "defaultAnimation": "turn",
+    "animations": {
+      "turn": {
+        "fps": 4,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    }
+  },
+  "attendant-0.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "attendant-1.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "attendant-2.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "attendant-3.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "bench.png": {
+    "category": "Quiet Line",
+    "size": [
+      64,
+      32
+    ]
+  },
+  "brass-tooth.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "cabinet-closed.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "cabinet-floating.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "camera-figure.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "camera-number.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "camera-platform.png": {
+    "category": "Quiet Line",
+    "size": [
+      64,
+      32
+    ]
+  },
+  "chair-facing.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "chair-out.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "clock-down.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "clock-empty.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "clock-one.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "copier-duplicate.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "copier.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ],
+    "frameSize": [
+      32,
+      32
+    ],
+    "defaultAnimation": "copy",
+    "animations": {
+      "copy": {
+        "fps": 6,
+        "frames": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          1
+        ]
+      }
+    }
+  },
+  "desk.png": {
+    "category": "Quiet Line",
+    "size": [
+      64,
+      32
+    ]
+  },
+  "dry-chair.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "duplicate-player.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "empty-seat.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "final-timetable.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "gate-apple.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "gate-blank.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "gate-eye.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "gate-umbrella.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "gate-zero.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "glass-figure.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "glass-fruit.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ],
+    "frameSize": [
+      32,
+      32
+    ],
+    "defaultAnimation": "pulse",
+    "animations": {
+      "pulse": {
+        "fps": 7,
+        "frames": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          1
+        ]
+      }
+    }
+  },
+  "keyboard-moss.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "monitor-off.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "monitor-on.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "passenger-chair.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "passenger-signal.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "passenger-tree.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "picnic-blanket.png": {
+    "category": "Quiet Line",
+    "size": [
+      64,
+      64
+    ]
+  },
+  "platform-variation-a.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "platform-variation-b.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "punch-card.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "reflection-attendant.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "reflection-backward.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "reflection-missing.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "reflection-normal.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "ringing-phone.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ],
+    "frameSize": [
+      32,
+      32
+    ],
+    "defaultAnimation": "ring",
+    "animations": {
+      "ring": {
+        "fps": 10,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    }
+  },
+  "shelves.png": {
+    "category": "Quiet Line",
+    "size": [
+      64,
+      64
+    ]
+  },
+  "sign-cleaning.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "sign-outside.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "sign-signal.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "sign-staff.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "signal-amber.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "signal-animal.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "signal-apparatus-red.png": {
+    "category": "Quiet Line",
+    "size": [
+      64,
+      64
+    ],
+    "frameSize": [
+      64,
+      64
+    ],
+    "defaultAnimation": "pulse",
+    "animations": {
+      "pulse": {
+        "fps": 5,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    }
+  },
+  "signal-apparatus-white.png": {
+    "category": "Quiet Line",
+    "size": [
+      64,
+      64
+    ],
+    "frameSize": [
+      64,
+      64
+    ],
+    "defaultAnimation": "pulse",
+    "animations": {
+      "pulse": {
+        "fps": 5,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    }
+  },
+  "signal-dark.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "signal-red.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ]
+  },
+  "staff-door-locked.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "staff-door-open.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "timetable-dark.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "timetable-one.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "timetable-two.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "timetable-zero.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "train-door.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "tree-awake.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ],
+    "frameSize": [
+      32,
+      64
+    ],
+    "defaultAnimation": "glow",
+    "animations": {
+      "glow": {
+        "fps": 7,
+        "frames": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          1
+        ]
+      }
+    }
+  },
+  "tree-sleep.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ],
+    "frameSize": [
+      32,
+      64
+    ],
+    "defaultAnimation": "glow",
+    "animations": {
+      "glow": {
+        "fps": 4,
+        "frames": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          1
+        ]
+      }
+    }
+  },
+  "vending-0.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "vending-1.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ],
+    "frameSize": [
+      32,
+      64
+    ],
+    "defaultAnimation": "blink",
+    "animations": {
+      "blink": {
+        "fps": 4,
+        "frames": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    }
+  },
+  "vending-2.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  },
+  "vending-3.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      64
+    ]
+  }
+}

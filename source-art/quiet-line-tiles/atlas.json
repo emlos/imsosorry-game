@@ -1,0 +1,72 @@
+{
+  "station-floor.png": {
+    "category": "Quiet Line"
+  },
+  "station-wall.png": {
+    "category": "Quiet Line"
+  },
+  "station-water.png": {
+    "category": "Quiet Line"
+  },
+  "office-floor.png": {
+    "category": "Quiet Line"
+  },
+  "office-wall.png": {
+    "category": "Quiet Line"
+  },
+  "office-water.png": {
+    "category": "Quiet Line"
+  },
+  "orchard-floor.png": {
+    "category": "Quiet Line"
+  },
+  "orchard-wall.png": {
+    "category": "Quiet Line"
+  },
+  "glass-floor.png": {
+    "category": "Quiet Line"
+  },
+  "service-floor.png": {
+    "category": "Quiet Line"
+  },
+  "service-wall.png": {
+    "category": "Quiet Line"
+  },
+  "red-floor.png": {
+    "category": "Quiet Line"
+  },
+  "train-floor.png": {
+    "category": "Quiet Line"
+  },
+  "train-wall.png": {
+    "category": "Quiet Line"
+  },
+  "final-floor.png": {
+    "category": "Quiet Line"
+  },
+  "track-water.png": {
+    "category": "Quiet Line",
+    "size": [
+      32,
+      32
+    ],
+    "frameSize": [
+      32,
+      32
+    ],
+    "defaultAnimation": "drift",
+    "animations": {
+      "drift": {
+        "fps": 5,
+        "frames": [
+          0,
+          1,
+          2,
+          3,
+          2,
+          1
+        ]
+      }
+    }
+  }
+}
