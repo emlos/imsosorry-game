@@ -111,10 +111,12 @@ export class EditorRenderer {
 
         if (options.showCollision) this.renderCollisionOverlay(map, tiles, visibleLayers);
         if (options.showFootprints) this.renderFootprintOverlay(map, tiles, options.activeLayer);
+        if (options.showTriggers) this.renderTriggers(map, options.selectedTriggerId);
         if (options.showEntries !== false) this.renderEntries(map, options.selectedEntryId);
         if (options.showExits !== false) this.renderExits(map, options.selectedExitIndex);
         if (options.selectedEntityId) this.renderEntitySelection(map, options.selectedEntityId);
         if (options.rectanglePreview) this.renderRectanglePreview(options.rectanglePreview);
+        if (options.triggerPreview) this.renderTriggerPreview(options.triggerPreview);
         if (options.showGrid !== false) this.renderGrid(map);
     }
 
@@ -356,6 +358,66 @@ export class EditorRenderer {
         ctx.restore();
     }
 
+    renderTriggers(map, selectedTriggerId) {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.font = "bold 11px sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+
+        for (const [index, trigger] of (map.triggers ?? []).entries()) {
+            const selected = trigger.id === selectedTriggerId;
+            const x = trigger.region.col * TILE_SIZE;
+            const y = trigger.region.row * TILE_SIZE;
+            const width = trigger.region.width * TILE_SIZE;
+            const height = trigger.region.height * TILE_SIZE;
+
+            ctx.fillStyle = selected ? "rgba(180, 100, 255, 0.30)" : "rgba(130, 80, 220, 0.20)";
+            ctx.strokeStyle = selected ? "rgba(225, 185, 255, 0.98)" : "rgba(180, 125, 245, 0.82)";
+            ctx.lineWidth = selected ? 3 : 2;
+            ctx.fillRect(x, y, width, height);
+            ctx.strokeRect(x + 1, y + 1, width - 2, height - 2);
+
+            const label = `${index + 1}. ${trigger.id}`;
+            const labelWidth = Math.min(width - 4, ctx.measureText(label).width + 8);
+            if (labelWidth > 4 && height >= 16) {
+                ctx.fillStyle = "rgba(24, 12, 38, 0.82)";
+                ctx.fillRect(x + 2, y + 2, labelWidth, 15);
+                ctx.fillStyle = "#f3eaff";
+                ctx.fillText(label, x + 5, y + 4, Math.max(0, width - 10));
+            }
+
+            if (selected) this.renderTriggerHandles(trigger);
+        }
+
+        ctx.restore();
+    }
+
+    renderTriggerHandles(trigger) {
+        const x = trigger.region.col * TILE_SIZE;
+        const y = trigger.region.row * TILE_SIZE;
+        const width = trigger.region.width * TILE_SIZE;
+        const height = trigger.region.height * TILE_SIZE;
+        const points = [
+            [x, y],
+            [x + width / 2, y],
+            [x + width, y],
+            [x, y + height / 2],
+            [x + width, y + height / 2],
+            [x, y + height],
+            [x + width / 2, y + height],
+            [x + width, y + height],
+        ];
+
+        this.ctx.fillStyle = "#f3eaff";
+        this.ctx.strokeStyle = "#4d236d";
+        this.ctx.lineWidth = 1;
+        for (const [centerX, centerY] of points) {
+            this.ctx.fillRect(centerX - 4, centerY - 4, 8, 8);
+            this.ctx.strokeRect(centerX - 4.5, centerY - 4.5, 9, 9);
+        }
+    }
+
     renderEntitySelection(map, entityId) {
         const entity = map.entities.find((candidate) => candidate.id === entityId);
         if (!entity) return;
@@ -386,6 +448,25 @@ export class EditorRenderer {
         const y = minRow * TILE_SIZE;
         const width = (maxCol - minCol + 1) * TILE_SIZE;
         const height = (maxRow - minRow + 1) * TILE_SIZE;
+        this.ctx.fillRect(x, y, width, height);
+        this.ctx.strokeRect(x + 1, y + 1, width - 2, height - 2);
+        this.ctx.restore();
+    }
+
+    renderTriggerPreview(preview) {
+        const minCol = Math.min(preview.start.col, preview.end.col);
+        const maxCol = Math.max(preview.start.col, preview.end.col);
+        const minRow = Math.min(preview.start.row, preview.end.row);
+        const maxRow = Math.max(preview.start.row, preview.end.row);
+        const x = minCol * TILE_SIZE;
+        const y = minRow * TILE_SIZE;
+        const width = (maxCol - minCol + 1) * TILE_SIZE;
+        const height = (maxRow - minRow + 1) * TILE_SIZE;
+
+        this.ctx.save();
+        this.ctx.fillStyle = "rgba(180, 100, 255, 0.28)";
+        this.ctx.strokeStyle = "rgba(225, 185, 255, 0.98)";
+        this.ctx.lineWidth = 2;
         this.ctx.fillRect(x, y, width, height);
         this.ctx.strokeRect(x + 1, y + 1, width - 2, height - 2);
         this.ctx.restore();

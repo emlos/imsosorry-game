@@ -20,11 +20,12 @@ The editor works on a cloned map document. It does not modify live game state or
 - Preserve and preview existing foreground layers without editing them.
 - Pencil, eraser, rectangle, fill, eyedropper, Empty tile, and clear-layer tools.
 - Atlas-aware static and animated previews.
-- Grid, layer, collision, footprint, entry, and exit overlays.
+- Grid, layer, collision, footprint, entry, exit, and rectangular-trigger overlays.
 - Canvas zoom from 50% to 400%, including Ctrl/Cmd-wheel zoom.
 - Place entities from presets, drag them, delete them, and choose either a sprite visual or a reusable tile visual.
 - Edit entity interactions as JSON and edit the primary dialogue fields for compatible interactions.
 - Place and edit entries, facing directions, and entry IDs.
+- Create rectangular triggers by dragging, then move, resize, reorder, and edit their event/frequency/condition/effect definitions.
 - Create and edit ordinary exits, reciprocal edge connections, and advanced exit JSON.
 - Undo and redo completed editor actions.
 - Import and export generated JavaScript or JSON.
@@ -54,14 +55,14 @@ Use the editor for:
 - Room geometry.
 - Tile placement.
 - Entity placement.
-- Entries and exits.
+- Entries, exits, and rectangular trigger regions.
 - Basic entity identity, collision, and visual selection.
 - Map organization and connection inspection.
 
 Use code or raw JSON for:
 
-- Conditions.
-- Effect sequences.
+- Complex condition construction beyond the trigger/entity JSON inspectors.
+- Complex effect sequence construction beyond the trigger/entity JSON inspectors.
 - Random branches.
 - Map `onEnter` and `onExit` hooks.
 - Conditional music and music events.

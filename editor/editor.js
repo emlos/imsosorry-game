@@ -128,8 +128,10 @@ export class MapEditor {
         this.showFootprints = false;
         this.selectedEntityId = null;
         this.selectedEntryId = null;
+        this.selectedTriggerId = null;
         this.selectedExitIndex = null;
         this.rectanglePreview = null;
+        this.triggerPreview = null;
         this.pointerAction = null;
         this.undoStack = [];
         this.redoStack = [];
@@ -440,6 +442,7 @@ export class MapEditor {
         byId("entity-visual-type").addEventListener("change", (event) => {
             this.populateEntityVisualOptions(event.target.value);
         });
+        byId("add-trigger").addEventListener("click", () => this.addTrigger());
         byId("add-exit").addEventListener("click", () => this.addExit());
         byId("connection-source-edge").addEventListener("change", () =>
             this.renderConnectionControls(),
@@ -483,6 +486,10 @@ export class MapEditor {
         byId("delete-entity").addEventListener("click", () => this.deleteSelectedEntity());
         byId("apply-entry").addEventListener("click", () => this.applyEntryInspector());
         byId("delete-entry").addEventListener("click", () => this.deleteSelectedEntry());
+        byId("apply-trigger").addEventListener("click", () => this.applyTriggerInspector());
+        byId("delete-trigger").addEventListener("click", () => this.deleteSelectedTrigger());
+        byId("move-trigger-up").addEventListener("click", () => this.moveSelectedTrigger(-1));
+        byId("move-trigger-down").addEventListener("click", () => this.moveSelectedTrigger(1));
         byId("apply-exit").addEventListener("click", () => this.applyExitInspector());
         byId("delete-exit").addEventListener("click", () => this.deleteSelectedExit());
         byId("exit-target-map").addEventListener("change", () => this.populateExitEntryOptions());
@@ -513,6 +520,7 @@ export class MapEditor {
             } else if (event.key === "Delete" && !event.target.matches("input, textarea, select")) {
                 if (this.selectedEntityId) this.deleteSelectedEntity();
                 else if (this.selectedEntryId) this.deleteSelectedEntry();
+                else if (this.selectedTriggerId) this.deleteSelectedTrigger();
                 else if (this.selectedExitIndex !== null) this.deleteSelectedExit();
             }
         });
@@ -599,6 +607,7 @@ export class MapEditor {
             .catch((error) => this.setStatus(error.message, true));
         this.renderMapControls();
         this.renderPalette();
+        this.renderTriggerList();
         this.renderExitList();
         this.updateModeUI();
         this.renderInspectors();
@@ -613,6 +622,7 @@ export class MapEditor {
             .catch((error) => this.setStatus(error.message, true));
         this.renderMapControls();
         this.renderPalette();
+        this.renderTriggerList();
         this.renderExitList();
         this.renderInspectors();
         this.validateAndDisplay();
@@ -673,6 +683,7 @@ export class MapEditor {
         byId("palette-section").hidden = this.mode !== "tiles";
         byId("entity-tools-section").hidden = this.mode !== "entities";
         byId("entry-tools-section").hidden = this.mode !== "entries";
+        byId("trigger-tools-section").hidden = this.mode !== "triggers";
         byId("exit-tools-section").hidden = this.mode !== "exits";
     }
 
@@ -749,6 +760,31 @@ export class MapEditor {
         }
     }
 
+    renderTriggerList() {
+        const root = byId("trigger-list");
+        root.replaceChildren();
+        for (const [index, trigger] of (this.currentMap.triggers ?? []).entries()) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent =
+                `${index + 1}. ${trigger.id} — ` +
+                `${trigger.region.col},${trigger.region.row} ` +
+                `${trigger.region.width}×${trigger.region.height}`;
+            button.classList.toggle("selected", trigger.id === this.selectedTriggerId);
+            button.addEventListener("click", () => {
+                this.selectedTriggerId = trigger.id;
+                this.selectedEntityId = null;
+                this.selectedEntryId = null;
+                this.selectedExitIndex = null;
+                this.mode = "triggers";
+                this.updateModeUI();
+                this.renderTriggerList();
+                this.renderInspectors();
+            });
+            root.append(button);
+        }
+    }
+
     renderExitList() {
         const root = byId("exit-list");
         root.replaceChildren();
@@ -767,6 +803,7 @@ export class MapEditor {
                 this.selectedExitIndex = index;
                 this.selectedEntityId = null;
                 this.selectedEntryId = null;
+                this.selectedTriggerId = null;
                 this.mode = "exits";
                 this.updateModeUI();
                 this.renderExitList();
@@ -894,6 +931,7 @@ export class MapEditor {
             this.selectedExitIndex = sourceExitIndex;
             this.selectedEntityId = null;
             this.selectedEntryId = null;
+            this.selectedTriggerId = null;
             this.mode = "exits";
             await this.refreshAfterMutation();
             this.updateModeUI();
@@ -989,8 +1027,11 @@ export class MapEditor {
             showFootprints: this.showFootprints,
             selectedEntityId: this.selectedEntityId,
             selectedEntryId: this.selectedEntryId,
+            showTriggers: this.mode === "triggers",
+            selectedTriggerId: this.selectedTriggerId,
             selectedExitIndex: this.selectedExitIndex,
             rectanglePreview: this.rectanglePreview,
+            triggerPreview: this.triggerPreview,
         });
         this.applyZoom();
         for (const preview of this.palettePreviews) {
@@ -1021,6 +1062,7 @@ export class MapEditor {
         if (this.mode === "tiles") this.startTileAction(event, cell);
         else if (this.mode === "entities") this.startEntityAction(cell);
         else if (this.mode === "entries") this.startEntryAction(cell);
+        else if (this.mode === "triggers") this.startTriggerAction(cell);
         else this.selectExitAt(cell);
     }
 
@@ -1058,6 +1100,29 @@ export class MapEditor {
                 entry.row = cell.row;
                 this.renderInspectors();
             }
+        } else if (this.pointerAction.kind === "trigger-create") {
+            this.triggerPreview.end = { col: cell.col, row: cell.row };
+        } else if (this.pointerAction.kind === "trigger-move") {
+            const trigger = this.currentMap.triggers.find(
+                (candidate) => candidate.id === this.pointerAction.triggerId,
+            );
+            if (trigger) {
+                const { width, height } = getMapSize(this.currentMap);
+                trigger.region.col = Math.max(
+                    0,
+                    Math.min(width - trigger.region.width, cell.col - this.pointerAction.offsetCol),
+                );
+                trigger.region.row = Math.max(
+                    0,
+                    Math.min(
+                        height - trigger.region.height,
+                        cell.row - this.pointerAction.offsetRow,
+                    ),
+                );
+                this.renderInspectors();
+            }
+        } else if (this.pointerAction.kind === "trigger-resize") {
+            this.resizeSelectedTriggerFromPointer(cell);
         }
     }
 
@@ -1082,6 +1147,24 @@ export class MapEditor {
             this.endTransaction("Move entity");
         } else if (action.kind === "entry-drag") {
             this.endTransaction("Move entry");
+        } else if (action.kind === "trigger-create") {
+            const start = this.triggerPreview.start;
+            const end = this.triggerPreview.end;
+            const region = {
+                col: Math.min(start.col, end.col),
+                row: Math.min(start.row, end.row),
+                width: Math.abs(end.col - start.col) + 1,
+                height: Math.abs(end.row - start.row) + 1,
+            };
+            const trigger = this.createDefaultTrigger(region);
+            this.currentMap.triggers.push(trigger);
+            this.selectedTriggerId = trigger.id;
+            this.triggerPreview = null;
+            this.endTransaction("Create trigger");
+        } else if (action.kind === "trigger-move") {
+            this.endTransaction("Move trigger");
+        } else if (action.kind === "trigger-resize") {
+            this.endTransaction("Resize trigger");
         }
         this.refreshAfterMutation();
         if (this.canvas.hasPointerCapture(event.pointerId))
@@ -1154,6 +1237,7 @@ export class MapEditor {
         if (existing) {
             this.selectedEntityId = existing.id;
             this.selectedEntryId = null;
+            this.selectedTriggerId = null;
             this.selectedExitIndex = null;
             this.beginTransaction();
             this.pointerAction = { kind: "entity-drag", entityId: existing.id };
@@ -1179,6 +1263,7 @@ export class MapEditor {
         }
         this.commitMutation("Place entity", () => this.currentMap.entities.push(entity));
         this.selectedEntityId = entity.id;
+        this.selectedTriggerId = null;
         this.renderInspectors();
         this.refreshAfterMutation();
     }
@@ -1190,6 +1275,7 @@ export class MapEditor {
         if (existing) {
             this.selectedEntryId = existing[0];
             this.selectedEntityId = null;
+            this.selectedTriggerId = null;
             this.selectedExitIndex = null;
             this.beginTransaction();
             this.pointerAction = { kind: "entry-drag", entryId: existing[0] };
@@ -1206,7 +1292,149 @@ export class MapEditor {
             if (!this.currentMap.initialEntryId) this.currentMap.initialEntryId = entryId;
         });
         this.selectedEntryId = entryId;
+        this.selectedTriggerId = null;
         this.renderMapControls();
+        this.renderInspectors();
+    }
+
+    createDefaultTrigger(region) {
+        return {
+            id: makeUniqueId(
+                "trigger",
+                new Set((this.currentMap.triggers ?? []).map((trigger) => trigger.id)),
+            ),
+            region: { ...region },
+            events: ["enter"],
+            frequency: "always",
+            effects: [
+                {
+                    type: "showText",
+                    pages: ["A trigger fired."],
+                },
+            ],
+        };
+    }
+
+    addTrigger() {
+        const trigger = this.createDefaultTrigger({ col: 0, row: 0, width: 1, height: 1 });
+        this.commitMutation("Add trigger", () => this.currentMap.triggers.push(trigger));
+        this.selectedTriggerId = trigger.id;
+        this.selectedEntityId = null;
+        this.selectedEntryId = null;
+        this.selectedExitIndex = null;
+        this.mode = "triggers";
+        this.updateModeUI();
+        this.refreshAfterMutation();
+    }
+
+    getSelectedTrigger() {
+        return (this.currentMap.triggers ?? []).find(
+            (trigger) => trigger.id === this.selectedTriggerId,
+        );
+    }
+
+    getTriggerAtCell(cell) {
+        return [...(this.currentMap.triggers ?? [])].reverse().find((trigger) => {
+            const { col, row, width, height } = trigger.region;
+            return (
+                cell.col >= col &&
+                cell.col < col + width &&
+                cell.row >= row &&
+                cell.row < row + height
+            );
+        });
+    }
+
+    getTriggerResizeHandle(cell, trigger) {
+        if (!trigger) return null;
+        const x = trigger.region.col * TILE_SIZE;
+        const y = trigger.region.row * TILE_SIZE;
+        const width = trigger.region.width * TILE_SIZE;
+        const height = trigger.region.height * TILE_SIZE;
+        const handles = [
+            ["nw", x, y],
+            ["n", x + width / 2, y],
+            ["ne", x + width, y],
+            ["w", x, y + height / 2],
+            ["e", x + width, y + height / 2],
+            ["sw", x, y + height],
+            ["s", x + width / 2, y + height],
+            ["se", x + width, y + height],
+        ];
+        const tolerance = 7;
+        return (
+            handles.find(
+                ([, handleX, handleY]) =>
+                    Math.abs(cell.x - handleX) <= tolerance &&
+                    Math.abs(cell.y - handleY) <= tolerance,
+            )?.[0] ?? null
+        );
+    }
+
+    startTriggerAction(cell) {
+        const selected = this.getSelectedTrigger();
+        const resizeHandle = this.getTriggerResizeHandle(cell, selected);
+        if (selected && resizeHandle) {
+            this.beginTransaction();
+            this.pointerAction = {
+                kind: "trigger-resize",
+                triggerId: selected.id,
+                handle: resizeHandle,
+                originalRegion: { ...selected.region },
+            };
+            return;
+        }
+
+        const existing = this.getTriggerAtCell(cell);
+        if (existing) {
+            this.selectedTriggerId = existing.id;
+            this.selectedEntityId = null;
+            this.selectedEntryId = null;
+            this.selectedExitIndex = null;
+            this.beginTransaction();
+            this.pointerAction = {
+                kind: "trigger-move",
+                triggerId: existing.id,
+                offsetCol: cell.col - existing.region.col,
+                offsetRow: cell.row - existing.region.row,
+            };
+            this.renderTriggerList();
+            this.renderInspectors();
+            return;
+        }
+
+        this.clearSelection();
+        this.beginTransaction();
+        this.pointerAction = { kind: "trigger-create" };
+        this.triggerPreview = {
+            start: { col: cell.col, row: cell.row },
+            end: { col: cell.col, row: cell.row },
+        };
+        this.renderInspectors();
+    }
+
+    resizeSelectedTriggerFromPointer(cell) {
+        const action = this.pointerAction;
+        const trigger = this.currentMap.triggers.find(
+            (candidate) => candidate.id === action.triggerId,
+        );
+        if (!trigger) return;
+
+        const original = action.originalRegion;
+        let left = original.col;
+        let right = original.col + original.width - 1;
+        let top = original.row;
+        let bottom = original.row + original.height - 1;
+
+        if (action.handle.includes("w")) left = Math.min(cell.col, right);
+        if (action.handle.includes("e")) right = Math.max(cell.col, left);
+        if (action.handle.includes("n")) top = Math.min(cell.row, bottom);
+        if (action.handle.includes("s")) bottom = Math.max(cell.row, top);
+
+        trigger.region.col = left;
+        trigger.region.row = top;
+        trigger.region.width = right - left + 1;
+        trigger.region.height = bottom - top + 1;
         this.renderInspectors();
     }
 
@@ -1227,6 +1455,7 @@ export class MapEditor {
             this.selectedExitIndex = index;
             this.selectedEntityId = null;
             this.selectedEntryId = null;
+            this.selectedTriggerId = null;
             this.renderExitList();
             this.renderInspectors();
         }
@@ -1235,27 +1464,35 @@ export class MapEditor {
     clearSelection() {
         this.selectedEntityId = null;
         this.selectedEntryId = null;
+        this.selectedTriggerId = null;
         this.selectedExitIndex = null;
     }
 
     renderInspectors() {
         byId("map-inspector").hidden = Boolean(
-            this.selectedEntityId || this.selectedEntryId || this.selectedExitIndex !== null,
+            this.selectedEntityId ||
+            this.selectedEntryId ||
+            this.selectedTriggerId ||
+            this.selectedExitIndex !== null,
         );
         byId("entity-inspector").hidden = !this.selectedEntityId;
         byId("entry-inspector").hidden = !this.selectedEntryId;
+        byId("trigger-inspector").hidden = !this.selectedTriggerId;
         byId("exit-inspector").hidden = this.selectedExitIndex === null;
 
         if (this.selectedEntityId) this.renderEntityInspector();
         if (this.selectedEntryId) this.renderEntryInspector();
+        if (this.selectedTriggerId) this.renderTriggerInspector();
         if (this.selectedExitIndex !== null) this.renderExitInspector();
         const selection = this.selectedEntityId
             ? `Entity: ${this.selectedEntityId}`
             : this.selectedEntryId
               ? `Entry: ${this.selectedEntryId}`
-              : this.selectedExitIndex !== null
-                ? `Exit: ${this.selectedExitIndex}`
-                : "No selection";
+              : this.selectedTriggerId
+                ? `Trigger: ${this.selectedTriggerId}`
+                : this.selectedExitIndex !== null
+                  ? `Exit: ${this.selectedExitIndex}`
+                  : "No selection";
         byId("selection-status").textContent = selection;
     }
 
@@ -1385,6 +1622,137 @@ export class MapEditor {
         this.refreshAfterMutation();
     }
 
+    renderTriggerInspector() {
+        const trigger = this.getSelectedTrigger();
+        if (!trigger) return this.clearSelection();
+
+        byId("trigger-id").value = trigger.id;
+        byId("trigger-col").value = trigger.region.col;
+        byId("trigger-row").value = trigger.region.row;
+        byId("trigger-width").value = trigger.region.width;
+        byId("trigger-height").value = trigger.region.height;
+        byId("trigger-event-enter").checked = trigger.events.includes("enter");
+        byId("trigger-event-exit").checked = trigger.events.includes("exit");
+        byId("trigger-event-step").checked = trigger.events.includes("step");
+        byId("trigger-frequency").value = trigger.frequency ?? "always";
+        byId("trigger-condition").value = trigger.condition
+            ? JSON.stringify(trigger.condition, null, 4)
+            : "";
+        byId("trigger-effects").value = JSON.stringify(trigger.effects, null, 4);
+
+        const index = this.currentMap.triggers.indexOf(trigger);
+        byId("move-trigger-up").disabled = index <= 0;
+        byId("move-trigger-down").disabled =
+            index < 0 || index >= this.currentMap.triggers.length - 1;
+    }
+
+    applyTriggerInspector() {
+        const trigger = this.getSelectedTrigger();
+        if (!trigger) return;
+
+        try {
+            const id = byId("trigger-id").value.trim();
+            const region = {
+                col: Number(byId("trigger-col").value),
+                row: Number(byId("trigger-row").value),
+                width: Number(byId("trigger-width").value),
+                height: Number(byId("trigger-height").value),
+            };
+            const events = [
+                ["enter", byId("trigger-event-enter").checked],
+                ["exit", byId("trigger-event-exit").checked],
+                ["step", byId("trigger-event-step").checked],
+            ]
+                .filter(([, enabled]) => enabled)
+                .map(([eventType]) => eventType);
+            const frequency = byId("trigger-frequency").value;
+            const conditionText = byId("trigger-condition").value.trim();
+            const effectsText = byId("trigger-effects").value.trim();
+            const condition = conditionText ? JSON.parse(conditionText) : null;
+            const effects = JSON.parse(effectsText);
+            const { width, height } = getMapSize(this.currentMap);
+
+            if (
+                !id ||
+                (id !== trigger.id &&
+                    this.currentMap.triggers.some((candidate) => candidate.id === id))
+            ) {
+                throw new Error("Trigger IDs must be nonempty and unique within the map.");
+            }
+            if (
+                !Number.isInteger(region.col) ||
+                !Number.isInteger(region.row) ||
+                !Number.isInteger(region.width) ||
+                !Number.isInteger(region.height) ||
+                region.col < 0 ||
+                region.row < 0 ||
+                region.width < 1 ||
+                region.height < 1 ||
+                region.col + region.width > width ||
+                region.row + region.height > height
+            ) {
+                throw new Error("Trigger region must be an integer rectangle inside the map.");
+            }
+            if (events.length === 0) {
+                throw new Error("Select at least one trigger event.");
+            }
+            if (!Array.isArray(effects) || effects.length === 0) {
+                throw new Error("Trigger effects JSON must be a nonempty array.");
+            }
+            if (
+                condition !== null &&
+                (!condition || typeof condition !== "object" || Array.isArray(condition))
+            ) {
+                throw new Error("Trigger condition JSON must be an object or blank.");
+            }
+
+            const previousId = trigger.id;
+            this.commitMutation("Edit trigger", () => {
+                trigger.id = id;
+                trigger.region = region;
+                trigger.events = events;
+                trigger.frequency = frequency;
+                if (condition === null) delete trigger.condition;
+                else trigger.condition = condition;
+                trigger.effects = effects;
+            });
+            this.selectedTriggerId = id;
+            this.refreshAfterMutation();
+
+            if (previousId !== id) {
+                this.setStatus(
+                    `Renamed trigger "${previousId}" to "${id}". Existing development saves are not migrated.`,
+                );
+            }
+        } catch (error) {
+            this.setStatus(error.message, true);
+        }
+    }
+
+    moveSelectedTrigger(direction) {
+        const trigger = this.getSelectedTrigger();
+        if (!trigger) return;
+        const index = this.currentMap.triggers.indexOf(trigger);
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= this.currentMap.triggers.length) return;
+
+        this.commitMutation("Reorder trigger", () => {
+            this.currentMap.triggers.splice(index, 1);
+            this.currentMap.triggers.splice(targetIndex, 0, trigger);
+        });
+        this.refreshAfterMutation();
+    }
+
+    deleteSelectedTrigger() {
+        const index = this.currentMap.triggers.findIndex(
+            (trigger) => trigger.id === this.selectedTriggerId,
+        );
+        if (index < 0) return;
+        this.commitMutation("Delete trigger", () => this.currentMap.triggers.splice(index, 1));
+        this.selectedTriggerId = null;
+        this.refreshAfterMutation();
+    }
+
     renderEntryInspector() {
         const entry = this.currentMap.entries[this.selectedEntryId];
         if (!entry) return this.clearSelection();
@@ -1487,6 +1855,9 @@ export class MapEditor {
         };
         this.commitMutation("Add exit", () => map.exits.push(exit));
         this.selectedExitIndex = map.exits.length - 1;
+        this.selectedEntityId = null;
+        this.selectedEntryId = null;
+        this.selectedTriggerId = null;
         this.mode = "exits";
         this.refreshAfterMutation();
     }

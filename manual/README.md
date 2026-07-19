@@ -1,6 +1,6 @@
-# Yume Prototype v0.8.3 — Authoring Manual
+# Yume Prototype v0.8.4 — Authoring Manual
 
-This manual documents the systems present in the attached `0.8.2` project. It is intended as the central reference for map authoring, editor use, interactions, hooks, conditions, effects, deterministic randomness, music, assets, and common recipes.
+This manual documents the systems present in the attached `0.8.4` project. It is intended as the central reference for map authoring, editor use, interactions, hooks, conditions, effects, deterministic randomness, music, assets, and common recipes.
 
 The code is strict by design. Most authored objects accept only the documented keys; a misspelled or unsupported key should fail during game initialization or Playtest rather than being silently ignored.
 
@@ -46,7 +46,7 @@ The code is strict by design. Most authored objects accept only the documented k
 ## Terminology
 
 - **Hook:** a place where an effect sequence may run, such as `onEnter`, an interaction, an item use, or `showText.afterClose`.
-- **Trigger:** the event that activates an interaction: currently `action` or `touch`.
+- **Trigger:** the event that activates an interaction: for interactions, `action` or `touch`; rectangular map triggers separately use `enter`, `exit`, or `step`.
 - **Interaction handler:** the top-level interaction behavior: currently `effects` or direct `teleport`.
 - **Effect:** one operation inside an effect array, such as `setFlag`, `showText`, or `random`.
 - **Condition:** a test controlling presence, availability, music, or one effect.

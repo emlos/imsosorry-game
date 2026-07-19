@@ -2,10 +2,10 @@ import { OPPOSITE_EDGE, getEdgePosition, getRangeLength } from "../map-edges.js"
 import { SPRITES } from "../sprites.js";
 import { EMPTY_TILE_ID, TILE_IDS, TILES } from "../tiles.js";
 
-export const EDITOR_STORAGE_KEY = "yume-map-editor-recovery-v2";
-export const EDITOR_BACKUP_KEY = "yume-map-editor-pre-import-backup-v2";
-export const PLAYTEST_STORAGE_KEY = "yume-map-editor-playtest-maps-v2";
-export const PLAYTEST_RESULT_KEY = "yume-map-editor-playtest-result-v2";
+export const EDITOR_STORAGE_KEY = "yume-map-editor-recovery-v3";
+export const EDITOR_BACKUP_KEY = "yume-map-editor-pre-import-backup-v3";
+export const PLAYTEST_STORAGE_KEY = "yume-map-editor-playtest-maps-v3";
+export const PLAYTEST_RESULT_KEY = "yume-map-editor-playtest-result-v3";
 
 export function cloneData(value) {
     return structuredClone(value);
@@ -222,6 +222,7 @@ export function createMap(id, width = 10, height = 8) {
             },
         },
         exits: [],
+        triggers: [],
         tiles: {},
         entities: [],
         layers: {
@@ -262,6 +263,18 @@ export function resizeMap(map, width, height) {
 
     Object.values(map.entries).forEach(clampPosition);
     map.entities.forEach(clampPosition);
+    for (const trigger of map.triggers ?? []) {
+        trigger.region.col = Math.max(0, Math.min(width - 1, trigger.region.col));
+        trigger.region.row = Math.max(0, Math.min(height - 1, trigger.region.row));
+        trigger.region.width = Math.max(
+            1,
+            Math.min(trigger.region.width, width - trigger.region.col),
+        );
+        trigger.region.height = Math.max(
+            1,
+            Math.min(trigger.region.height, height - trigger.region.row),
+        );
+    }
 }
 
 export function mergeTileDefinitions(map) {
@@ -514,6 +527,16 @@ export function refactorMapId(documentMaps, map, newId) {
                 oldId,
                 newId,
                 `${mapPath}.entities[${index}].interaction`,
+                changedReferences,
+            );
+        }
+
+        for (const [index, trigger] of (sourceMap.triggers ?? []).entries()) {
+            rewriteMapIdInEffects(
+                trigger?.effects,
+                oldId,
+                newId,
+                `${mapPath}.triggers[${index}].effects`,
                 changedReferences,
             );
         }
@@ -937,6 +960,9 @@ export function validateEditorDocument(maps) {
         if (!Array.isArray(map.entities)) {
             errors.push(`Map "${map.id ?? "?"}" entities must be an array.`);
         }
+        if (!Array.isArray(map.triggers)) {
+            errors.push(`Map "${map.id ?? "?"}" triggers must be an array.`);
+        }
         if (!Array.isArray(map.exits)) {
             errors.push(`Map "${map.id ?? "?"}" exits must be an array.`);
         }
@@ -1091,6 +1117,59 @@ export function validateEditorDocument(maps) {
             }
         }
 
+        const triggerIds = new Set();
+        const triggerEvents = new Set(["enter", "exit", "step"]);
+        const triggerFrequencies = new Set(["always", "once-per-visit", "once-per-save"]);
+        for (const [index, trigger] of (map.triggers ?? []).entries()) {
+            const label = `Trigger ${index} in "${map.id}"`;
+            if (!trigger || typeof trigger !== "object" || Array.isArray(trigger)) {
+                errors.push(`${label} must be an object.`);
+                continue;
+            }
+            if (typeof trigger.id !== "string" || trigger.id.length === 0) {
+                errors.push(`${label} needs a nonempty ID.`);
+            } else if (triggerIds.has(trigger.id)) {
+                errors.push(`${label} duplicates ID "${trigger.id}".`);
+            } else {
+                triggerIds.add(trigger.id);
+            }
+
+            const region = trigger.region;
+            if (
+                !region ||
+                typeof region !== "object" ||
+                Array.isArray(region) ||
+                !Number.isInteger(region.col) ||
+                !Number.isInteger(region.row) ||
+                !Number.isInteger(region.width) ||
+                !Number.isInteger(region.height) ||
+                region.col < 0 ||
+                region.row < 0 ||
+                region.width < 1 ||
+                region.height < 1 ||
+                region.col + region.width > width ||
+                region.row + region.height > height
+            ) {
+                errors.push(`${label} has a region outside the map or with invalid dimensions.`);
+            }
+
+            if (
+                !Array.isArray(trigger.events) ||
+                trigger.events.length === 0 ||
+                trigger.events.some((eventType) => !triggerEvents.has(eventType)) ||
+                new Set(trigger.events).size !== trigger.events.length
+            ) {
+                errors.push(`${label} needs unique enter, exit, or step events.`);
+            }
+
+            if (!triggerFrequencies.has(trigger.frequency ?? "always")) {
+                errors.push(`${label} has unsupported frequency "${String(trigger.frequency)}".`);
+            }
+            if (!Array.isArray(trigger.effects) || trigger.effects.length === 0) {
+                errors.push(`${label}.effects must be a nonempty array.`);
+            }
+        }
+
         const randomExitIds = new Set();
         for (const [index, exit] of (map.exits ?? []).entries()) {
             if (!exit || typeof exit !== "object" || Array.isArray(exit)) {
@@ -1240,6 +1319,16 @@ export function validateEditorDocument(maps) {
                 entity?.interaction,
                 map,
                 `${map.id}.entities[${index}].interaction`,
+                mapById,
+                errors,
+            );
+        }
+
+        for (const [index, trigger] of (map.triggers ?? []).entries()) {
+            validateEditorEffectsReferences(
+                trigger?.effects,
+                map,
+                `${map.id}.triggers[${index}].effects`,
                 mapById,
                 errors,
             );

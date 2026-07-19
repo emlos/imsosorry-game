@@ -4,8 +4,8 @@ import { MAPS } from "./maps.js";
 import { SaveControls } from "./save-ui.js";
 import { SaveStore } from "./saves.js";
 
-const EDITOR_PLAYTEST_STORAGE_KEY = "yume-map-editor-playtest-maps-v1";
-const EDITOR_PLAYTEST_RESULT_KEY = "yume-map-editor-playtest-result-v1";
+const EDITOR_PLAYTEST_STORAGE_KEY = "yume-map-editor-playtest-maps-v3";
+const EDITOR_PLAYTEST_RESULT_KEY = "yume-map-editor-playtest-result-v3";
 const canvas = document.querySelector("#game");
 const startScreen = document.querySelector("#start-screen");
 const startButton = document.querySelector("#start-game");

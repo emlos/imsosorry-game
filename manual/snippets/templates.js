@@ -1,4 +1,4 @@
-// Yume v0.8.3 authoring templates.
+// Yume v0.8.4 authoring templates.
 // These are examples to paste into the appropriate definitions; this file is not imported.
 
 // -----------------------------------------------------------------------------
@@ -67,6 +67,22 @@ const teleportInteraction = {
         // musicTransitionMs: 700,
     },
     message: "The door opens.",
+};
+
+// -----------------------------------------------------------------------------
+// RECTANGULAR MAP TRIGGER
+// -----------------------------------------------------------------------------
+
+const mapTrigger = {
+    id: "hallway-distortion",
+    region: { col: 3, row: 4, width: 5, height: 2 },
+    events: ["enter"],
+    frequency: "always", // "once-per-visit" | "once-per-save"
+    // condition: { flag: "world.changed" },
+    effects: [
+        { type: "playSound", soundId: "receiver-chime" },
+        { type: "showText", pages: ["The hallway changes."] },
+    ],
 };
 
 // -----------------------------------------------------------------------------

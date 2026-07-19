@@ -225,6 +225,23 @@ function collectRawLinks(maps) {
             }
         }
 
+        for (const [triggerIndex, trigger] of (map.triggers ?? []).entries()) {
+            for (const teleport of collectEffectTeleports(trigger?.effects)) {
+                rawLinks.push({
+                    sourceMapId: map.id,
+                    targetMapId: teleport.targetMapId,
+                    kind: teleport.probabilistic ? "random-teleport" : "teleport",
+                    conditional: Boolean(trigger?.condition) || teleport.conditional,
+                    origin: {
+                        originType: "trigger",
+                        triggerIndex,
+                        triggerId: trigger?.id ?? null,
+                        entryId: teleport.entryId,
+                    },
+                });
+            }
+        }
+
         for (const [eventIndex, event] of (map.musicEvents ?? []).entries()) {
             for (const teleport of collectEffectTeleports(event?.effects)) {
                 rawLinks.push({
@@ -263,7 +280,8 @@ function formatExitRangeLabel(origins, count) {
 
     const uniqueLabels = [...new Set(labels)];
     if (uniqueLabels.length === 1) return uniqueLabels[0];
-    if (uniqueLabels.length > 1) return `${uniqueLabels.slice(0, 2).join("\n")}${uniqueLabels.length > 2 ? `\n+${uniqueLabels.length - 2} more` : ""}`;
+    if (uniqueLabels.length > 1)
+        return `${uniqueLabels.slice(0, 2).join("\n")}${uniqueLabels.length > 2 ? `\n+${uniqueLabels.length - 2} more` : ""}`;
     return count > 1 ? `×${count}` : "";
 }
 

@@ -55,6 +55,8 @@ import {
 } from "./validation.js";
 
 const RENDER_LAYER_NAMES = new Set(["base", "obstacles", "foreground"]);
+const TRIGGER_EVENT_TYPES = new Set(["enter", "exit", "step"]);
+const TRIGGER_FREQUENCIES = new Set(["always", "once-per-visit", "once-per-save"]);
 const COLLISION_EPSILON = 1e-7;
 
 function validateEdgeRange(range, label) {
@@ -118,6 +120,9 @@ function createRuntimeState(maps) {
         inventory: {},
         maps: Object.fromEntries(maps.map((map) => [map.id, createMapState(map)])),
         random: createRandomState(),
+        triggerHistory: {
+            oncePerSave: {},
+        },
     };
 }
 
@@ -135,6 +140,7 @@ export class Game {
         this.itemDefinitions = new Map();
         this.activeSpatialData = null;
         this.activeTouchTargets = new Set();
+        this.activeTriggerIds = new Set();
         this.sessionMusicEventIds = new Set();
         this.saveMusicEventIds = new Set();
         this.audioDebugElapsedMs = 0;
@@ -302,6 +308,7 @@ export class Game {
         requireObject(map.entries, `Map "${map.id}" entries`);
         requireObject(map.layers, `Map "${map.id}" layers`);
         requireArray(map.entities, `Map "${map.id}" entities`);
+        requireArray(map.triggers, `Map "${map.id}" triggers`);
         requireArray(map.exits, `Map "${map.id}" exits`);
         if (map.onEnter !== undefined) {
             requireArray(map.onEnter, `Map "${map.id}" onEnter`);
@@ -348,6 +355,15 @@ export class Game {
         for (const [tileId, tile] of Object.entries(map.tiles)) {
             this.validateTile(tileId, tile, map.id);
         }
+
+        const triggerIds = new Set();
+        map.triggers.forEach((trigger, index) => {
+            this.validateTriggerDefinition(trigger, map, index);
+            if (triggerIds.has(trigger.id)) {
+                throw new Error(`Map "${map.id}" contains duplicate trigger ID "${trigger.id}".`);
+            }
+            triggerIds.add(trigger.id);
+        });
 
         let walkableBaseCells = 0;
 
@@ -851,6 +867,22 @@ export class Game {
             validateEffectsReferences(this, map.onExit, map.id, `Map "${map.id}" onExit`);
         }
 
+        for (const trigger of map.triggers) {
+            if (trigger.condition) {
+                validateConditionReferences(
+                    this,
+                    trigger.condition,
+                    `Condition for trigger "${trigger.id}" in "${map.id}"`,
+                );
+            }
+            validateEffectsReferences(
+                this,
+                trigger.effects,
+                map.id,
+                `Effects for trigger "${trigger.id}" in "${map.id}"`,
+            );
+        }
+
         for (const entity of map.entities) {
             if (entity.condition) {
                 validateConditionReferences(
@@ -869,6 +901,57 @@ export class Game {
                 `interaction for entity "${entity.id}" in "${map.id}"`,
             );
         }
+    }
+
+    validateTriggerDefinition(trigger, map, index) {
+        const label = `Trigger ${index} in "${map.id}"`;
+        requireObject(trigger, label);
+        requireExactKeys(
+            trigger,
+            new Set(["id", "region", "events", "frequency", "condition", "effects"]),
+            label,
+        );
+        requireString(trigger.id, `${label}.id`);
+
+        requireObject(trigger.region, `${label}.region`);
+        requireExactKeys(
+            trigger.region,
+            new Set(["col", "row", "width", "height"]),
+            `${label}.region`,
+        );
+        requireNonNegativeInteger(trigger.region.col, `${label}.region.col`);
+        requireNonNegativeInteger(trigger.region.row, `${label}.region.row`);
+        requirePositiveInteger(trigger.region.width, `${label}.region.width`);
+        requirePositiveInteger(trigger.region.height, `${label}.region.height`);
+
+        const regionRight = trigger.region.col + trigger.region.width;
+        const regionBottom = trigger.region.row + trigger.region.height;
+        if (regionRight > map.gridSize.width || regionBottom > map.gridSize.height) {
+            throw new Error(`${label}.region extends outside map "${map.id}".`);
+        }
+
+        requireNonEmptyArray(trigger.events, `${label}.events`);
+        const eventTypes = new Set();
+        trigger.events.forEach((eventType, eventIndex) => {
+            requireString(eventType, `${label}.events[${eventIndex}]`);
+            if (!TRIGGER_EVENT_TYPES.has(eventType)) {
+                throw new Error(`${label}.events[${eventIndex}] is unsupported.`);
+            }
+            if (eventTypes.has(eventType)) {
+                throw new Error(`${label}.events duplicates "${eventType}".`);
+            }
+            eventTypes.add(eventType);
+        });
+
+        if (trigger.frequency !== undefined && !TRIGGER_FREQUENCIES.has(trigger.frequency)) {
+            throw new Error(
+                `${label}.frequency must be "always", "once-per-visit", or "once-per-save".`,
+            );
+        }
+        if (trigger.condition !== undefined) {
+            validateCondition(trigger.condition, `Condition for ${label}`);
+        }
+        validateEffectsDefinition(trigger.effects, `Effects for ${label}`);
     }
 
     validateSize(size, label) {
@@ -1201,6 +1284,104 @@ export class Game {
 
     syncTouchTargets() {
         this.activeTouchTargets = new Set(this.getPlayerTouchTargets().keys());
+    }
+
+    isTileInsideTrigger(tile, trigger) {
+        const { col, row, width, height } = trigger.region;
+        return (
+            tile.col >= col && tile.col < col + width && tile.row >= row && tile.row < row + height
+        );
+    }
+
+    getTriggerIdsAtTile(tile = this.player.getCurrentTile()) {
+        return new Set(
+            this.activeMap.triggers
+                .filter((trigger) => this.isTileInsideTrigger(tile, trigger))
+                .map((trigger) => trigger.id),
+        );
+    }
+
+    syncTriggerMembership() {
+        this.activeTriggerIds = this.getTriggerIdsAtTile();
+    }
+
+    getTriggerFrequency(trigger) {
+        return trigger.frequency ?? "always";
+    }
+
+    triggerHasFired(trigger) {
+        const frequency = this.getTriggerFrequency(trigger);
+        if (frequency === "always") return false;
+        if (frequency === "once-per-save") {
+            const triggerKey = `${this.activeMap.id}:${trigger.id}`;
+            return this.state.triggerHistory.oncePerSave[triggerKey] === true;
+        }
+
+        const roomRuntime = this.state.random.currentRoomRuntime;
+        return roomRuntime?.triggerFires?.[trigger.id] === true;
+    }
+
+    markTriggerFired(trigger) {
+        const frequency = this.getTriggerFrequency(trigger);
+        if (frequency === "always") return;
+        if (frequency === "once-per-save") {
+            this.state.triggerHistory.oncePerSave[`${this.activeMap.id}:${trigger.id}`] = true;
+            return;
+        }
+
+        this.state.random.currentRoomRuntime.triggerFires[trigger.id] = true;
+    }
+
+    getTriggerMovementEvent(trigger, previousIds, currentIds) {
+        const wasInside = previousIds.has(trigger.id);
+        const isInside = currentIds.has(trigger.id);
+
+        if (!wasInside && isInside && trigger.events.includes("enter")) return "enter";
+        if (wasInside && !isInside && trigger.events.includes("exit")) return "exit";
+        if (isInside && trigger.events.includes("step")) return "step";
+        return null;
+    }
+
+    handleMapTriggers() {
+        if (this.mode !== "world") return false;
+
+        const sourceMapId = this.activeMap.id;
+        const sourceVisitSerial = this.state.random.currentRoomRuntime?.visitSerial;
+        const previousIds = this.activeTriggerIds;
+        const currentIds = this.getTriggerIdsAtTile();
+        this.activeTriggerIds = currentIds;
+
+        for (const trigger of this.activeMap.triggers) {
+            const eventType = this.getTriggerMovementEvent(trigger, previousIds, currentIds);
+            if (!eventType || this.triggerHasFired(trigger)) continue;
+            if (trigger.condition && !this.evaluateCondition(trigger.condition)) continue;
+
+            this.markTriggerFired(trigger);
+            this.runEffects(trigger.effects, {
+                mapId: sourceMapId,
+                ownerId: `map:${sourceMapId}:trigger:${trigger.id}`,
+            });
+
+            this.canvas.dispatchEvent(
+                new CustomEvent("game-trigger", {
+                    detail: {
+                        mapId: sourceMapId,
+                        triggerId: trigger.id,
+                        eventType,
+                    },
+                }),
+            );
+
+            if (
+                this.state.player.mapId !== sourceMapId ||
+                this.state.random.currentRoomRuntime?.visitSerial !== sourceVisitSerial ||
+                this.mode !== "world"
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     validatePlayerPosition(mapId, col, row, label) {
@@ -1673,6 +1854,7 @@ export class Game {
             inventory: structuredClone(this.state.inventory),
             maps,
             random: structuredClone(this.state.random),
+            triggerHistory: structuredClone(this.state.triggerHistory),
             music: {
                 playback: this.audio.createSaveState(),
                 playedEventIds: [...this.saveMusicEventIds].sort(),
@@ -1694,6 +1876,7 @@ export class Game {
                 "inventory",
                 "maps",
                 "random",
+                "triggerHistory",
                 "music",
             ]),
             "Save data",
@@ -1715,6 +1898,7 @@ export class Game {
         this.applySavedInventory(candidate, rawSaveData.inventory);
         this.applySavedMaps(candidate, rawSaveData.maps);
         this.applySavedRandom(candidate, rawSaveData.random);
+        this.applySavedTriggerHistory(candidate, rawSaveData.triggerHistory);
         const music = this.prepareSavedMusic(rawSaveData.music);
 
         const activeMap = this.mapsById.get(candidate.player.mapId);
@@ -1891,7 +2075,7 @@ export class Game {
         requirePlainObject(roomRuntime, "Save data.random.currentRoomRuntime");
         requireExactKeys(
             roomRuntime,
-            new Set(["mapId", "visitSerial", "entityOverrides"]),
+            new Set(["mapId", "visitSerial", "entityOverrides", "triggerFires"]),
             "Save data.random.currentRoomRuntime",
         );
         requireString(roomRuntime.mapId, "Save data.random.currentRoomRuntime.mapId");
@@ -1926,7 +2110,51 @@ export class Game {
             );
         }
 
+        requirePlainObject(
+            roomRuntime.triggerFires,
+            "Save data.random.currentRoomRuntime.triggerFires",
+        );
+        const currentMap = this.mapsById.get(roomRuntime.mapId);
+        const currentTriggerIds = new Set(
+            currentMap.triggers
+                .filter((trigger) => (trigger.frequency ?? "always") === "once-per-visit")
+                .map((trigger) => trigger.id),
+        );
+        for (const [triggerId, fired] of Object.entries(roomRuntime.triggerFires)) {
+            if (!currentTriggerIds.has(triggerId)) {
+                throw new Error(
+                    `Save data.random.currentRoomRuntime.triggerFires references missing once-per-visit trigger "${triggerId}" in "${roomRuntime.mapId}".`,
+                );
+            }
+            requireBoolean(fired, `Save data.random.currentRoomRuntime.triggerFires.${triggerId}`);
+        }
+
         candidate.random = structuredClone(random);
+    }
+
+    applySavedTriggerHistory(candidate, triggerHistory) {
+        requirePlainObject(triggerHistory, "Save data.triggerHistory");
+        requireExactKeys(triggerHistory, new Set(["oncePerSave"]), "Save data.triggerHistory");
+        requirePlainObject(triggerHistory.oncePerSave, "Save data.triggerHistory.oncePerSave");
+
+        const validIds = new Set(
+            this.maps.flatMap((map) =>
+                map.triggers
+                    .filter((trigger) => (trigger.frequency ?? "always") === "once-per-save")
+                    .map((trigger) => `${map.id}:${trigger.id}`),
+            ),
+        );
+
+        for (const [triggerKey, fired] of Object.entries(triggerHistory.oncePerSave)) {
+            if (!validIds.has(triggerKey)) {
+                throw new Error(
+                    `Save data.triggerHistory.oncePerSave references missing trigger "${triggerKey}".`,
+                );
+            }
+            requireBoolean(fired, `Save data.triggerHistory.oncePerSave.${triggerKey}`);
+        }
+
+        candidate.triggerHistory = structuredClone(triggerHistory);
     }
 
     applySavedMaps(candidate, savedMaps) {
@@ -2087,6 +2315,7 @@ export class Game {
         this.resetPlayerAnimation();
         this.activeSpatialData = prepared.spatialData;
         this.syncTouchTargets();
+        this.syncTriggerMembership();
         this.selectedItemId = Object.keys(this.state.inventory)[0] ?? null;
         this.mode = "world";
         this.eventLogElement.textContent = "";
@@ -2310,6 +2539,7 @@ export class Game {
             mapId,
             visitSerial: visits,
             entityOverrides: {},
+            triggerFires: {},
         };
     }
 
@@ -2357,6 +2587,7 @@ export class Game {
         this.resetPlayerAnimation();
         this.activeSpatialData = this.buildSpatialData(map);
         this.syncTouchTargets();
+        this.syncTriggerMembership();
 
         this.applyMapMusic(map, transition);
         this.runMapMusicEntryEvents(map, usesEntry ? transition.entryId : null);
@@ -3191,6 +3422,11 @@ export class Game {
                     remainingMs = result.remainingMs;
 
                     if (!result.completed) break;
+
+                    if (result.tileChanged) {
+                        this.handleMapTriggers();
+                        if (this.mode !== "world") break;
+                    }
 
                     this.handleTouchInteractions();
                     if (this.mode !== "world") break;

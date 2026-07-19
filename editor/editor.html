@@ -57,6 +57,7 @@
                     <button data-mode="tiles" class="selected" type="button">Tiles</button>
                     <button data-mode="entities" type="button">Entities</button>
                     <button data-mode="entries" type="button">Entries</button>
+                    <button data-mode="triggers" type="button">Triggers</button>
                     <button data-mode="exits" type="button">Exits</button>
                 </div>
             </section>
@@ -97,6 +98,14 @@
             <section id="entry-tools-section" hidden>
                 <h2>Entry placement</h2>
                 <p class="hint">Click an existing marker to select it. Click an empty cell to place a new entry.</p>
+            </section>
+
+            <section id="trigger-tools-section" hidden>
+                <h2>Trigger regions</h2>
+                <button id="add-trigger" type="button">Add 1×1 trigger</button>
+                <div id="trigger-list" class="compact-list"></div>
+                <p class="hint">Drag empty space to create a rectangle. Drag a region to move it. Drag the selected
+                    region’s handles to resize it. Overlaps are allowed; list order is execution order.</p>
             </section>
 
             <section id="exit-tools-section" hidden>
@@ -167,7 +176,7 @@
         <aside class="panel right-panel">
             <section id="map-inspector">
                 <h2>Inspector</h2>
-                <p>Select an entity, entry, or exit to edit it.</p>
+                <p>Select an entity, entry, trigger, or exit to edit it.</p>
             </section>
 
             <section id="entity-inspector" hidden>
@@ -218,6 +227,42 @@
                 <div class="button-row">
                     <button id="apply-entry" type="button">Apply</button>
                     <button id="delete-entry" type="button" class="danger">Delete</button>
+                </div>
+            </section>
+
+            <section id="trigger-inspector" hidden>
+                <h2>Trigger</h2>
+                <label>ID<input id="trigger-id" type="text"></label>
+                <div class="field-pair">
+                    <label>Column<input id="trigger-col" type="number" min="0" step="1"></label>
+                    <label>Row<input id="trigger-row" type="number" min="0" step="1"></label>
+                </div>
+                <div class="field-pair">
+                    <label>Width<input id="trigger-width" type="number" min="1" step="1"></label>
+                    <label>Height<input id="trigger-height" type="number" min="1" step="1"></label>
+                </div>
+                <fieldset>
+                    <legend>Events</legend>
+                    <div class="check-grid">
+                        <label class="check"><input id="trigger-event-enter" type="checkbox"> Enter</label>
+                        <label class="check"><input id="trigger-event-exit" type="checkbox"> Exit</label>
+                        <label class="check"><input id="trigger-event-step" type="checkbox"> Step</label>
+                    </div>
+                </fieldset>
+                <label>Frequency<select id="trigger-frequency">
+                        <option value="always">Always</option>
+                        <option value="once-per-visit">Once per room visit</option>
+                        <option value="once-per-save">Once per save file</option>
+                    </select></label>
+                <label>Condition JSON<textarea id="trigger-condition" rows="7" spellcheck="false"></textarea></label>
+                <label>Effects JSON<textarea id="trigger-effects" rows="14" spellcheck="false"></textarea></label>
+                <div class="button-row">
+                    <button id="move-trigger-up" type="button">Earlier</button>
+                    <button id="move-trigger-down" type="button">Later</button>
+                </div>
+                <div class="button-row">
+                    <button id="apply-trigger" type="button">Apply</button>
+                    <button id="delete-trigger" type="button" class="danger">Delete</button>
                 </div>
             </section>
 

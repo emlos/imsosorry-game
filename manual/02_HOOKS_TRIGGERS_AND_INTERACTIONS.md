@@ -108,7 +108,51 @@ Owner:
 map:<mapId>:music-event:<eventId>
 ```
 
-### 7. Dialogue close
+### 7. Rectangular map region
+
+```js
+triggers: [
+    {
+        id: "hallway-distortion",
+        region: {
+            col: 3,
+            row: 4,
+            width: 5,
+            height: 2,
+        },
+        events: ["enter"],
+        frequency: "always",
+        condition: { flag: "world.changed" }, // optional
+        effects: [/* non-empty effect array */],
+    },
+]
+```
+
+Map triggers are invisible rectangular regions independent of tiles and entities. They are evaluated after the player completes a movement into a new tile, never once per rendered frame. The runtime tracks the trigger IDs containing the player's previous tile.
+
+Event types:
+
+- `enter`: the previous tile was outside and the new tile is inside.
+- `exit`: the previous tile was inside and the new tile is outside.
+- `step`: the completed movement ends inside. If the same trigger lists both `enter` and `step`, entering reports `enter` and executes the effects once for that movement.
+
+Frequency values:
+
+- `always` or omitted: every matching movement.
+- `once-per-visit`: once during the current stay in that map. Leaving and entering the map starts a new visit. Saving and reloading in the same room preserves the current visit's fired state.
+- `once-per-save`: once for the entire save file.
+
+Overlapping trigger regions are allowed. Matching triggers execute in their order in the map's `triggers` array. If an earlier trigger changes maps or leaves world mode, later triggers do not continue during that movement.
+
+Owner:
+
+```text
+map:<mapId>:trigger:<triggerId>
+```
+
+Trigger IDs must be unique within a map and should remain stable after saves exist. Conditions are checked when the movement event occurs. A false condition does not consume a one-time trigger.
+
+### 8. Dialogue close
 
 ```js
 {
@@ -120,7 +164,7 @@ map:<mapId>:music-event:<eventId>
 
 Use this for every operation that must happen after dialogue. `showText` must be the final reachable effect in its current array.
 
-### 8. Random choice branch
+### 9. Random choice branch
 
 ```js
 {

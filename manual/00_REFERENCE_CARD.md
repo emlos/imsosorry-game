@@ -12,6 +12,25 @@ triggers: ["action", "touch"]
 - `touch`: fires when the player's footbox newly enters the interaction cell.
 - A colliding entity or colliding tile placement cannot use `touch`.
 
+## Rectangular map triggers
+
+```js
+triggers: [
+    {
+        id: "hallway-distortion",
+        region: { col: 3, row: 4, width: 5, height: 2 },
+        events: ["enter"], // enter, exit, step
+        frequency: "always", // always, once-per-visit, once-per-save
+        condition: { flag: "world.changed" }, // optional
+        effects: [/* effects */],
+    },
+]
+```
+
+- Evaluated only after a completed tile movement.
+- Overlaps execute in `triggers` array order.
+- Stable effect owner: `map:<mapId>:trigger:<triggerId>`.
+
 ## Interaction handlers
 
 ```js
@@ -83,6 +102,7 @@ Usable item (`ITEMS[itemId].effects`)
 Map `onEnter`
 Map `onExit`
 Map `musicEvents[].effects`
+Map `triggers[].effects`
 `showText.afterClose`
 `random.choices[].effects`
 ```

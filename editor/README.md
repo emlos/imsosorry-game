@@ -13,10 +13,11 @@ Maps may define an optional `editorGroup` string. The editor uses it to organize
 - Existing foreground layers are preserved and previewed, but are not currently editable.
 - Pencil, eraser, rectangle, flood-fill, eyedropper, Empty palette selection, and active-layer clearing tools.
 - Atlas-aware static and animated previews.
-- Grid, layer visibility, collision, footprint, entry, and exit overlays.
+- Grid, layer visibility, collision, footprint, entry, exit, and rectangular-trigger overlays.
 - CSS-only canvas zoom from 50% to 400%, with buttons and Ctrl/Cmd-wheel cursor anchoring.
 - Entity presets, placement, dragging, deletion, and basic property editing.
 - Entry placement, facing, renaming, reference display, and deletion.
+- Rectangular trigger creation, dragging, handle resizing, ordering, event/frequency controls, and condition/effect JSON editing.
 - Exit range display, entry-target and edge-target form editing, reciprocal equal-length doorway connections, and raw JSON editing for advanced forms.
 - Full-document undo/redo snapshots grouped by completed action.
 - Generated JavaScript and JSON export, import, local recovery, and pre-import backup.
@@ -30,13 +31,13 @@ editor does not create tile or sprite assets, edit atlas coordinates, edit anima
 
 ## Read-only map graph
 
-Use **Map graph** in the top toolbar to open a derived project overview. The graph contains one node per map, compound regions for `editorGroup` values, solid arrows for edge exits, and dashed arrows for entity or tile teleports. Edge links display their source and target doorway ranges; repeated non-exit links of the same type are aggregated and labelled with a count. Broken map references appear as explicit missing-destination nodes.
+Use **Map graph** in the top toolbar to open a derived project overview. The graph contains one node per map, compound regions for `editorGroup` values, solid arrows for edge exits, and dashed arrows for entity, tile, or trigger teleports. Edge links display their source and target doorway ranges; repeated non-exit links of the same type are aggregated and labelled with a count. Broken map references appear as explicit missing-destination nodes.
 
 The graph is read-only. Drag the background to pan, use the mouse wheel to zoom, use **Fit** to recenter all nodes, and use **Relayout** to generate a new force-directed arrangement. Clicking a map node closes the graph and selects that map in the normal editor. Graph positions exist only for the current editor session and are never exported with map data.
 
 ## Map ID refactors
 
-Changing a map ID is an atomic reference refactor, not an ordinary label edit. The editor rewrites map-owned exits, teleport interactions, nested effects, cross-map entity effects, and map-specific tile interactions on a cloned document, validates the candidate, and commits only when the result is valid. References found in read-only source registries such as `ITEMS`, global `TILES`, `SPRITES`, or entity presets block the operation and report their source paths; update those source definitions before retrying.
+Changing a map ID is an atomic reference refactor, not an ordinary label edit. The editor rewrites map-owned exits, teleport interactions, trigger effects, nested effects, cross-map entity effects, and map-specific tile interactions on a cloned document, validates the candidate, and commits only when the result is valid. References found in read-only source registries such as `ITEMS`, global `TILES`, `SPRITES`, or entity presets block the operation and report their source paths; update those source definitions before retrying.
 
 Development saves are not migrated when a map ID changes. Clear old development save slots after a successful ID refactor. Prefer keeping technical map IDs stable and use `editorGroup` or authored dialogue for human-readable organization.
 

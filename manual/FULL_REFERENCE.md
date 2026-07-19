@@ -1,4 +1,4 @@
-# Yume Prototype v0.8.3
+# Yume Prototype v0.8.4
 Generated from the project source on 2026-07-19.
 
 ---
@@ -16,6 +16,25 @@ triggers: ["action", "touch"]
 - `action`: player uses the interaction button while facing the target.
 - `touch`: fires when the player's footbox newly enters the interaction cell.
 - A colliding entity or colliding tile placement cannot use `touch`.
+
+## Rectangular map triggers
+
+```js
+triggers: [
+    {
+        id: "hallway-distortion",
+        region: { col: 3, row: 4, width: 5, height: 2 },
+        events: ["enter"], // enter, exit, step
+        frequency: "always", // always, once-per-visit, once-per-save
+        condition: { flag: "world.changed" }, // optional
+        effects: [/* effects */],
+    },
+]
+```
+
+- Evaluated only after a completed tile movement.
+- Overlaps execute in `triggers` array order.
+- Stable effect owner: `map:<mapId>:trigger:<triggerId>`.
 
 ## Interaction handlers
 
@@ -88,6 +107,7 @@ Usable item (`ITEMS[itemId].effects`)
 Map `onEnter`
 Map `onExit`
 Map `musicEvents[].effects`
+Map `triggers[].effects`
 `showText.afterClose`
 `random.choices[].effects`
 ```
@@ -191,11 +211,12 @@ The editor works on a cloned map document. It does not modify live game state or
 - Preserve and preview existing foreground layers without editing them.
 - Pencil, eraser, rectangle, fill, eyedropper, Empty tile, and clear-layer tools.
 - Atlas-aware static and animated previews.
-- Grid, layer, collision, footprint, entry, and exit overlays.
+- Grid, layer, collision, footprint, entry, exit, and rectangular-trigger overlays.
 - Canvas zoom from 50% to 400%, including Ctrl/Cmd-wheel zoom.
 - Place entities from presets, drag them, delete them, and choose either a sprite visual or a reusable tile visual.
 - Edit entity interactions as JSON and edit the primary dialogue fields for compatible interactions.
 - Place and edit entries, facing directions, and entry IDs.
+- Create rectangular triggers by dragging, then move, resize, reorder, and edit their event/frequency/condition/effect definitions.
 - Create and edit ordinary exits, reciprocal edge connections, and advanced exit JSON.
 - Undo and redo completed editor actions.
 - Import and export generated JavaScript or JSON.
@@ -225,14 +246,14 @@ Use the editor for:
 - Room geometry.
 - Tile placement.
 - Entity placement.
-- Entries and exits.
+- Entries, exits, and rectangular trigger regions.
 - Basic entity identity, collision, and visual selection.
 - Map organization and connection inspection.
 
 Use code or raw JSON for:
 
-- Conditions.
-- Effect sequences.
+- Complex condition construction beyond the trigger/entity JSON inspectors.
+- Complex effect sequence construction beyond the trigger/entity JSON inspectors.
 - Random branches.
 - Map `onEnter` and `onExit` hooks.
 - Conditional music and music events.
@@ -403,7 +424,51 @@ Owner:
 map:<mapId>:music-event:<eventId>
 ```
 
-### 7. Dialogue close
+### 7. Rectangular map region
+
+```js
+triggers: [
+    {
+        id: "hallway-distortion",
+        region: {
+            col: 3,
+            row: 4,
+            width: 5,
+            height: 2,
+        },
+        events: ["enter"],
+        frequency: "always",
+        condition: { flag: "world.changed" }, // optional
+        effects: [/* non-empty effect array */],
+    },
+]
+```
+
+Map triggers are invisible rectangular regions independent of tiles and entities. They are evaluated after the player completes a movement into a new tile, never once per rendered frame. The runtime tracks the trigger IDs containing the player's previous tile.
+
+Event types:
+
+- `enter`: the previous tile was outside and the new tile is inside.
+- `exit`: the previous tile was inside and the new tile is outside.
+- `step`: the completed movement ends inside. If the same trigger lists both `enter` and `step`, entering reports `enter` and executes the effects once for that movement.
+
+Frequency values:
+
+- `always` or omitted: every matching movement.
+- `once-per-visit`: once during the current stay in that map. Leaving and entering the map starts a new visit. Saving and reloading in the same room preserves the current visit's fired state.
+- `once-per-save`: once for the entire save file.
+
+Overlapping trigger regions are allowed. Matching triggers execute in their order in the map's `triggers` array. If an earlier trigger changes maps or leaves world mode, later triggers do not continue during that movement.
+
+Owner:
+
+```text
+map:<mapId>:trigger:<triggerId>
+```
+
+Trigger IDs must be unique within a map and should remain stable after saves exist. Conditions are checked when the movement event occurs. A false condition does not consume a one-time trigger.
+
+### 8. Dialogue close
 
 ```js
 {
@@ -415,7 +480,7 @@ map:<mapId>:music-event:<eventId>
 
 Use this for every operation that must happen after dialogue. `showText` must be the final reachable effect in its current array.
 
-### 8. Random choice branch
+### 9. Random choice branch
 
 ```js
 {
@@ -1092,6 +1157,7 @@ See `06_RANDOMNESS.md` for scope semantics and stable IDs.
     },
 
     exits: [],
+    triggers: [],
     tiles: {},
     entities: [],
 
@@ -1245,6 +1311,39 @@ Rules:
 - `condition` controls authored presence in addition to runtime `active`.
 - `interaction` must be `null` or a valid interaction.
 - Collision plus a `touch` interaction is forbidden.
+
+## Rectangular triggers
+
+```js
+triggers: [
+    {
+        id: "hallway-distortion",
+        region: { col: 3, row: 4, width: 5, height: 2 },
+        events: ["enter"],
+        frequency: "once-per-visit",
+        condition: { notFlag: "hallway.resolved" }, // optional
+        effects: [
+            { type: "playSound", soundId: "receiver-chime" },
+            { type: "showText", pages: ["The corridor bends behind you."] },
+        ],
+    },
+],
+```
+
+Rules:
+
+- `id` is unique within the map.
+- `region.col` and `region.row` are non-negative integers.
+- `region.width` and `region.height` are positive integers.
+- The complete rectangle must fit inside the map.
+- `events` is a non-empty, duplicate-free list containing `enter`, `exit`, and/or `step`.
+- `frequency` is optional and defaults to `always`; supported values are `always`, `once-per-visit`, and `once-per-save`.
+- `condition` is optional.
+- `effects` is a non-empty effect sequence.
+- Overlapping rectangles are valid and execute in array order.
+- The regions have no rendering or collision of their own.
+
+The editor's Trigger mode creates, moves, resizes, reorders, and overlays these rectangles. Its inspector edits condition and effect arrays as JSON.
 
 ## Static edge exit: target entry
 
