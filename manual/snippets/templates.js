@@ -1,4 +1,4 @@
-// Yume v0.8.t-1 authoring templates.
+// Yume v0.8.3 authoring templates.
 // These are examples to paste into the appropriate definitions; this file is not imported.
 
 // -----------------------------------------------------------------------------
@@ -28,7 +28,7 @@ const entity = {
     active: true,
     col: 2,
     row: 3,
-    spriteId: "placeholder",
+    visual: { type: "sprite", id: "placeholder" },
     collision: false,
     interaction: null,
     // condition: { notFlag: "entity.removed" },
@@ -47,9 +47,7 @@ const effectsInteraction = {
             type: "showText",
             speaker: "Speaker",
             pages: ["Page one.", "Page two."],
-            afterClose: [
-                { type: "setFlag", flag: "interaction.finished", value: true },
-            ],
+            afterClose: [{ type: "setFlag", flag: "interaction.finished", value: true }],
         },
     ],
     // message: "Status log text.",
@@ -97,9 +95,7 @@ const mapHooks = {
             ],
         },
     ],
-    onExit: [
-        { type: "setFlag", flag: "room.was-left", value: true },
-    ],
+    onExit: [{ type: "setFlag", flag: "room.was-left", value: true }],
 };
 
 // -----------------------------------------------------------------------------
@@ -208,7 +204,12 @@ const tileDefinition = {
     animations: {
         glow: {
             fps: 6,
-            frames: [[0, 0], [1, 0], [2, 0], [1, 0]],
+            frames: [
+                [0, 0],
+                [1, 0],
+                [2, 0],
+                [1, 0],
+            ],
         },
     },
 };

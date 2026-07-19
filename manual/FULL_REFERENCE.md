@@ -1,6 +1,5 @@
-# Yume Prototype v0.8.t-1 — Full Reference
-
-Generated from the attached project source on 2026-07-17.
+# Yume Prototype v0.8.3
+Generated from the project source on 2026-07-19.
 
 ---
 
@@ -63,7 +62,7 @@ setFlag             toggleFlag
 addItem             removeItem
 setPlayerSprite     setPlayerMoveSpeed
 setEntityActive     setEntityPosition
-setEntitySprite     setEntityCollision
+setEntityVisual     setEntityCollision
 setTile             teleport
 saveGame            playSound
 playMusic           stopMusic
@@ -194,7 +193,7 @@ The editor works on a cloned map document. It does not modify live game state or
 - Atlas-aware static and animated previews.
 - Grid, layer, collision, footprint, entry, and exit overlays.
 - Canvas zoom from 50% to 400%, including Ctrl/Cmd-wheel zoom.
-- Place entities from presets, drag them, delete them, and edit their basic properties.
+- Place entities from presets, drag them, delete them, and choose either a sprite visual or a reusable tile visual.
 - Edit entity interactions as JSON and edit the primary dialogue fields for compatible interactions.
 - Place and edit entries, facing directions, and entry IDs.
 - Create and edit ordinary exits, reciprocal edge connections, and advanced exit JSON.
@@ -227,7 +226,7 @@ Use the editor for:
 - Tile placement.
 - Entity placement.
 - Entries and exits.
-- Basic entity identity, collision, and sprite selection.
+- Basic entity identity, collision, and visual selection.
 - Map organization and connection inspection.
 
 Use code or raw JSON for:
@@ -820,13 +819,25 @@ Current room visit only:
 
 Entity positions use non-negative integer cells.
 
-### `setEntitySprite`
+### `setEntityVisual`
+
+Use a sprite visual:
 
 ```js
 {
-    type: "setEntitySprite",
+    type: "setEntityVisual",
     entityId: "statue",
-    spriteId: "glass-figure",
+    visual: { type: "sprite", id: "glass-figure" },
+}
+```
+
+Or reuse a tile visual from the target map:
+
+```js
+{
+    type: "setEntityVisual",
+    entityId: "statue",
+    visual: { type: "tile", id: TILE_IDS.TREE },
 }
 ```
 
@@ -1197,20 +1208,40 @@ Cardinal facings:
     active: true,
     col: 4,
     row: 3,
-    spriteId: "receiver",
+    visual: { type: "sprite", id: "receiver" },
     collision: true,
     interaction: null,
     condition: { notFlag: "receiver.removed" }, // optional
 }
 ```
 
+A unique interactive placement can reuse any tile visual without duplicating it in `SPRITES`:
+
+```js
+{
+    id: "strange-tree",
+    active: true,
+    col: 4,
+    row: 6,
+    visual: { type: "tile", id: TILE_IDS.TREE },
+    collision: true,
+    interaction: {
+        handler: "effects",
+        triggers: ["action"],
+        effects: [{ type: "showText", pages: ["The bark is warm."] }],
+    },
+}
+```
+
+The tile supplies only the artwork, animation, size, and footprint. The entity supplies its own condition, collision, interaction, position, and runtime state.
+
 Rules:
 
 - IDs are unique within one map.
 - Positions are non-negative integer cells.
-- Entities occupy one collision/interaction cell.
+- Sprite-backed entities occupy one cell. Tile-backed entities use the referenced tile footprint.
 - `active` is saved runtime state and can be mutated.
-- `spriteId`, `collision`, position, and active state can be changed persistently.
+- `visual`, `collision`, position, and active state can be changed persistently.
 - `condition` controls authored presence in addition to runtime `active`.
 - `interaction` must be `null` or a valid interaction.
 - Collision plus a `touch` interaction is forbidden.
@@ -1469,7 +1500,7 @@ Author the entity inactive:
     active: false,
     col: 5,
     row: 3,
-    spriteId: "robed-figure",
+    visual: { type: "sprite", id: "robed-figure" },
     collision: false,
     interaction: null,
 }
@@ -2034,7 +2065,7 @@ newPreset: {
     label: "New object",
     entity: {
         active: true,
-        spriteId: "new-sprite",
+        visual: { type: "sprite", id: "new-sprite" },
         collision: true,
         interaction: null,
     },
@@ -2199,7 +2230,7 @@ Entity:
     active: true,
     col: 4,
     row: 3,
-    spriteId: "pink-orb",
+    visual: { type: "sprite", id: "pink-orb" },
     collision: false,
     interaction: {
         handler: "effects",
@@ -2337,7 +2368,7 @@ interaction: {
     active: true,
     col: 3,
     row: 2,
-    spriteId: "blue-orb",
+    visual: { type: "sprite", id: "blue-orb" },
     collision: false,
     interaction: {
         handler: "effects",
@@ -2857,7 +2888,7 @@ A colliding entity cannot use a touch interaction. A tile on a colliding layer c
 - The anchor is the placed grid cell.
 - Every footprint cell must stay inside the map.
 - A tile interaction covers every footprint cell.
-- Entity collision remains one cell regardless of sprite size.
+- Sprite-backed entity collision occupies one cell. Tile-backed entities use the referenced tile footprint.
 
 ## Shallow map tile override
 
@@ -2875,6 +2906,11 @@ Map-specific tiles are shallow-merged with global tiles. Nested fields are not d
 The editor can rewrite map-owned references but cannot modify external source files. Items, global tiles, sprites, presets, or other registries may block renaming.
 
 Old saves retain old map IDs and are not migrated.
+
+
+## Entity visual schema
+
+Entities use `visual: { type, id }`. `type` is `"sprite"` or `"tile"`; the old entity `spriteId` property and `setEntitySprite` effect are not supported. Use `setEntityVisual` for runtime changes.
 
 ## Entity ID refactors
 
@@ -2910,7 +2946,7 @@ Every static source and every calculated animation frame must fit the loaded tex
 
 ## Interaction cell conflict
 
-Only one spatial interaction is stored per cell. An entity interaction can replace a tile interaction at the same coordinate.
+Only one spatial interaction is stored per cell. A multi-cell entity interaction can replace tile interactions on any cell in its footprint.
 
 ## Player versus entity coordinates
 

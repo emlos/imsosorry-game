@@ -22,7 +22,7 @@ The editor works on a cloned map document. It does not modify live game state or
 - Atlas-aware static and animated previews.
 - Grid, layer, collision, footprint, entry, and exit overlays.
 - Canvas zoom from 50% to 400%, including Ctrl/Cmd-wheel zoom.
-- Place entities from presets, drag them, delete them, and edit their basic properties.
+- Place entities from presets, drag them, delete them, and choose either a sprite visual or a reusable tile visual.
 - Edit entity interactions as JSON and edit the primary dialogue fields for compatible interactions.
 - Place and edit entries, facing directions, and entry IDs.
 - Create and edit ordinary exits, reciprocal edge connections, and advanced exit JSON.
@@ -55,7 +55,7 @@ Use the editor for:
 - Tile placement.
 - Entity placement.
 - Entries and exits.
-- Basic entity identity, collision, and sprite selection.
+- Basic entity identity, collision, and visual selection.
 - Map organization and connection inspection.
 
 Use code or raw JSON for:

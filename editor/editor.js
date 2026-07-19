@@ -11,6 +11,7 @@ import {
     EDITOR_STORAGE_KEY,
     PLAYTEST_RESULT_KEY,
     PLAYTEST_STORAGE_KEY,
+    canPlaceEntity,
     canPlaceTile,
     cloneData,
     createMap,
@@ -21,6 +22,7 @@ import {
     findReciprocalEdgeExit,
     floodFill,
     getEdgeAxisLength,
+    getEntityOccupiedCells,
     getMapSize,
     ensureLayer,
     makeUniqueId,
@@ -164,12 +166,43 @@ export class MapEditor {
             presetSelect.add(new Option(preset.label, presetId));
         }
         presetSelect.value = this.selectedEntityPreset;
+    }
 
-        const spriteSelect = byId("entity-sprite");
-        for (const [spriteId, sprite] of Object.entries(SPRITES)) {
-            const meta = SPRITE_EDITOR_META[spriteId];
-            spriteSelect.add(new Option(meta?.label ?? spriteId, spriteId));
+    populateEntityVisualOptions(type, selectedId = null) {
+        const select = byId("entity-visual-id");
+        if (type === "sprite") {
+            select.replaceChildren(
+                ...Object.keys(SPRITES).map((spriteId) => {
+                    const meta = SPRITE_EDITOR_META[spriteId];
+                    return new Option(meta?.label ?? spriteId, spriteId);
+                }),
+            );
+        } else {
+            const localIds = new Set(Object.keys(this.currentMap.tiles ?? {}).map(String));
+            const tiles = mergeTileDefinitions(this.currentMap);
+            select.replaceChildren(
+                ...Object.keys(tiles)
+                    .map(Number)
+                    .sort((first, second) => first - second)
+                    .map((tileId) => {
+                        const meta = TILE_EDITOR_META[tileId];
+                        const localSuffix = localIds.has(String(tileId)) ? " (map)" : "";
+                        return new Option(
+                            `${meta?.label ?? `Tile ${tileId}`}${localSuffix}`,
+                            String(tileId),
+                        );
+                    }),
+            );
         }
+
+        if (selectedId !== null) select.value = String(selectedId);
+        if (select.selectedIndex < 0 && select.options.length > 0) select.selectedIndex = 0;
+    }
+
+    readEntityVisualInspector() {
+        const type = byId("entity-visual-type").value;
+        const rawId = byId("entity-visual-id").value;
+        return { type, id: type === "tile" ? Number(rawId) : rawId };
     }
 
     bindEvents() {
@@ -404,6 +437,9 @@ export class MapEditor {
             "change",
             (event) => (this.selectedEntityPreset = event.target.value),
         );
+        byId("entity-visual-type").addEventListener("change", (event) => {
+            this.populateEntityVisualOptions(event.target.value);
+        });
         byId("add-exit").addEventListener("click", () => this.addExit());
         byId("connection-source-edge").addEventListener("change", () =>
             this.renderConnectionControls(),
@@ -1010,7 +1046,7 @@ export class MapEditor {
             const entity = this.currentMap.entities.find(
                 (item) => item.id === this.pointerAction.entityId,
             );
-            if (entity) {
+            if (entity && canPlaceEntity(this.currentMap, entity, cell.col, cell.row)) {
                 entity.col = cell.col;
                 entity.row = cell.row;
                 this.renderInspectors();
@@ -1110,7 +1146,11 @@ export class MapEditor {
     startEntityAction(cell) {
         const existing = [...this.currentMap.entities]
             .reverse()
-            .find((entity) => entity.col === cell.col && entity.row === cell.row);
+            .find((entity) =>
+                getEntityOccupiedCells(this.currentMap, entity).some(
+                    (occupied) => occupied.col === cell.col && occupied.row === cell.row,
+                ),
+            );
         if (existing) {
             this.selectedEntityId = existing.id;
             this.selectedEntryId = null;
@@ -1130,6 +1170,13 @@ export class MapEditor {
             col: cell.col,
             row: cell.row,
         };
+        if (!canPlaceEntity(this.currentMap, entity)) {
+            this.setStatus(
+                "Placement rejected: entity visual footprint extends outside the map.",
+                true,
+            );
+            return;
+        }
         this.commitMutation("Place entity", () => this.currentMap.entities.push(entity));
         this.selectedEntityId = entity.id;
         this.renderInspectors();
@@ -1216,7 +1263,8 @@ export class MapEditor {
         const entity = this.currentMap.entities.find((item) => item.id === this.selectedEntityId);
         if (!entity) return this.clearSelection();
         byId("entity-id").value = entity.id;
-        byId("entity-sprite").value = entity.spriteId;
+        byId("entity-visual-type").value = entity.visual.type;
+        this.populateEntityVisualOptions(entity.visual.type, entity.visual.id);
         byId("entity-col").value = entity.col;
         byId("entity-row").value = entity.row;
         byId("entity-active").checked = entity.active;
@@ -1288,6 +1336,7 @@ export class MapEditor {
             const row = Number(byId("entity-row").value);
             const interactionText = byId("entity-interaction").value.trim();
             const interaction = interactionText ? JSON.parse(interactionText) : null;
+            const visual = this.readEntityVisualInspector();
             const { width, height } = getMapSize(this.currentMap);
             if (
                 !newId ||
@@ -1305,9 +1354,14 @@ export class MapEditor {
             ) {
                 throw new Error("Entity position must be an integer cell inside the map.");
             }
+            if (!canPlaceEntity(this.currentMap, { ...entity, visual }, col, row)) {
+                throw new Error(
+                    "Entity visual is invalid or its footprint extends outside the map.",
+                );
+            }
             this.commitMutation("Edit entity", () => {
                 if (newId !== entity.id) renameEntity(this.maps, this.currentMap, entity, newId);
-                entity.spriteId = byId("entity-sprite").value;
+                entity.visual = visual;
                 entity.col = col;
                 entity.row = row;
                 entity.active = byId("entity-active").checked;
@@ -1534,7 +1588,7 @@ export class MapEditor {
 
             const destinations =
                 replacement.destination?.type === "random"
-                    ? replacement.destination.choices ?? []
+                    ? (replacement.destination.choices ?? [])
                     : [replacement];
             for (const [choiceIndex, destination] of destinations.entries()) {
                 if (!Object.hasOwn(destination, "targetEdge")) continue;
@@ -1549,7 +1603,9 @@ export class MapEditor {
                     destination.targetRange[0] < 0 ||
                     destination.targetRange[1] < destination.targetRange[0]
                 ) {
-                    throw new Error(`${choiceLabel} range must contain ordered non-negative integers.`);
+                    throw new Error(
+                        `${choiceLabel} range must contain ordered non-negative integers.`,
+                    );
                 }
                 if (destination.targetEdge !== OPPOSITE_EDGE[replacement.edge]) {
                     throw new Error(`${choiceLabel} edge must be opposite the source edge.`);
@@ -1557,7 +1613,9 @@ export class MapEditor {
                 const sourceLength = replacement.range[1] - replacement.range[0];
                 const targetLength = destination.targetRange[1] - destination.targetRange[0];
                 if (sourceLength !== targetLength) {
-                    throw new Error(`${choiceLabel} must contain the same number of cells as the source range.`);
+                    throw new Error(
+                        `${choiceLabel} must contain the same number of cells as the source range.`,
+                    );
                 }
                 const targetMap = this.maps.find((map) => map.id === destination.targetMapId);
                 if (!targetMap) throw new Error(`${choiceLabel} targets a missing map.`);
@@ -1573,9 +1631,7 @@ export class MapEditor {
             let reciprocalTargetMap = null;
 
             if (reciprocal && replacementIsDirectEdgeExit) {
-                reciprocalTargetMap = this.maps.find(
-                    (map) => map.id === replacement.targetMapId,
-                );
+                reciprocalTargetMap = this.maps.find((map) => map.id === replacement.targetMapId);
                 if (!reciprocalTargetMap) {
                     throw new Error("The reciprocal exit's new target map does not exist.");
                 }

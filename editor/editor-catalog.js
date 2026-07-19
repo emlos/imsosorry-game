@@ -60,16 +60,34 @@ export const ENTITY_PRESETS = {
         label: "Blank entity",
         entity: {
             active: true,
-            spriteId: "placeholder",
+            visual: { type: "sprite", id: "placeholder" },
             collision: false,
             interaction: null,
+        },
+    },
+    strangeTree: {
+        label: "Strange tree (tile visual)",
+        entity: {
+            active: true,
+            visual: { type: "tile", id: TILE_IDS.TREE },
+            collision: true,
+            interaction: {
+                handler: "effects",
+                triggers: ["action"],
+                effects: [
+                    {
+                        type: "showText",
+                        pages: ["The bark is warm."],
+                    },
+                ],
+            },
         },
     },
     door: {
         label: "Door",
         entity: {
             active: true,
-            spriteId: "door",
+            visual: { type: "sprite", id: "door" },
             collision: true,
             interaction: null,
         },
@@ -78,7 +96,7 @@ export const ENTITY_PRESETS = {
         label: "Save point",
         entity: {
             active: true,
-            spriteId: "save-point",
+            visual: { type: "sprite", id: "save-point" },
             collision: true,
             interaction: createSavePointInteraction(),
         },
@@ -87,7 +105,7 @@ export const ENTITY_PRESETS = {
         label: "Animated save point",
         entity: {
             active: true,
-            spriteId: "animated-save-point",
+            visual: { type: "sprite", id: "animated-save-point" },
             collision: true,
             interaction: createSavePointInteraction(),
         },
@@ -97,7 +115,7 @@ export const ENTITY_PRESETS = {
         label: "Glittering crystal",
         entity: {
             active: true,
-            spriteId: "glittering-crystal",
+            visual: { type: "sprite", id: "glittering-crystal" },
             collision: true,
             interaction: {
                 handler: "effects",
@@ -115,7 +133,7 @@ export const ENTITY_PRESETS = {
         label: "Crystal totem",
         entity: {
             active: true,
-            spriteId: "crystal-totem",
+            visual: { type: "sprite", id: "crystal-totem" },
             collision: true,
             interaction: {
                 handler: "effects",
@@ -133,7 +151,7 @@ export const ENTITY_PRESETS = {
         label: "Arcane vat",
         entity: {
             active: true,
-            spriteId: "arcane-vat",
+            visual: { type: "sprite", id: "arcane-vat" },
             collision: true,
             interaction: {
                 handler: "effects",
@@ -152,7 +170,7 @@ export const ENTITY_PRESETS = {
         label: "Forest sign",
         entity: {
             active: true,
-            spriteId: "forest-sign",
+            visual: { type: "sprite", id: "forest-sign" },
             collision: true,
             interaction: null,
         },
@@ -161,7 +179,7 @@ export const ENTITY_PRESETS = {
         label: "Lantern",
         entity: {
             active: true,
-            spriteId: "lantern",
+            visual: { type: "sprite", id: "lantern" },
             collision: true,
             interaction: null,
         },
@@ -170,7 +188,7 @@ export const ENTITY_PRESETS = {
         label: "Control console",
         entity: {
             active: true,
-            spriteId: "control-console",
+            visual: { type: "sprite", id: "control-console" },
             collision: true,
             interaction: null,
         },
@@ -179,7 +197,7 @@ export const ENTITY_PRESETS = {
         label: "Signal beacon",
         entity: {
             active: true,
-            spriteId: "signal-beacon",
+            visual: { type: "sprite", id: "signal-beacon" },
             collision: true,
             interaction: null,
         },

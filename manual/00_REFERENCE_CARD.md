@@ -57,7 +57,7 @@ setFlag             toggleFlag
 addItem             removeItem
 setPlayerSprite     setPlayerMoveSpeed
 setEntityActive     setEntityPosition
-setEntitySprite     setEntityCollision
+setEntityVisual     setEntityCollision
 setTile             teleport
 saveGame            playSound
 playMusic           stopMusic

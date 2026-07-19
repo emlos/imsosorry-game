@@ -249,24 +249,29 @@ const EFFECT_HANDLERS = new Map([
         },
     ],
     [
-        "setEntitySprite",
+        "setEntityVisual",
         {
             validateDefinition({ effect, label }) {
-                requireExactKeys(effect, effectKeys("mapId", "entityId", "spriteId"), label);
+                requireExactKeys(effect, effectKeys("mapId", "entityId", "visual"), label);
                 if (effect.mapId !== undefined) requireString(effect.mapId, `${label}.mapId`);
                 requireString(effect.entityId, `${label}.entityId`);
-                requireString(effect.spriteId, `${label}.spriteId`);
+                requireObject(effect.visual, `${label}.visual`);
+                requireExactKeys(effect.visual, new Set(["type", "id"]), `${label}.visual`);
+                if (effect.visual.type === "sprite") {
+                    requireString(effect.visual.id, `${label}.visual.id`);
+                } else if (effect.visual.type === "tile") {
+                    requireInteger(effect.visual.id, `${label}.visual.id`);
+                } else {
+                    throw new Error(`${label}.visual.type must be "sprite" or "tile".`);
+                }
             },
             validateReferences({ game, effect, mapId, label }) {
-                game.validateEntityReference(
-                    getEffectMapId(effect, mapId, label),
-                    effect.entityId,
-                    label,
-                );
-                game.validateSpriteReference(effect.spriteId, label);
+                const effectMapId = getEffectMapId(effect, mapId, label);
+                game.validateEntityReference(effectMapId, effect.entityId, label);
+                game.validateEntityVisualReference(effectMapId, effect.visual, label);
             },
             execute({ game, effect, mapId }) {
-                game.setEntitySprite(effect.mapId ?? mapId, effect.entityId, effect.spriteId);
+                game.setEntityVisual(effect.mapId ?? mapId, effect.entityId, effect.visual);
             },
         },
     ],

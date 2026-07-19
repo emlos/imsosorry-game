@@ -151,13 +151,25 @@ Current room visit only:
 
 Entity positions use non-negative integer cells.
 
-### `setEntitySprite`
+### `setEntityVisual`
+
+Use a sprite visual:
 
 ```js
 {
-    type: "setEntitySprite",
+    type: "setEntityVisual",
     entityId: "statue",
-    spriteId: "glass-figure",
+    visual: { type: "sprite", id: "glass-figure" },
+}
+```
+
+Or reuse a tile visual from the target map:
+
+```js
+{
+    type: "setEntityVisual",
+    entityId: "statue",
+    visual: { type: "tile", id: TILE_IDS.TREE },
 }
 ```
 

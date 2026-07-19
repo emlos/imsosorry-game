@@ -83,9 +83,13 @@ function createEntityState(entity) {
         active: entity.active,
         col: entity.col,
         row: entity.row,
-        spriteId: entity.spriteId,
+        visual: structuredClone(entity.visual),
         collision: entity.collision,
     };
+}
+
+function entityVisualsEqual(first, second) {
+    return first.type === second.type && first.id === second.id;
 }
 
 function createMapState(map) {
@@ -760,7 +764,7 @@ export class Game {
                 "active",
                 "col",
                 "row",
-                "spriteId",
+                "visual",
                 "collision",
                 "interaction",
                 "condition",
@@ -773,8 +777,8 @@ export class Game {
         const entityLabel = `Entity "${entity.id}" in "${map.id}"`;
         requireBoolean(entity.active, `${entityLabel}.active`);
 
-        this.validateMapPosition(map.id, entity.col, entity.row, entityLabel);
-        this.validateSpriteReference(entity.spriteId, entityLabel);
+        this.validateEntityVisualReference(map.id, entity.visual, entityLabel);
+        this.validateEntityPlacement(map.id, entity.col, entity.row, entity.visual, entityLabel);
 
         requireBoolean(entity.collision, `${entityLabel}.collision`);
 
@@ -1274,6 +1278,55 @@ export class Game {
         }
     }
 
+    validateEntityVisualReference(mapId, visual, label) {
+        requireObject(visual, `${label}.visual`);
+        requireExactKeys(visual, new Set(["type", "id"]), `${label}.visual`);
+
+        if (visual.type === "sprite") {
+            this.validateSpriteReference(visual.id, `${label}.visual`);
+            return;
+        }
+
+        if (visual.type === "tile") {
+            requireInteger(visual.id, `${label}.visual.id`);
+            const map = this.mapsById.get(mapId);
+            if (!map?.tiles[visual.id]) {
+                throw new Error(
+                    `${label}.visual references missing tile "${String(visual.id)}" in "${mapId}".`,
+                );
+            }
+            return;
+        }
+
+        throw new Error(`${label}.visual.type must be "sprite" or "tile".`);
+    }
+
+    getEntityVisualDefinition(mapId, visual) {
+        if (visual.type === "sprite") return this.spriteDefinitions.get(visual.id);
+        return this.mapsById.get(mapId).tiles[visual.id];
+    }
+
+    getEntityOccupiedCells(mapId, col, row, visual) {
+        if (visual.type !== "tile") return [{ col, row }];
+        const tile = this.getEntityVisualDefinition(mapId, visual);
+        return this.getOccupiedTileCells(col, row, tile);
+    }
+
+    validateEntityPlacement(mapId, col, row, visual, label) {
+        this.validateMapPosition(mapId, col, row, label);
+        const map = this.mapsById.get(mapId);
+        const outside = this.getEntityOccupiedCells(mapId, col, row, visual).some(
+            (cell) =>
+                cell.col < 0 ||
+                cell.row < 0 ||
+                cell.col >= map.gridSize.width ||
+                cell.row >= map.gridSize.height,
+        );
+        if (outside) {
+            throw new Error(`${label} visual footprint extends outside map "${mapId}".`);
+        }
+    }
+
     validateSpriteReference(spriteId, label) {
         if (typeof spriteId !== "string" || !this.spriteDefinitions.has(spriteId)) {
             throw new Error(`${label} references missing sprite "${String(spriteId)}".`);
@@ -1433,33 +1486,42 @@ export class Game {
             const state = this.getEntityState(map.id, definition.id, runtimeState);
             if (!this.isEntityPresent(definition, state, runtimeState)) continue;
 
-            visibleEntities.push({
+            const occupiedCells = this.getEntityOccupiedCells(
+                map.id,
+                state.col,
+                state.row,
+                state.visual,
+            );
+            const entity = {
                 mapId: map.id,
                 entityId: definition.id,
                 definition,
                 state,
-            });
-
-            const key = `${state.col},${state.row}`;
-            if (state.collision) {
-                collision.add(key);
-            }
+                occupiedCells,
+            };
+            visibleEntities.push(entity);
 
             const interaction = definition.interaction;
-            if (
+            const interactionActive =
                 interaction &&
                 (!interaction.condition ||
-                    this.evaluateCondition(interaction.condition, runtimeState))
-            ) {
-                interactions.set(key, {
-                    kind: "entity",
-                    mapId: map.id,
-                    entityId: definition.id,
-                    definition,
-                    state,
-                    anchor: { col: state.col, row: state.row },
-                    interaction,
-                });
+                    this.evaluateCondition(interaction.condition, runtimeState));
+            const target = interactionActive
+                ? {
+                      kind: "entity",
+                      mapId: map.id,
+                      entityId: definition.id,
+                      definition,
+                      state,
+                      anchor: { col: state.col, row: state.row },
+                      interaction,
+                  }
+                : null;
+
+            for (const occupied of occupiedCells) {
+                const key = `${occupied.col},${occupied.row}`;
+                if (state.collision) collision.add(key);
+                if (target) interactions.set(key, target);
             }
         }
 
@@ -1586,8 +1648,8 @@ export class Game {
                     changes.col = runtimeEntity.col;
                     changes.row = runtimeEntity.row;
                 }
-                if (runtimeEntity.spriteId !== definition.spriteId) {
-                    changes.spriteId = runtimeEntity.spriteId;
+                if (!entityVisualsEqual(runtimeEntity.visual, definition.visual)) {
+                    changes.visual = structuredClone(runtimeEntity.visual);
                 }
                 if (runtimeEntity.collision !== definition.collision) {
                     changes.collision = runtimeEntity.collision;
@@ -1943,7 +2005,7 @@ export class Game {
             requirePlainObject(changes, `Saved entity "${map.id}.${entityId}"`);
             requireExactKeys(
                 changes,
-                new Set(["active", "col", "row", "spriteId", "collision"]),
+                new Set(["active", "col", "row", "visual", "collision"]),
                 `Saved entity "${map.id}.${entityId}"`,
             );
             if (Object.keys(changes).length === 0) {
@@ -1976,18 +2038,27 @@ export class Game {
                 runtimeEntity.row = changes.row;
             }
 
-            if (Object.hasOwn(changes, "spriteId")) {
-                this.validateSpriteReference(
-                    changes.spriteId,
+            if (Object.hasOwn(changes, "visual")) {
+                this.validateEntityVisualReference(
+                    map.id,
+                    changes.visual,
                     `Saved entity "${map.id}.${entityId}"`,
                 );
-                runtimeEntity.spriteId = changes.spriteId;
+                runtimeEntity.visual = structuredClone(changes.visual);
             }
 
             if (Object.hasOwn(changes, "collision")) {
                 requireBoolean(changes.collision, `Saved entity "${map.id}.${entityId}".collision`);
                 runtimeEntity.collision = changes.collision;
             }
+
+            this.validateEntityPlacement(
+                map.id,
+                runtimeEntity.col,
+                runtimeEntity.row,
+                runtimeEntity.visual,
+                `Saved entity "${map.id}.${entityId}"`,
+            );
 
             const definition = this.entityDefinitionsByMap.get(map.id).get(entityId);
             this.validateEntityCollisionInteraction(
@@ -2725,9 +2796,15 @@ export class Game {
 
     setEntityPosition(mapId, entityId, col, row) {
         this.validateEntityReference(mapId, entityId, "Moving entity");
-        this.validateMapPosition(mapId, col, row, `Entity "${entityId}" position`);
-
         const state = this.getPersistentEntityState(mapId, entityId);
+        this.validateEntityPlacement(
+            mapId,
+            col,
+            row,
+            state.visual,
+            `Entity "${entityId}" position`,
+        );
+
         const previousPosition = { col: state.col, row: state.row };
         this.applySpatialMutation(
             mapId,
@@ -2743,10 +2820,24 @@ export class Game {
         );
     }
 
-    setEntitySprite(mapId, entityId, spriteId) {
-        this.validateEntityReference(mapId, entityId, "Setting entity sprite");
-        this.validateSpriteReference(spriteId, `Entity "${entityId}"`);
-        this.getPersistentEntityState(mapId, entityId).spriteId = spriteId;
+    setEntityVisual(mapId, entityId, visual) {
+        this.validateEntityReference(mapId, entityId, "Setting entity visual");
+        this.validateEntityVisualReference(mapId, visual, `Entity "${entityId}"`);
+
+        const state = this.getPersistentEntityState(mapId, entityId);
+        this.validateEntityPlacement(mapId, state.col, state.row, visual, `Entity "${entityId}"`);
+
+        const previousVisual = structuredClone(state.visual);
+        this.applySpatialMutation(
+            mapId,
+            `Changing visual for entity "${entityId}" in "${mapId}"`,
+            () => {
+                state.visual = structuredClone(visual);
+            },
+            () => {
+                state.visual = previousVisual;
+            },
+        );
     }
 
     setEntityCollision(mapId, entityId, collision) {
@@ -3212,7 +3303,7 @@ export class Game {
             drawables.push({
                 kind: "entity",
                 entity,
-                depthY: (entity.state.row + 1) * TILE_SIZE,
+                depthY: (Math.max(...entity.occupiedCells.map((cell) => cell.row)) + 1) * TILE_SIZE,
                 sequence: nextSequence(),
             });
         }
@@ -3257,19 +3348,29 @@ export class Game {
     }
 
     renderEntity(entity) {
-        const sprite = this.spriteDefinitions.get(entity.state.spriteId);
-        const image = this.images.get(sprite.path);
+        const visualReference = entity.state.visual;
+        const visual = this.getEntityVisualDefinition(entity.mapId, visualReference);
+        const image = this.images.get(visual.path);
         if (!image) return;
 
-        const [width, height] = sprite.size;
-        const worldX = entity.state.col * TILE_SIZE;
-        const worldY = entity.state.row * TILE_SIZE;
-        const drawX = Math.round(worldX + (TILE_SIZE - width) / 2 - this.camera.x);
-        const drawY = Math.round(worldY + TILE_SIZE - height - this.camera.y);
+        const [width, height] = visual.size ?? [TILE_SIZE, TILE_SIZE];
+        let drawX;
+        let drawY;
 
-        const animationId = resolveAnimationId(sprite, [sprite.defaultAnimation]);
-        const frame = resolveVisualFrame(sprite, animationId, this.ambientAnimationTimeMs);
-        drawImageVisual(this.ctx, image, sprite, frame, drawX, drawY);
+        if (visualReference.type === "tile") {
+            const bottomRow = Math.max(...entity.occupiedCells.map((cell) => cell.row));
+            drawX = Math.round(entity.state.col * TILE_SIZE - this.camera.x);
+            drawY = Math.round((bottomRow + 1) * TILE_SIZE - height - this.camera.y);
+        } else {
+            const worldX = entity.state.col * TILE_SIZE;
+            const worldY = entity.state.row * TILE_SIZE;
+            drawX = Math.round(worldX + (TILE_SIZE - width) / 2 - this.camera.x);
+            drawY = Math.round(worldY + TILE_SIZE - height - this.camera.y);
+        }
+
+        const animationId = resolveAnimationId(visual, [visual.defaultAnimation]);
+        const frame = resolveVisualFrame(visual, animationId, this.ambientAnimationTimeMs);
+        drawImageVisual(this.ctx, image, { ...visual, size: [width, height] }, frame, drawX, drawY);
     }
 
     loop(time) {

@@ -203,7 +203,7 @@ newPreset: {
     label: "New object",
     entity: {
         active: true,
-        spriteId: "new-sprite",
+        visual: { type: "sprite", id: "new-sprite" },
         collision: true,
         interaction: null,
     },

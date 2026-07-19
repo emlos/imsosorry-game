@@ -132,20 +132,40 @@ Cardinal facings:
     active: true,
     col: 4,
     row: 3,
-    spriteId: "receiver",
+    visual: { type: "sprite", id: "receiver" },
     collision: true,
     interaction: null,
     condition: { notFlag: "receiver.removed" }, // optional
 }
 ```
 
+A unique interactive placement can reuse any tile visual without duplicating it in `SPRITES`:
+
+```js
+{
+    id: "strange-tree",
+    active: true,
+    col: 4,
+    row: 6,
+    visual: { type: "tile", id: TILE_IDS.TREE },
+    collision: true,
+    interaction: {
+        handler: "effects",
+        triggers: ["action"],
+        effects: [{ type: "showText", pages: ["The bark is warm."] }],
+    },
+}
+```
+
+The tile supplies only the artwork, animation, size, and footprint. The entity supplies its own condition, collision, interaction, position, and runtime state.
+
 Rules:
 
 - IDs are unique within one map.
 - Positions are non-negative integer cells.
-- Entities occupy one collision/interaction cell.
+- Sprite-backed entities occupy one cell. Tile-backed entities use the referenced tile footprint.
 - `active` is saved runtime state and can be mutated.
-- `spriteId`, `collision`, position, and active state can be changed persistently.
+- `visual`, `collision`, position, and active state can be changed persistently.
 - `condition` controls authored presence in addition to runtime `active`.
 - `interaction` must be `null` or a valid interaction.
 - Collision plus a `touch` interaction is forbidden.

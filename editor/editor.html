@@ -114,20 +114,25 @@
                             <option value="east">East</option>
                         </select></label>
                     <div class="field-pair">
-                        <label>Source range start<input id="connection-source-range-start" type="number" min="0" step="1"></label>
-                        <label>Source range end<input id="connection-source-range-end" type="number" min="0" step="1"></label>
+                        <label>Source range start<input id="connection-source-range-start" type="number" min="0"
+                                step="1"></label>
+                        <label>Source range end<input id="connection-source-range-end" type="number" min="0"
+                                step="1"></label>
                     </div>
                     <label>Target map<select id="connection-target-map"></select></label>
                     <label>Target edge<input id="connection-target-edge" type="text" readonly></label>
                     <div class="field-pair">
-                        <label>Target range start<input id="connection-target-range-start" type="number" min="0" step="1"></label>
-                        <label>Target range end<input id="connection-target-range-end" type="number" min="0" step="1" readonly></label>
+                        <label>Target range start<input id="connection-target-range-start" type="number" min="0"
+                                step="1"></label>
+                        <label>Target range end<input id="connection-target-range-end" type="number" min="0" step="1"
+                                readonly></label>
                     </div>
                     <pre id="connection-preview" class="connection-preview"></pre>
                     <button id="create-reciprocal-connection" type="button">
                         Create reciprocal connection
                     </button>
-                    <p class="hint">Creates reciprocal exits that preserve the exact relative position within equal-length openings.</p>
+                    <p class="hint">Creates reciprocal exits that preserve the exact relative position within
+                        equal-length openings.</p>
                 </div>
             </section>
 
@@ -168,7 +173,13 @@
             <section id="entity-inspector" hidden>
                 <h2>Entity</h2>
                 <label>ID<input id="entity-id" type="text"></label>
-                <label>Sprite<select id="entity-sprite"></select></label>
+                <div class="field-pair">
+                    <label>Visual type<select id="entity-visual-type">
+                            <option value="sprite">Sprite</option>
+                            <option value="tile">Tile</option>
+                        </select></label>
+                    <label>Visual<select id="entity-visual-id"></select></label>
+                </div>
                 <div class="field-pair">
                     <label>Column<input id="entity-col" type="number" min="0"></label>
                     <label>Row<input id="entity-row" type="number" min="0"></label>
@@ -237,7 +248,8 @@
                         <label>Target range start<input id="exit-target-range-start" type="number" min="0"></label>
                         <label>Target range end<input id="exit-target-range-end" type="number" min="0"></label>
                     </div>
-                    <p class="hint">Source and target ranges must contain the same number of cells. Applying changes to a reciprocal connection updates its linked exit too.</p>
+                    <p class="hint">Source and target ranges must contain the same number of cells. Applying changes to
+                        a reciprocal connection updates its linked exit too.</p>
                 </div>
                 <details>
                     <summary>Advanced raw exit JSON</summary>

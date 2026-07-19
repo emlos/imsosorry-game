@@ -101,7 +101,7 @@ interaction: {
     active: true,
     col: 3,
     row: 2,
-    spriteId: "blue-orb",
+    visual: { type: "sprite", id: "blue-orb" },
     collision: false,
     interaction: {
         handler: "effects",

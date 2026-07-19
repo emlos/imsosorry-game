@@ -1,4 +1,4 @@
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 export const SAVE_SLOT_ID = "slot-1";
 export const SAVE_SLOT_NAME = "Bedroom";
 

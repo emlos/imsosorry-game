@@ -1,7 +1,13 @@
 import { drawImageVisual, resolveAnimationId, resolveVisualFrame } from "../animation.js";
 import { SPRITES } from "../sprites.js";
 import { EMPTY_TILE_ID, TILE_SIZE } from "../tiles.js";
-import { getMapSize, getOccupiedTileCells, mergeTileDefinitions } from "./editor-model.js";
+import {
+    getEntityOccupiedCells,
+    getEntityVisualDefinition,
+    getMapSize,
+    getOccupiedTileCells,
+    mergeTileDefinitions,
+} from "./editor-model.js";
 
 function assetUrl(path) {
     const normalized = path.startsWith("./") ? path.slice(2) : path;
@@ -63,6 +69,7 @@ export class EditorRenderer {
     }
 
     render(map, options = {}) {
+        this.currentMap = map;
         this.resizeForMap(map);
         const ctx = this.ctx;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -80,10 +87,11 @@ export class EditorRenderer {
         }
 
         for (const entity of map.entities) {
+            const occupiedCells = getEntityOccupiedCells(map, entity);
             drawables.push({
                 kind: "entity",
                 entity,
-                depthY: (entity.row + 1) * TILE_SIZE,
+                depthY: (Math.max(...occupiedCells.map((cell) => cell.row)) + 1) * TILE_SIZE,
                 sequence: sequence++,
             });
         }
@@ -163,18 +171,36 @@ export class EditorRenderer {
     }
 
     renderEntity(entity) {
-        const sprite = SPRITES[entity.spriteId];
-        if (!sprite) return;
-        const record = this.images.get(sprite.path);
+        const visual = getEntityVisualDefinition(this.currentMap, entity.visual);
+        if (!visual) return;
+        const record = this.images.get(visual.path);
         if (!record?.image.complete) return;
-        const [width, height] = sprite.size;
-        const drawX = entity.col * TILE_SIZE + (TILE_SIZE - width) / 2;
-        const drawY = entity.row * TILE_SIZE + TILE_SIZE - height;
-        const animationId = resolveAnimationId(sprite, [sprite.defaultAnimation]);
-        const frame = resolveVisualFrame(sprite, animationId, this.animationTimeMs);
+        const [width, height] = visual.size ?? [TILE_SIZE, TILE_SIZE];
+        let drawX;
+        let drawY;
+
+        if (entity.visual.type === "tile") {
+            const occupiedCells = getEntityOccupiedCells(this.currentMap, entity);
+            const bottomRow = Math.max(...occupiedCells.map((cell) => cell.row));
+            drawX = entity.col * TILE_SIZE;
+            drawY = (bottomRow + 1) * TILE_SIZE - height;
+        } else {
+            drawX = entity.col * TILE_SIZE + (TILE_SIZE - width) / 2;
+            drawY = entity.row * TILE_SIZE + TILE_SIZE - height;
+        }
+
+        const animationId = resolveAnimationId(visual, [visual.defaultAnimation]);
+        const frame = resolveVisualFrame(visual, animationId, this.animationTimeMs);
         this.ctx.save();
         if (entity.active === false) this.ctx.globalAlpha = 0.45;
-        drawImageVisual(this.ctx, record.image, sprite, frame, drawX, drawY);
+        drawImageVisual(
+            this.ctx,
+            record.image,
+            { ...visual, size: [width, height] },
+            frame,
+            drawX,
+            drawY,
+        );
         this.ctx.restore();
     }
 
@@ -222,8 +248,9 @@ export class EditorRenderer {
             });
         }
         for (const entity of map.entities) {
-            if (entity.active !== false && entity.collision) {
-                ctx.fillRect(entity.col * TILE_SIZE, entity.row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            if (entity.active === false || !entity.collision) continue;
+            for (const cell of getEntityOccupiedCells(map, entity)) {
+                ctx.fillRect(cell.col * TILE_SIZE, cell.row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
             }
         }
         ctx.restore();
@@ -254,6 +281,19 @@ export class EditorRenderer {
                 }
             });
         });
+        for (const entity of map.entities) {
+            if (entity.visual?.type !== "tile") continue;
+            const cells = getEntityOccupiedCells(map, entity);
+            if (cells.length === 1) continue;
+            for (const cell of cells) {
+                ctx.strokeRect(
+                    cell.col * TILE_SIZE + 2,
+                    cell.row * TILE_SIZE + 2,
+                    TILE_SIZE - 4,
+                    TILE_SIZE - 4,
+                );
+            }
+        }
         ctx.restore();
     }
 
@@ -322,12 +362,14 @@ export class EditorRenderer {
         this.ctx.save();
         this.ctx.strokeStyle = "rgba(0, 255, 180, 0.95)";
         this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(
-            entity.col * TILE_SIZE + 1,
-            entity.row * TILE_SIZE + 1,
-            TILE_SIZE - 2,
-            TILE_SIZE - 2,
-        );
+        for (const cell of getEntityOccupiedCells(map, entity)) {
+            this.ctx.strokeRect(
+                cell.col * TILE_SIZE + 1,
+                cell.row * TILE_SIZE + 1,
+                TILE_SIZE - 2,
+                TILE_SIZE - 2,
+            );
+        }
         this.ctx.restore();
     }
 

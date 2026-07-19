@@ -149,7 +149,7 @@ Author the entity inactive:
     active: false,
     col: 5,
     row: 3,
-    spriteId: "robed-figure",
+    visual: { type: "sprite", id: "robed-figure" },
     collision: false,
     interaction: null,
 }

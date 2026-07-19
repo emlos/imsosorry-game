@@ -88,7 +88,7 @@ Entity:
     active: true,
     col: 4,
     row: 3,
-    spriteId: "pink-orb",
+    visual: { type: "sprite", id: "pink-orb" },
     collision: false,
     interaction: {
         handler: "effects",

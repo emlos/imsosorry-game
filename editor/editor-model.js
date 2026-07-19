@@ -2,10 +2,10 @@ import { OPPOSITE_EDGE, getEdgePosition, getRangeLength } from "../map-edges.js"
 import { SPRITES } from "../sprites.js";
 import { EMPTY_TILE_ID, TILE_IDS, TILES } from "../tiles.js";
 
-export const EDITOR_STORAGE_KEY = "yume-map-editor-recovery-v1";
-export const EDITOR_BACKUP_KEY = "yume-map-editor-pre-import-backup-v1";
-export const PLAYTEST_STORAGE_KEY = "yume-map-editor-playtest-maps-v1";
-export const PLAYTEST_RESULT_KEY = "yume-map-editor-playtest-result-v1";
+export const EDITOR_STORAGE_KEY = "yume-map-editor-recovery-v2";
+export const EDITOR_BACKUP_KEY = "yume-map-editor-pre-import-backup-v2";
+export const PLAYTEST_STORAGE_KEY = "yume-map-editor-playtest-maps-v2";
+export const PLAYTEST_RESULT_KEY = "yume-map-editor-playtest-result-v2";
 
 export function cloneData(value) {
     return structuredClone(value);
@@ -262,7 +262,6 @@ export function resizeMap(map, width, height) {
 
     Object.values(map.entries).forEach(clampPosition);
     map.entities.forEach(clampPosition);
-
 }
 
 export function mergeTileDefinitions(map) {
@@ -281,6 +280,27 @@ export function getOccupiedTileCells(col, row, tile) {
         col: col + dc,
         row: row + dr,
     }));
+}
+
+export function getEntityVisualDefinition(map, visual) {
+    if (visual?.type === "sprite") return SPRITES[visual.id];
+    if (visual?.type === "tile") return mergeTileDefinitions(map)[visual.id];
+    return null;
+}
+
+export function getEntityOccupiedCells(map, entity, col = entity.col, row = entity.row) {
+    if (entity.visual?.type !== "tile") return [{ col, row }];
+    const tile = getEntityVisualDefinition(map, entity.visual);
+    return tile ? getOccupiedTileCells(col, row, tile) : [{ col, row }];
+}
+
+export function canPlaceEntity(map, entity, col = entity.col, row = entity.row) {
+    const { width, height } = getMapSize(map);
+    const visual = getEntityVisualDefinition(map, entity.visual);
+    if (!visual) return false;
+    return getEntityOccupiedCells(map, entity, col, row).every(
+        (cell) => cell.col >= 0 && cell.row >= 0 && cell.col < width && cell.row < height,
+    );
 }
 
 export function canPlaceTile(map, layerName, tileId, col, row) {
@@ -370,7 +390,7 @@ function visitObjects(value, visitor) {
 const MAP_SCOPED_EFFECT_TYPES = new Set([
     "setEntityActive",
     "setEntityPosition",
-    "setEntitySprite",
+    "setEntityVisual",
     "setEntityCollision",
     "setTile",
     "teleport",
@@ -379,7 +399,7 @@ const MAP_SCOPED_EFFECT_TYPES = new Set([
 const ENTITY_REFERENCE_EFFECT_TYPES = new Set([
     "setEntityActive",
     "setEntityPosition",
-    "setEntitySprite",
+    "setEntityVisual",
     "setEntityCollision",
 ]);
 
@@ -675,6 +695,30 @@ function validateEditorEffectsReferences(
                 );
             }
 
+            if (effect.type === "setEntityVisual" && targetMap) {
+                const visual = effect.visual;
+                if (!visual || typeof visual !== "object" || Array.isArray(visual)) {
+                    errors.push(`${effectPath}.visual must be an object.`);
+                } else if (visual.type === "sprite") {
+                    if (!Object.hasOwn(SPRITES, visual.id)) {
+                        errors.push(
+                            `${effectPath}.visual targets missing sprite "${String(visual.id)}".`,
+                        );
+                    }
+                } else if (visual.type === "tile") {
+                    if (
+                        !Number.isInteger(visual.id) ||
+                        !mergeTileDefinitions(targetMap)[visual.id]
+                    ) {
+                        errors.push(
+                            `${effectPath}.visual targets missing tile "${String(visual.id)}" in "${targetMapId}".`,
+                        );
+                    }
+                } else {
+                    errors.push(`${effectPath}.visual.type must be "sprite" or "tile".`);
+                }
+            }
+
             if (
                 effect.type === "setEntityActive" &&
                 effect.persistence === "roomVisit" &&
@@ -753,7 +797,9 @@ function validateEditorExitDestinationShape(exit, destination, label, errors) {
     }
 
     if (Object.hasOwn(destination, "preserveAxis") || Object.hasOwn(destination, "offset")) {
-        errors.push(`${label} uses removed preserveAxis/offset fields; author targetRange instead.`);
+        errors.push(
+            `${label} uses removed preserveAxis/offset fields; author targetRange instead.`,
+        );
     }
 
     if (Object.hasOwn(destination, "entryId")) {
@@ -773,7 +819,10 @@ function validateEditorExitDestinationShape(exit, destination, label, errors) {
 
     if (!isValidEdgeRange(destination.targetRange)) {
         errors.push(`${label} has an invalid targetRange.`);
-    } else if (isValidEdgeRange(exit.range) && getRangeLength(exit.range) !== getRangeLength(destination.targetRange)) {
+    } else if (
+        isValidEdgeRange(exit.range) &&
+        getRangeLength(exit.range) !== getRangeLength(destination.targetRange)
+    ) {
         errors.push(`${label} connects ranges with different lengths.`);
     }
 }
@@ -822,13 +871,18 @@ export function validateEditorDocument(maps) {
     };
     const transitionCellProblem = (map, col, row) => {
         const baseTileId = map.layers?.base?.[row]?.[col];
-        if (baseTileId === undefined || baseTileId === EMPTY_TILE_ID) return "is not on the walkable base";
+        if (baseTileId === undefined || baseTileId === EMPTY_TILE_ID)
+            return "is not on the walkable base";
 
         const tiles = mergeTileDefinitions(map);
         for (const [layerName, layer] of Object.entries(map.layers ?? {})) {
             if (!Array.isArray(layer) || layerName === "base") continue;
             for (let anchorRow = 0; anchorRow < layer.length; anchorRow += 1) {
-                for (let anchorCol = 0; anchorCol < (layer[anchorRow]?.length ?? 0); anchorCol += 1) {
+                for (
+                    let anchorCol = 0;
+                    anchorCol < (layer[anchorRow]?.length ?? 0);
+                    anchorCol += 1
+                ) {
                     const tileId = layer[anchorRow][anchorCol];
                     if (tileId === EMPTY_TILE_ID) continue;
                     const tile = tiles[tileId];
@@ -849,8 +903,9 @@ export function validateEditorDocument(maps) {
                 (entity) =>
                     entity?.active !== false &&
                     entity?.collision === true &&
-                    entity.col === col &&
-                    entity.row === row,
+                    getEntityOccupiedCells(map, entity).some(
+                        (cell) => cell.col === col && cell.row === row,
+                    ),
             )
         ) {
             return "is blocked by collision";
@@ -985,12 +1040,35 @@ export function validateEditorDocument(maps) {
                 errors.push(`Duplicate entity ID "${entity.id}" in "${map.id}".`);
             }
             entityIds.add(entity.id);
-            if (!isInsideMap(map, entity.col, entity.row)) {
-                errors.push(`Entity "${entity.id}" in "${map.id}" is outside the map.`);
-            }
-            if (!Object.hasOwn(SPRITES, entity.spriteId)) {
+            if (
+                !entity.visual ||
+                typeof entity.visual !== "object" ||
+                Array.isArray(entity.visual)
+            ) {
+                errors.push(`Entity "${entity.id}" in "${map.id}" needs a visual object.`);
+            } else if (entity.visual.type === "sprite") {
+                if (!Object.hasOwn(SPRITES, entity.visual.id)) {
+                    errors.push(
+                        `Entity "${entity.id}" in "${map.id}" uses unknown sprite "${String(entity.visual.id)}".`,
+                    );
+                }
+            } else if (entity.visual.type === "tile") {
+                if (
+                    !Number.isInteger(entity.visual.id) ||
+                    !mergeTileDefinitions(map)[entity.visual.id]
+                ) {
+                    errors.push(
+                        `Entity "${entity.id}" in "${map.id}" uses unknown tile "${String(entity.visual.id)}".`,
+                    );
+                }
+            } else {
                 errors.push(
-                    `Entity "${entity.id}" in "${map.id}" uses unknown sprite "${entity.spriteId}".`,
+                    `Entity "${entity.id}" in "${map.id}" visual type must be "sprite" or "tile".`,
+                );
+            }
+            if (!canPlaceEntity(map, entity)) {
+                errors.push(
+                    `Entity "${entity.id}" in "${map.id}" has an invalid visual or footprint outside the map.`,
                 );
             }
             if (typeof entity.active !== "boolean") {
@@ -1108,7 +1186,10 @@ export function validateEditorDocument(maps) {
                     );
                 }
 
-                if (Object.hasOwn(destination, "targetEdge") && isValidEdgeRange(destination.targetRange)) {
+                if (
+                    Object.hasOwn(destination, "targetEdge") &&
+                    isValidEdgeRange(destination.targetRange)
+                ) {
                     const { width: targetWidth, height: targetHeight } = getMapSize(target);
                     const targetLimit =
                         destination.targetEdge === "east" || destination.targetEdge === "west"
@@ -1129,7 +1210,11 @@ export function validateEditorDocument(maps) {
                                 destination.targetEdge,
                                 axis,
                             );
-                            const problem = transitionCellProblem(target, position.col, position.row);
+                            const problem = transitionCellProblem(
+                                target,
+                                position.col,
+                                position.row,
+                            );
                             if (problem) {
                                 errors.push(
                                     `Exit ${index}${suffix} in "${map.id}" target doorway axis ${axis} ${problem} in "${target.id}".`,

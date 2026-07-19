@@ -67,7 +67,7 @@ A colliding entity cannot use a touch interaction. A tile on a colliding layer c
 - The anchor is the placed grid cell.
 - Every footprint cell must stay inside the map.
 - A tile interaction covers every footprint cell.
-- Entity collision remains one cell regardless of sprite size.
+- Sprite-backed entity collision occupies one cell. Tile-backed entities use the referenced tile footprint.
 
 ## Shallow map tile override
 
@@ -85,6 +85,11 @@ Map-specific tiles are shallow-merged with global tiles. Nested fields are not d
 The editor can rewrite map-owned references but cannot modify external source files. Items, global tiles, sprites, presets, or other registries may block renaming.
 
 Old saves retain old map IDs and are not migrated.
+
+
+## Entity visual schema
+
+Entities use `visual: { type, id }`. `type` is `"sprite"` or `"tile"`; the old entity `spriteId` property and `setEntitySprite` effect are not supported. Use `setEntityVisual` for runtime changes.
 
 ## Entity ID refactors
 
@@ -120,7 +125,7 @@ Every static source and every calculated animation frame must fit the loaded tex
 
 ## Interaction cell conflict
 
-Only one spatial interaction is stored per cell. An entity interaction can replace a tile interaction at the same coordinate.
+Only one spatial interaction is stored per cell. A multi-cell entity interaction can replace tile interactions on any cell in its footprint.
 
 ## Player versus entity coordinates
 
