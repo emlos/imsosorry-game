@@ -4,44 +4,44 @@ import { MAPS } from "../maps.js";
 import { SPRITES } from "../sprites.js";
 import { EMPTY_TILE_ID, TILE_IDS, TILE_SIZE, TILES } from "../tiles.js";
 import {
-    ENTITY_PRESETS,
-    INTERACTION_TEMPLATES,
-    SPRITE_EDITOR_META,
-    TILE_EDITOR_META,
-    createInteractionFromTemplate,
-    getInteractionTemplate,
+  ENTITY_PRESETS,
+  INTERACTION_TEMPLATES,
+  SPRITE_EDITOR_META,
+  TILE_EDITOR_META,
+  createInteractionFromTemplate,
+  getInteractionTemplate,
 } from "./editor-catalog.js";
 import {
-    EDITOR_BACKUP_KEY,
-    EDITOR_STORAGE_KEY,
-    PLAYTEST_RESULT_KEY,
-    PLAYTEST_STORAGE_KEY,
-    canPlaceEntity,
-    canPlaceTile,
-    cloneData,
-    createMap,
-    createMapIdRefactorCandidate,
-    createReciprocalEdgeConnection,
-    fillRectangle,
-    findMapIdReferences,
-    findReciprocalEdgeExit,
-    floodFill,
-    getEdgeAxisLength,
-    getEntityOccupiedCells,
-    getEntityVisualDefinition,
-    getMapSize,
-    ensureLayer,
-    makeUniqueId,
-    mergeTileDefinitions,
-    OPPOSITE_EDGE,
-    parseImportedMaps,
-    renameEntity,
-    renameEntry,
-    resizeMap,
-    serializeGeneratedMaps,
-    updateReciprocalEdgeExitGeometry,
-    setTile,
-    validateEditorDocument,
+  EDITOR_BACKUP_KEY,
+  EDITOR_STORAGE_KEY,
+  PLAYTEST_RESULT_KEY,
+  PLAYTEST_STORAGE_KEY,
+  canPlaceEntity,
+  canPlaceTile,
+  cloneData,
+  createMap,
+  createMapIdRefactorCandidate,
+  createReciprocalEdgeConnection,
+  fillRectangle,
+  findMapIdReferences,
+  findReciprocalEdgeExit,
+  floodFill,
+  getEdgeAxisLength,
+  getEntityOccupiedCells,
+  getEntityVisualDefinition,
+  getMapSize,
+  ensureLayer,
+  makeUniqueId,
+  mergeTileDefinitions,
+  OPPOSITE_EDGE,
+  parseImportedMaps,
+  renameEntity,
+  renameEntry,
+  resizeMap,
+  serializeGeneratedMaps,
+  updateReciprocalEdgeExitGeometry,
+  setTile,
+  validateEditorDocument,
 } from "./editor-model.js";
 import { EditorRenderer } from "./editor-renderer.js";
 import { EditorMapGraph } from "./editor-map-graph.js";
@@ -50,2424 +50,2715 @@ const byId = (id) => document.getElementById(id);
 export const ZOOM_LEVELS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
 
 const EXTERNAL_MAP_REFERENCE_REGISTRIES = {
-    ITEMS,
-    TILES,
-    SPRITES,
-    ENTITY_PRESETS,
+  TILES,
+  SPRITES,
+  ENTITY_PRESETS,
 };
 
 export function findExternalMapIdReferences(mapId) {
-    return Object.entries(EXTERNAL_MAP_REFERENCE_REGISTRIES).flatMap(([name, registry]) =>
-        findMapIdReferences(registry, mapId, name),
-    );
+  return Object.entries(EXTERNAL_MAP_REFERENCE_REGISTRIES).flatMap(
+    ([name, registry]) => findMapIdReferences(registry, mapId, name),
+  );
 }
 
 const directionVectors = {
-    up: { dc: 0, dr: -1 },
-    down: { dc: 0, dr: 1 },
-    left: { dc: -1, dr: 0 },
-    right: { dc: 1, dr: 0 },
+  up: { dc: 0, dr: -1 },
+  down: { dc: 0, dr: 1 },
+  left: { dc: -1, dr: 0 },
+  right: { dc: 1, dr: 0 },
 };
 
 function facingName(facing) {
-    if (facing.dr < 0) return "up";
-    if (facing.dr > 0) return "down";
-    if (facing.dc < 0) return "left";
-    return "right";
+  if (facing.dr < 0) return "up";
+  if (facing.dr > 0) return "down";
+  if (facing.dc < 0) return "left";
+  return "right";
 }
 
 export function parseDialoguePages(text) {
-    const trimmed = text.trim();
-    if (!trimmed) return [];
+  const trimmed = text.trim();
+  if (!trimmed) return [];
 
-    return trimmed.split(/\r?\n[ \t]*\r?\n/).map((page) => page.trim());
+  return trimmed.split(/\r?\n[ \t]*\r?\n/).map((page) => page.trim());
 }
 
 export function formatDialoguePages(pages) {
-    return Array.isArray(pages) ? pages.join("\n\n") : "";
+  return Array.isArray(pages) ? pages.join("\n\n") : "";
 }
 
 function downloadText(filename, text, type) {
-    const url = URL.createObjectURL(new Blob([text], { type }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function renderThumbnailPlaceholder(ctx, kind = "empty") {
-    const { width, height } = ctx.canvas;
-    const cellSize = 8;
+  const { width, height } = ctx.canvas;
+  const cellSize = 8;
 
-    ctx.clearRect(0, 0, width, height);
+  ctx.clearRect(0, 0, width, height);
 
-    for (let row = 0; row < Math.ceil(height / cellSize); row += 1) {
-        for (let col = 0; col < Math.ceil(width / cellSize); col += 1) {
-            ctx.fillStyle = (row + col) % 2 === 0 ? "#20232b" : "#2c303a";
-            ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-        }
+  for (let row = 0; row < Math.ceil(height / cellSize); row += 1) {
+    for (let col = 0; col < Math.ceil(width / cellSize); col += 1) {
+      ctx.fillStyle = (row + col) % 2 === 0 ? "#20232b" : "#2c303a";
+      ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
     }
+  }
 
-    ctx.strokeStyle = kind === "missing" ? "#d18a8f" : "#8c929f";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(8, 8);
-    ctx.lineTo(width - 8, height - 8);
-    ctx.moveTo(width - 8, 8);
-    ctx.lineTo(8, height - 8);
-    ctx.stroke();
+  ctx.strokeStyle = kind === "missing" ? "#d18a8f" : "#8c929f";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(8, 8);
+  ctx.lineTo(width - 8, height - 8);
+  ctx.moveTo(width - 8, 8);
+  ctx.lineTo(8, height - 8);
+  ctx.stroke();
 
-    if (kind === "missing") {
-        ctx.fillStyle = "#f1c0c3";
-        ctx.font = "bold 18px system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("?", width / 2, height / 2);
-    }
+  if (kind === "missing") {
+    ctx.fillStyle = "#f1c0c3";
+    ctx.font = "bold 18px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("?", width / 2, height / 2);
+  }
 }
 
-export function getPaletteNavigationIndex(currentIndex, key, itemCount, columns = 3) {
-    if (itemCount <= 0) return -1;
-    const clampedIndex = Math.max(0, Math.min(itemCount - 1, currentIndex));
-    if (key === "Home") return 0;
-    if (key === "End") return itemCount - 1;
-    if (key === "ArrowLeft") return Math.max(0, clampedIndex - 1);
-    if (key === "ArrowRight") return Math.min(itemCount - 1, clampedIndex + 1);
-    if (key === "ArrowUp") return Math.max(0, clampedIndex - columns);
-    if (key === "ArrowDown") return Math.min(itemCount - 1, clampedIndex + columns);
-    return clampedIndex;
+export function getPaletteNavigationIndex(
+  currentIndex,
+  key,
+  itemCount,
+  columns = 3,
+) {
+  if (itemCount <= 0) return -1;
+  const clampedIndex = Math.max(0, Math.min(itemCount - 1, currentIndex));
+  if (key === "Home") return 0;
+  if (key === "End") return itemCount - 1;
+  if (key === "ArrowLeft") return Math.max(0, clampedIndex - 1);
+  if (key === "ArrowRight") return Math.min(itemCount - 1, clampedIndex + 1);
+  if (key === "ArrowUp") return Math.max(0, clampedIndex - columns);
+  if (key === "ArrowDown")
+    return Math.min(itemCount - 1, clampedIndex + columns);
+  return clampedIndex;
 }
 
 function createVisualPaletteCard({
-    id,
-    label,
-    title,
-    visual,
-    selected,
-    disabled = false,
-    missing = false,
-    onSelect,
+  id,
+  label,
+  title,
+  visual,
+  selected,
+  disabled = false,
+  missing = false,
+  onSelect,
 }) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "palette-item";
-    button.dataset.paletteId = String(id);
-    button.classList.toggle("selected", selected);
-    button.setAttribute("role", "option");
-    button.setAttribute("aria-selected", String(selected));
-    button.title = title ?? label;
-    button.disabled = disabled;
-    if (missing) button.dataset.missing = "true";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "palette-item";
+  button.dataset.paletteId = String(id);
+  button.classList.toggle("selected", selected);
+  button.setAttribute("role", "option");
+  button.setAttribute("aria-selected", String(selected));
+  button.title = title ?? label;
+  button.disabled = disabled;
+  if (missing) button.dataset.missing = "true";
 
-    const canvas = document.createElement("canvas");
-    canvas.width = 48;
-    canvas.height = 48;
-    canvas.setAttribute("aria-hidden", "true");
+  const canvas = document.createElement("canvas");
+  canvas.width = 48;
+  canvas.height = 48;
+  canvas.setAttribute("aria-hidden", "true");
 
-    const labelElement = document.createElement("span");
-    labelElement.textContent = label;
-    button.append(canvas, labelElement);
-    button.addEventListener("click", () => onSelect(id));
+  const labelElement = document.createElement("span");
+  labelElement.textContent = label;
+  button.append(canvas, labelElement);
+  button.addEventListener("click", () => onSelect(id));
 
-    return {
-        button,
-        preview: visual
-            ? { ctx: canvas.getContext("2d"), visual }
-            : { ctx: canvas.getContext("2d"), placeholder: missing ? "missing" : "empty" },
-    };
+  return {
+    button,
+    preview: visual
+      ? { ctx: canvas.getContext("2d"), visual }
+      : {
+          ctx: canvas.getContext("2d"),
+          placeholder: missing ? "missing" : "empty",
+        },
+  };
 }
 
 function bindPaletteKeyboardNavigation(root, onSelect) {
-    const buttons = [...root.querySelectorAll(".palette-item:not(:disabled)")];
-    if (buttons.length === 0) return;
+  const buttons = [...root.querySelectorAll(".palette-item:not(:disabled)")];
+  if (buttons.length === 0) return;
 
-    const selectedIndex = Math.max(
-        0,
-        buttons.findIndex((button) => button.classList.contains("selected")),
+  const selectedIndex = Math.max(
+    0,
+    buttons.findIndex((button) => button.classList.contains("selected")),
+  );
+  buttons.forEach((button, index) => {
+    button.tabIndex = index === selectedIndex ? 0 : -1;
+  });
+
+  root.onkeydown = (event) => {
+    if (
+      ![
+        "ArrowLeft",
+        "ArrowRight",
+        "ArrowUp",
+        "ArrowDown",
+        "Home",
+        "End",
+      ].includes(event.key)
+    ) {
+      return;
+    }
+    const currentIndex = buttons.indexOf(document.activeElement);
+    if (currentIndex < 0) return;
+    const nextIndex = getPaletteNavigationIndex(
+      currentIndex,
+      event.key,
+      buttons.length,
     );
-    buttons.forEach((button, index) => {
-        button.tabIndex = index === selectedIndex ? 0 : -1;
+    if (nextIndex === currentIndex) return;
+    event.preventDefault();
+    const nextButton = buttons[nextIndex];
+    buttons.forEach(
+      (button) => (button.tabIndex = button === nextButton ? 0 : -1),
+    );
+    buttons.forEach((button) => {
+      const isSelected = button === nextButton;
+      button.classList.toggle("selected", isSelected);
+      button.setAttribute("aria-selected", String(isSelected));
     });
-
-    root.onkeydown = (event) => {
-        if (
-            !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)
-        ) {
-            return;
-        }
-        const currentIndex = buttons.indexOf(document.activeElement);
-        if (currentIndex < 0) return;
-        const nextIndex = getPaletteNavigationIndex(currentIndex, event.key, buttons.length);
-        if (nextIndex === currentIndex) return;
-        event.preventDefault();
-        const nextButton = buttons[nextIndex];
-        buttons.forEach((button) => (button.tabIndex = button === nextButton ? 0 : -1));
-        buttons.forEach((button) => {
-            const isSelected = button === nextButton;
-            button.classList.toggle("selected", isSelected);
-            button.setAttribute("aria-selected", String(isSelected));
-        });
-        nextButton.focus();
-        nextButton.scrollIntoView({ block: "nearest", inline: "nearest" });
-        onSelect(nextButton.dataset.paletteId);
-    };
+    nextButton.focus();
+    nextButton.scrollIntoView({ block: "nearest", inline: "nearest" });
+    onSelect(nextButton.dataset.paletteId);
+  };
 }
 
 export class MapEditor {
-    constructor() {
-        this.maps = cloneData(MAPS);
-        this.selectedMapId = this.maps[0]?.id ?? null;
-        this.mode = "tiles";
-        this.tool = "pencil";
-        this.activeLayer = "obstacles";
-        this.selectedTileId = TILE_IDS.WALL;
-        this.selectedEntityPreset = "blank";
-        this.visibleLayers = new Set(["base", "obstacles", "foreground"]);
-        this.showGrid = true;
-        this.showCollision = false;
-        this.showFootprints = false;
-        this.selectedEntityId = null;
-        this.selectedEntryId = null;
-        this.selectedTriggerId = null;
-        this.selectedExitIndex = null;
-        this.rectanglePreview = null;
-        this.triggerPreview = null;
-        this.pointerAction = null;
-        this.undoStack = [];
-        this.redoStack = [];
-        this.transactionBefore = null;
-        this.dirty = false;
-        this.palettePreviews = [];
-        this.exitJsonDirty = false;
-        this.zoom = 1;
-        this.renderer = new EditorRenderer(byId("editor-canvas"));
-        this.canvas = byId("editor-canvas");
-        this.canvasStage = byId("canvas-stage");
-        this.canvasScroll = byId("canvas-scroll");
-        this.mapGraph = new EditorMapGraph(byId("map-graph-root"), {
-            onSelectMap: (mapId) => this.openMapFromGraph(mapId),
-            onStatus: (message, error = false) => this.setStatus(message, error),
-        });
+  constructor() {
+    this.maps = cloneData(MAPS);
+    this.selectedMapId = this.maps[0]?.id ?? null;
+    this.mode = "tiles";
+    this.tool = "pencil";
+    this.activeLayer = "obstacles";
+    this.selectedTileId = TILE_IDS.WALL;
+    this.selectedEntityPreset = "blank";
+    this.visibleLayers = new Set(["base", "obstacles", "foreground"]);
+    this.showGrid = true;
+    this.showCollision = false;
+    this.showFootprints = false;
+    this.selectedEntityId = null;
+    this.selectedEntryId = null;
+    this.selectedTriggerId = null;
+    this.selectedExitIndex = null;
+    this.rectanglePreview = null;
+    this.triggerPreview = null;
+    this.pointerAction = null;
+    this.undoStack = [];
+    this.redoStack = [];
+    this.transactionBefore = null;
+    this.dirty = false;
+    this.palettePreviews = [];
+    this.exitJsonDirty = false;
+    this.zoom = 1;
+    this.renderer = new EditorRenderer(byId("editor-canvas"));
+    this.canvas = byId("editor-canvas");
+    this.canvasStage = byId("canvas-stage");
+    this.canvasScroll = byId("canvas-scroll");
+    this.mapGraph = new EditorMapGraph(byId("map-graph-root"), {
+      onSelectMap: (mapId) => this.openMapFromGraph(mapId),
+      onStatus: (message, error = false) => this.setStatus(message, error),
+    });
+  }
+
+  get currentMap() {
+    return (
+      this.maps.find((map) => map.id === this.selectedMapId) ?? this.maps[0]
+    );
+  }
+
+  async start() {
+    this.populateInteractionTemplateOptions();
+    this.populateTriggerItemOptions();
+    this.bindEvents();
+    await this.refreshDocumentUI();
+    this.updateRecoveryButton();
+    requestAnimationFrame((time) => this.animationLoop(time));
+  }
+
+  populateTriggerItemOptions(selectedId = null) {
+    const select = byId("trigger-item-id");
+    select.replaceChildren(
+      ...Object.entries(ITEMS).map(
+        ([itemId, item]) => new Option(item.name, itemId),
+      ),
+    );
+    if (selectedId !== null) select.value = selectedId;
+    if (select.selectedIndex < 0 && select.options.length > 0)
+      select.selectedIndex = 0;
+  }
+
+  updateTriggerItemFieldVisibility() {
+    byId("trigger-item-id-field").hidden = !byId("trigger-event-item-use")
+      .checked;
+  }
+
+  populateInteractionTemplateOptions() {
+    const select = byId("entity-interaction-template");
+    select.replaceChildren(
+      ...INTERACTION_TEMPLATES.map(
+        (template) => new Option(template.label, template.id),
+      ),
+    );
+    if (select.options.length > 0) select.selectedIndex = 0;
+    this.renderInteractionTemplateDescription();
+  }
+
+  getInteractionTemplateContext(entity = null) {
+    return {
+      map: this.currentMap,
+      maps: this.maps,
+      entity,
+      itemIds: Object.keys(ITEMS),
+    };
+  }
+
+  renderInteractionTemplateDescription() {
+    const select = byId("entity-interaction-template");
+    const template = getInteractionTemplate(select.value);
+    const entity = this.currentMap?.entities.find(
+      (item) => item.id === this.selectedEntityId,
+    );
+    const context = this.getInteractionTemplateContext(entity ?? null);
+    const notice = template?.notice?.(context) ?? "";
+    byId("entity-interaction-template-description").textContent = template
+      ? [template.description, notice].filter(Boolean).join(" ")
+      : "";
+  }
+
+  insertSelectedInteractionTemplate() {
+    const entity = this.currentMap.entities.find(
+      (item) => item.id === this.selectedEntityId,
+    );
+    if (!entity) return;
+
+    try {
+      const templateId = byId("entity-interaction-template").value;
+      const template = getInteractionTemplate(templateId);
+      const draftEntityId = byId("entity-id").value.trim() || entity.id;
+      const context = this.getInteractionTemplateContext({
+        ...entity,
+        id: draftEntityId,
+      });
+      const interaction = createInteractionFromTemplate(templateId, context);
+      byId("entity-interaction").value = JSON.stringify(interaction, null, 4);
+      this.syncSimpleDialogueFromInteractionJson();
+      const notice = template?.notice?.(context) ?? "";
+      this.setStatus(
+        `Inserted ${template?.label ?? templateId} into the inspector. ` +
+          `Click Apply to save it to the entity.${notice ? ` ${notice}` : ""}`,
+        Boolean(notice),
+      );
+    } catch (error) {
+      this.setStatus(error.message, true);
     }
+  }
 
-    get currentMap() {
-        return this.maps.find((map) => map.id === this.selectedMapId) ?? this.maps[0];
-    }
-
-    async start() {
-        this.populateInteractionTemplateOptions();
-        this.bindEvents();
-        await this.refreshDocumentUI();
-        this.updateRecoveryButton();
-        requestAnimationFrame((time) => this.animationLoop(time));
-    }
-
-    populateInteractionTemplateOptions() {
-        const select = byId("entity-interaction-template");
-        select.replaceChildren(
-            ...INTERACTION_TEMPLATES.map((template) => new Option(template.label, template.id)),
-        );
-        if (select.options.length > 0) select.selectedIndex = 0;
-        this.renderInteractionTemplateDescription();
-    }
-
-    getInteractionTemplateContext(entity = null) {
-        return {
-            map: this.currentMap,
-            maps: this.maps,
-            entity,
-            itemIds: Object.keys(ITEMS),
-        };
-    }
-
-    renderInteractionTemplateDescription() {
-        const select = byId("entity-interaction-template");
-        const template = getInteractionTemplate(select.value);
-        const entity = this.currentMap?.entities.find((item) => item.id === this.selectedEntityId);
-        const context = this.getInteractionTemplateContext(entity ?? null);
-        const notice = template?.notice?.(context) ?? "";
-        byId("entity-interaction-template-description").textContent = template
-            ? [template.description, notice].filter(Boolean).join(" ")
-            : "";
-    }
-
-    insertSelectedInteractionTemplate() {
-        const entity = this.currentMap.entities.find((item) => item.id === this.selectedEntityId);
-        if (!entity) return;
-
-        try {
-            const templateId = byId("entity-interaction-template").value;
-            const template = getInteractionTemplate(templateId);
-            const draftEntityId = byId("entity-id").value.trim() || entity.id;
-            const context = this.getInteractionTemplateContext({
-                ...entity,
-                id: draftEntityId,
-            });
-            const interaction = createInteractionFromTemplate(templateId, context);
-            byId("entity-interaction").value = JSON.stringify(interaction, null, 4);
-            this.syncSimpleDialogueFromInteractionJson();
-            const notice = template?.notice?.(context) ?? "";
-            this.setStatus(
-                `Inserted ${template?.label ?? templateId} into the inspector. ` +
-                    `Click Apply to save it to the entity.${notice ? ` ${notice}` : ""}`,
-                Boolean(notice),
-            );
-        } catch (error) {
-            this.setStatus(error.message, true);
-        }
-    }
-
-    populateEntityVisualOptions(type, selectedId = null) {
-        const select = byId("entity-visual-id");
-        if (type === "sprite") {
-            select.replaceChildren(
-                ...Object.keys(SPRITES).map((spriteId) => {
-                    const meta = SPRITE_EDITOR_META[spriteId];
-                    return new Option(meta?.label ?? spriteId, spriteId);
-                }),
-            );
-        } else {
-            const localIds = new Set(Object.keys(this.currentMap.tiles ?? {}).map(String));
-            const tiles = mergeTileDefinitions(this.currentMap);
-            select.replaceChildren(
-                ...Object.keys(tiles)
-                    .map(Number)
-                    .sort((first, second) => first - second)
-                    .map((tileId) => {
-                        const meta = TILE_EDITOR_META[tileId];
-                        const localSuffix = localIds.has(String(tileId)) ? " (map)" : "";
-                        return new Option(
-                            `${meta?.label ?? `Tile ${tileId}`}${localSuffix}`,
-                            String(tileId),
-                        );
-                    }),
-            );
-        }
-
-        if (selectedId !== null) select.value = String(selectedId);
-        if (select.selectedIndex < 0 && select.options.length > 0) select.selectedIndex = 0;
-    }
-
-    readEntityVisualInspector() {
-        const type = byId("entity-visual-type").value;
-        const rawId = byId("entity-visual-id").value;
-        return { type, id: type === "tile" ? Number(rawId) : rawId };
-    }
-
-    bindEvents() {
-        byId("undo").addEventListener("click", () => this.undo());
-        byId("redo").addEventListener("click", () => this.redo());
-        byId("save-recovery").addEventListener("click", () => this.saveRecovery(true));
-        byId("restore-recovery").addEventListener("click", () => this.restoreRecovery());
-        byId("restore-backup").addEventListener("click", () => this.restorePreImportBackup());
-        byId("export-js").addEventListener("click", () => {
-            downloadText("maps.generated.js", serializeGeneratedMaps(this.maps), "text/javascript");
-            this.markExported();
-        });
-        byId("export-json").addEventListener("click", () => {
-            downloadText(
-                "maps.json",
-                `${JSON.stringify(this.maps, null, 4)}\n`,
-                "application/json",
-            );
-            this.markExported();
-        });
-        byId("import-file").addEventListener("change", async (event) => {
-            const [file] = event.target.files;
-            if (!file) return;
-            try {
-                await this.importText(await file.text());
-            } catch (error) {
-                this.setStatus(error.message, true);
-            } finally {
-                event.target.value = "";
-            }
-        });
-        byId("import-text-button").addEventListener("click", async () => {
-            try {
-                await this.importText(byId("import-text").value);
-            } catch (error) {
-                this.setStatus(error.message, true);
-            }
-        });
-        byId("playtest").addEventListener("click", () => this.playtest());
-        byId("open-map-graph").addEventListener("click", () => this.showMapGraph());
-        byId("map-graph-fit").addEventListener("click", () => this.mapGraph.fit());
-        byId("map-graph-relayout").addEventListener("click", () => this.mapGraph.relayout());
-        byId("map-graph-close").addEventListener("click", () => byId("map-graph-dialog").close());
-
-        byId("map-select").addEventListener("change", async (event) => {
-            this.selectedMapId = event.target.value;
-            this.clearSelection();
-            await this.refreshDocumentUI();
-        });
-        byId("new-map").addEventListener("click", async () => {
-            const id = makeUniqueId("new-room", new Set(this.maps.map((map) => map.id)));
-            this.commitMutation("Create map", () => this.maps.push(createMap(id)));
-            this.selectedMapId = id;
-            await this.refreshDocumentUI();
-        });
-        byId("duplicate-map").addEventListener("click", async () => {
-            const source = this.currentMap;
-            const id = makeUniqueId(`${source.id}-copy`, new Set(this.maps.map((map) => map.id)));
-            const duplicate = cloneData(source);
-            duplicate.id = id;
-            this.commitMutation("Duplicate map", () => this.maps.push(duplicate));
-            this.selectedMapId = id;
-            await this.refreshDocumentUI();
-        });
-        byId("copy-current-map").addEventListener("click", () => this.copyCurrentMap());
-        byId("delete-map").addEventListener("click", async () => {
-            if (this.maps.length <= 1)
-                return this.setStatus("The document must keep at least one map.", true);
-            if (
-                !confirm(
-                    `Delete map "${this.currentMap.id}"? References will remain visible as validation errors.`,
-                )
-            )
-                return;
-            const index = this.maps.indexOf(this.currentMap);
-            this.commitMutation("Delete map", () => this.maps.splice(index, 1));
-            this.selectedMapId = this.maps[Math.min(index, this.maps.length - 1)].id;
-            this.clearSelection();
-            await this.refreshDocumentUI();
-        });
-        byId("map-camera-zoom").addEventListener("change", (event) => {
-            const zoom = Number(event.target.value);
-            if (!Number.isFinite(zoom) || zoom < 0.25 || zoom > 8) {
-                event.target.value = this.currentMap.camera.zoom;
-                return this.setStatus("Camera zoom must be between 0.25 and 8.", true);
-            }
-            this.commitMutation("Change map camera zoom", () => {
-                this.currentMap.camera.zoom = zoom;
-            });
-            this.validateAndDisplay();
-        });
-        byId("map-id").addEventListener("change", async (event) => {
-            const oldId = this.currentMap.id;
-            const newId = event.target.value.trim();
-            if (!newId || (newId !== oldId && this.maps.some((map) => map.id === newId))) {
-                this.setStatus("Map IDs must be nonempty and unique.", true);
-                event.target.value = oldId;
-                return;
-            }
-            if (newId === oldId) {
-                event.target.value = oldId;
-                return;
-            }
-
-            const externalReferences = findExternalMapIdReferences(oldId);
-            if (externalReferences.length > 0) {
-                this.setStatus(
-                    `This map is referenced outside generated map data: ${externalReferences.join(
-                        ", ",
-                    )}. Update those source definitions before renaming the map.`,
-                    true,
-                );
-                event.target.value = oldId;
-                return;
-            }
-
-            try {
-                const { candidateMaps, report } = createMapIdRefactorCandidate(
-                    this.maps,
-                    oldId,
-                    newId,
-                );
-
-                this.commitMutation("Rename map", () => {
-                    this.maps = candidateMaps;
-                    this.selectedMapId = newId;
-                });
-                this.mapGraph.invalidatePositions();
-                await this.refreshDocumentUI();
-
-                const count = report.changedReferences.length;
-                this.setStatus(
-                    `Renamed "${oldId}" to "${newId}" and updated ${count} map ${
-                        count === 1 ? "reference" : "references"
-                    }. Existing development saves using the old ID are not migrated and should be cleared.`,
-                );
-            } catch (error) {
-                event.target.value = oldId;
-                this.setStatus(error.message, true);
-            }
-        });
-        byId("map-group").addEventListener("change", async (event) => {
-            const group = event.target.value.trim();
-            const map = this.currentMap;
-            const previousGroup = typeof map.editorGroup === "string" ? map.editorGroup.trim() : "";
-            const storedGroupIsCanonical = map.editorGroup === previousGroup;
-
-            if (
-                group === previousGroup &&
-                (group ? storedGroupIsCanonical : !Object.hasOwn(map, "editorGroup"))
-            ) {
-                event.target.value = previousGroup;
-                return;
-            }
-
-            this.commitMutation("Change map group", () => {
-                if (group) {
-                    map.editorGroup = group;
-                } else {
-                    delete map.editorGroup;
-                }
-            });
-            await this.refreshAfterMutation();
-        });
-        byId("resize-map").addEventListener("click", async () => {
-            const width = Number(byId("map-width").value);
-            const height = Number(byId("map-height").value);
-            try {
-                this.commitMutation("Resize map", () => resizeMap(this.currentMap, width, height));
-                await this.refreshDocumentUI();
-            } catch (error) {
-                this.setStatus(error.message, true);
-            }
-        });
-        byId("initial-entry").addEventListener("change", (event) => {
-            this.commitMutation("Change initial entry", () => {
-                this.currentMap.initialEntryId = event.target.value;
-            });
-            this.refreshAfterMutation();
-        });
-
-        byId("mode-buttons").addEventListener("click", (event) => {
-            const button = event.target.closest("button[data-mode]");
-            if (!button) return;
-            this.mode = button.dataset.mode;
-            this.updateModeUI();
-            this.renderInspectors();
-        });
-        byId("tool-buttons").addEventListener("click", (event) => {
-            const button = event.target.closest("button[data-tool]");
-            if (!button) return;
-            this.tool = button.dataset.tool;
-            this.updateButtonSelection("#tool-buttons button", "tool", this.tool);
-        });
-        byId("active-layer").addEventListener("change", (event) => {
-            this.activeLayer = event.target.value;
-            this.renderPalette();
-        });
-        byId("clear-layer").addEventListener("click", () => {
-            const layerName = this.activeLayer;
-            const warning =
-                layerName === "base"
-                    ? "Clearing the base layer will make the map unplayable until floor tiles are added. Clear every cell in the base layer?"
-                    : `Clear every cell in the ${layerName} layer?`;
-
-            if (!confirm(warning)) return;
-
-            this.commitMutation("Clear layer", () => {
-                const layer = ensureLayer(this.currentMap, layerName);
-
-                for (const row of layer) {
-                    row.fill(EMPTY_TILE_ID);
-                }
-            });
-
-            this.refreshAfterMutation();
-        });
-        document.querySelectorAll("[data-layer-visible]").forEach((input) => {
-            input.addEventListener("change", () => {
-                if (input.checked) this.visibleLayers.add(input.dataset.layerVisible);
-                else this.visibleLayers.delete(input.dataset.layerVisible);
-            });
-        });
-        byId("show-grid").addEventListener(
-            "change",
-            (event) => (this.showGrid = event.target.checked),
-        );
-        byId("show-collision").addEventListener(
-            "change",
-            (event) => (this.showCollision = event.target.checked),
-        );
-        byId("show-footprints").addEventListener(
-            "change",
-            (event) => (this.showFootprints = event.target.checked),
-        );
-        byId("zoom-out").addEventListener("click", () => this.changeZoom(-1));
-        byId("zoom-reset").addEventListener("click", () => this.setZoom(1));
-        byId("zoom-in").addEventListener("click", () => this.changeZoom(1));
-        this.canvasScroll.addEventListener("wheel", (event) => this.onCanvasWheel(event), {
-            passive: false,
-        });
-        byId("entity-visual-type").addEventListener("change", (event) => {
-            this.populateEntityVisualOptions(event.target.value);
-        });
-        byId("add-trigger").addEventListener("click", () => this.addTrigger());
-        byId("add-exit").addEventListener("click", () => this.addExit());
-        byId("connection-source-edge").addEventListener("change", () =>
-            this.renderConnectionControls(),
-        );
-        byId("connection-target-map").addEventListener("change", () =>
-            this.renderConnectionControls(),
-        );
-        for (const id of [
-            "connection-source-range-start",
-            "connection-source-range-end",
-            "connection-target-range-start",
-        ]) {
-            byId(id).addEventListener("input", () => this.renderConnectionControls());
-        }
-        byId("create-reciprocal-connection").addEventListener("click", () =>
-            this.createReciprocalConnection(),
-        );
-
-        this.canvas.addEventListener("pointerdown", (event) => this.onPointerDown(event));
-        this.canvas.addEventListener("pointermove", (event) => this.onPointerMove(event));
-        this.canvas.addEventListener("pointerup", (event) => this.onPointerUp(event));
-        this.canvas.addEventListener("pointercancel", (event) => this.onPointerUp(event));
-        this.canvas.addEventListener("pointerleave", () => {
-            if (this.pointerAction?.kind === "brush") {
-                this.pointerAction.lastKey = null;
-            }
-            byId("cursor-position").textContent = "Cell: —";
-        });
-        this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
-
-        byId("entity-interaction-template").addEventListener("change", () =>
-            this.renderInteractionTemplateDescription(),
-        );
-        byId("insert-entity-interaction-template").addEventListener("click", () =>
-            this.insertSelectedInteractionTemplate(),
-        );
-        byId("entity-interaction").addEventListener("input", () =>
-            this.syncSimpleDialogueFromInteractionJson(),
-        );
-        byId("entity-dialogue-speaker").addEventListener("input", () =>
-            this.syncInteractionJsonFromSimpleDialogue(),
-        );
-        byId("entity-dialogue-pages").addEventListener("input", () =>
-            this.syncInteractionJsonFromSimpleDialogue(),
-        );
-        byId("apply-entity").addEventListener("click", () => this.applyEntityInspector());
-        byId("delete-entity").addEventListener("click", () => this.deleteSelectedEntity());
-        byId("apply-entry").addEventListener("click", () => this.applyEntryInspector());
-        byId("delete-entry").addEventListener("click", () => this.deleteSelectedEntry());
-        byId("apply-trigger").addEventListener("click", () => this.applyTriggerInspector());
-        byId("delete-trigger").addEventListener("click", () => this.deleteSelectedTrigger());
-        byId("move-trigger-up").addEventListener("click", () => this.moveSelectedTrigger(-1));
-        byId("move-trigger-down").addEventListener("click", () => this.moveSelectedTrigger(1));
-        byId("apply-exit").addEventListener("click", () => this.applyExitInspector());
-        byId("delete-exit").addEventListener("click", () => this.deleteSelectedExit());
-        byId("exit-target-map").addEventListener("change", () => this.populateExitEntryOptions());
-        byId("exit-json").addEventListener("input", () => (this.exitJsonDirty = true));
-
-        window.addEventListener("storage", (event) => {
-            if (event.key !== PLAYTEST_RESULT_KEY || !event.newValue) return;
-            try {
-                this.displayPlaytestResult(JSON.parse(event.newValue));
-            } catch (error) {
-                this.displayPlaytestResult({ ok: false, message: error.message });
-            }
-        });
-
-        window.addEventListener("beforeunload", (event) => {
-            if (!this.dirty) return;
-            event.preventDefault();
-            event.returnValue = "";
-        });
-        document.addEventListener("keydown", (event) => {
-            const modifier = event.ctrlKey || event.metaKey;
-            if (modifier && event.key.toLowerCase() === "z") {
-                event.preventDefault();
-                event.shiftKey ? this.redo() : this.undo();
-            } else if (modifier && event.key.toLowerCase() === "y") {
-                event.preventDefault();
-                this.redo();
-            } else if (event.key === "Delete" && !event.target.matches("input, textarea, select")) {
-                if (this.selectedEntityId) this.deleteSelectedEntity();
-                else if (this.selectedEntryId) this.deleteSelectedEntry();
-                else if (this.selectedTriggerId) this.deleteSelectedTrigger();
-                else if (this.selectedExitIndex !== null) this.deleteSelectedExit();
-            }
-        });
-    }
-
-    snapshot() {
-        return { maps: cloneData(this.maps), selectedMapId: this.selectedMapId };
-    }
-
-    restoreSnapshot(snapshot) {
-        this.maps = cloneData(snapshot.maps);
-        this.selectedMapId = this.maps.some((map) => map.id === snapshot.selectedMapId)
-            ? snapshot.selectedMapId
-            : this.maps[0].id;
-        this.mapGraph.invalidatePositions();
-        this.clearSelection();
-    }
-
-    beginTransaction() {
-        if (!this.transactionBefore) this.transactionBefore = this.snapshot();
-    }
-
-    endTransaction(label) {
-        if (!this.transactionBefore) return;
-        const before = this.transactionBefore;
-        this.transactionBefore = null;
-        if (JSON.stringify(before.maps) === JSON.stringify(this.maps)) return;
-        this.undoStack.push(before);
-        if (this.undoStack.length > 100) this.undoStack.shift();
-        this.redoStack = [];
-        this.afterMutation(label);
-    }
-
-    commitMutation(label, mutator) {
-        const before = this.snapshot();
-        mutator();
-        if (JSON.stringify(before.maps) === JSON.stringify(this.maps)) return false;
-        this.undoStack.push(before);
-        if (this.undoStack.length > 100) this.undoStack.shift();
-        this.redoStack = [];
-        this.afterMutation(label);
-        return true;
-    }
-
-    afterMutation(label) {
-        this.dirty = true;
-        this.saveRecovery(false);
-        this.setStatus(`${label}. Unsaved editor changes.`);
-        this.updateUndoButtons();
-        this.validateAndDisplay();
-    }
-
-    async undo() {
-        const snapshot = this.undoStack.pop();
-        if (!snapshot) return;
-        this.redoStack.push(this.snapshot());
-        this.restoreSnapshot(snapshot);
-        this.dirty = true;
-        this.saveRecovery(false);
-        await this.refreshDocumentUI();
-        this.setStatus("Undid the last action.");
-    }
-
-    async redo() {
-        const snapshot = this.redoStack.pop();
-        if (!snapshot) return;
-        this.undoStack.push(this.snapshot());
-        this.restoreSnapshot(snapshot);
-        this.dirty = true;
-        this.saveRecovery(false);
-        await this.refreshDocumentUI();
-        this.setStatus("Redid the last action.");
-    }
-
-    updateUndoButtons() {
-        byId("undo").disabled = this.undoStack.length === 0;
-        byId("redo").disabled = this.redoStack.length === 0;
-    }
-
-    async refreshDocumentUI() {
-        if (!this.currentMap) return;
-        await this.renderer
-            .loadDefinitions(this.currentMap)
-            .catch((error) => this.setStatus(error.message, true));
-        this.renderMapControls();
-        this.renderPalette();
-        this.renderEntityPalette();
-        this.renderTriggerList();
-        this.renderExitList();
-        this.updateModeUI();
-        this.renderInspectors();
-        this.validateAndDisplay();
-        this.updateUndoButtons();
-        this.refreshOpenMapGraph();
-    }
-
-    async refreshAfterMutation() {
-        await this.renderer
-            .loadDefinitions(this.currentMap)
-            .catch((error) => this.setStatus(error.message, true));
-        this.renderMapControls();
-        this.renderPalette();
-        this.renderEntityPalette();
-        this.renderTriggerList();
-        this.renderExitList();
-        this.renderInspectors();
-        this.validateAndDisplay();
-    }
-
-    renderMapControls() {
-        const mapSelect = byId("map-select");
-        const groupedMaps = new Map();
-
-        for (const map of this.maps) {
-            const authoredGroup = typeof map.editorGroup === "string" ? map.editorGroup.trim() : "";
-            const groupName = authoredGroup || "Ungrouped";
-
-            if (!groupedMaps.has(groupName)) {
-                groupedMaps.set(groupName, []);
-            }
-            groupedMaps.get(groupName).push(map);
-        }
-
-        const groupNames = [...groupedMaps.keys()].sort((first, second) => {
-            if (first === second) return 0;
-            if (first === "Ungrouped") return 1;
-            if (second === "Ungrouped") return -1;
-            return first.localeCompare(second);
-        });
-
-        const optionGroups = groupNames.map((groupName) => {
-            const optionGroup = document.createElement("optgroup");
-            optionGroup.label = groupName;
-            optionGroup.append(
-                ...groupedMaps.get(groupName).map((map) => new Option(map.id, map.id)),
-            );
-            return optionGroup;
-        });
-
-        mapSelect.replaceChildren(...optionGroups);
-        mapSelect.value = this.currentMap.id;
-        byId("map-id").value = this.currentMap.id;
-        byId("map-group").value =
-            typeof this.currentMap.editorGroup === "string"
-                ? this.currentMap.editorGroup.trim()
-                : "";
-        const { width, height } = getMapSize(this.currentMap);
-        byId("map-width").value = width;
-        byId("map-height").value = height;
-        byId("map-camera-zoom").value = this.currentMap.camera.zoom;
-
-        const initialSelect = byId("initial-entry");
-        initialSelect.replaceChildren(
-            ...Object.keys(this.currentMap.entries).map((entryId) => new Option(entryId, entryId)),
-        );
-        initialSelect.value = this.currentMap.initialEntryId ?? "";
-        this.renderConnectionControls();
-    }
-
-    updateModeUI() {
-        this.updateButtonSelection("#mode-buttons button", "mode", this.mode);
-        byId("tile-tools-section").hidden = this.mode !== "tiles";
-        byId("palette-section").hidden = this.mode !== "tiles";
-        byId("entity-tools-section").hidden = this.mode !== "entities";
-        byId("entry-tools-section").hidden = this.mode !== "entries";
-        byId("trigger-tools-section").hidden = this.mode !== "triggers";
-        byId("exit-tools-section").hidden = this.mode !== "exits";
-    }
-
-    updateButtonSelection(selector, datasetKey, value) {
-        document.querySelectorAll(selector).forEach((button) => {
-            button.classList.toggle("selected", button.dataset[datasetKey] === value);
-        });
-    }
-
-    renderPalette() {
-        const root = byId("tile-palette");
-        root.setAttribute("role", "listbox");
-        root.setAttribute("aria-label", "Tile palette");
-        root.replaceChildren();
-        this.palettePreviews = this.palettePreviews.filter(
-            (preview) => preview.palette !== "tiles",
-        );
-        const merged = mergeTileDefinitions(this.currentMap);
-        const localIds = new Set(Object.keys(this.currentMap.tiles ?? {}).map(String));
-        const categories = new Map([
-            [
-                "Utility",
-                [
-                    {
-                        tileId: EMPTY_TILE_ID,
-                        tile: null,
-                        label: "Empty",
-                    },
-                ],
-            ],
-        ]);
-
-        for (const [rawId, tile] of Object.entries(merged)) {
-            const tileId = Number(rawId);
-            const isLocal = localIds.has(rawId);
+  populateEntityVisualOptions(type, selectedId = null) {
+    const select = byId("entity-visual-id");
+    if (type === "sprite") {
+      select.replaceChildren(
+        ...Object.keys(SPRITES).map((spriteId) => {
+          const meta = SPRITE_EDITOR_META[spriteId];
+          return new Option(meta?.label ?? spriteId, spriteId);
+        }),
+      );
+    } else {
+      const localIds = new Set(
+        Object.keys(this.currentMap.tiles ?? {}).map(String),
+      );
+      const tiles = mergeTileDefinitions(this.currentMap);
+      select.replaceChildren(
+        ...Object.keys(tiles)
+          .map(Number)
+          .sort((first, second) => first - second)
+          .map((tileId) => {
             const meta = TILE_EDITOR_META[tileId];
-            const category = isLocal ? "This map" : (meta?.category ?? "Other");
-            if (!categories.has(category)) categories.set(category, []);
-            categories.get(category).push({ tileId, tile, label: meta?.label ?? `Tile ${tileId}` });
-        }
-
-        for (const [category, items] of categories) {
-            const section = document.createElement("div");
-            section.className = "palette-category";
-            const title = document.createElement("h3");
-            title.textContent = category;
-            const list = document.createElement("div");
-            list.className = "palette-items";
-            for (const item of items) {
-                const incompatible = !canPlaceTile(
-                    this.currentMap,
-                    this.activeLayer,
-                    item.tileId,
-                    0,
-                    0,
-                );
-                const card = createVisualPaletteCard({
-                    id: item.tileId,
-                    label: item.label,
-                    title: `${item.label} (${item.tileId})`,
-                    visual: item.tile,
-                    selected: item.tileId === this.selectedTileId,
-                    onSelect: (rawTileId) => {
-                        this.selectedTileId = Number(rawTileId);
-                        this.renderPalette();
-                    },
-                });
-                if (incompatible) card.button.dataset.incompatible = "true";
-                list.append(card.button);
-                this.palettePreviews.push({ ...card.preview, palette: "tiles" });
-            }
-            section.append(title, list);
-            root.append(section);
-        }
-        bindPaletteKeyboardNavigation(root, (rawTileId) => {
-            this.selectedTileId = Number(rawTileId);
-        });
+            const localSuffix = localIds.has(String(tileId)) ? " (map)" : "";
+            return new Option(
+              `${meta?.label ?? `Tile ${tileId}`}${localSuffix}`,
+              String(tileId),
+            );
+          }),
+      );
     }
 
-    renderEntityPalette() {
-        const root = byId("entity-palette");
-        root.replaceChildren();
-        this.palettePreviews = this.palettePreviews.filter(
-            (preview) => preview.palette !== "entities",
+    if (selectedId !== null) select.value = String(selectedId);
+    if (select.selectedIndex < 0 && select.options.length > 0)
+      select.selectedIndex = 0;
+  }
+
+  readEntityVisualInspector() {
+    const type = byId("entity-visual-type").value;
+    const rawId = byId("entity-visual-id").value;
+    return { type, id: type === "tile" ? Number(rawId) : rawId };
+  }
+
+  bindEvents() {
+    byId("undo").addEventListener("click", () => this.undo());
+    byId("redo").addEventListener("click", () => this.redo());
+    byId("save-recovery").addEventListener("click", () =>
+      this.saveRecovery(true),
+    );
+    byId("restore-recovery").addEventListener("click", () =>
+      this.restoreRecovery(),
+    );
+    byId("restore-backup").addEventListener("click", () =>
+      this.restorePreImportBackup(),
+    );
+    byId("export-js").addEventListener("click", () => {
+      downloadText(
+        "maps.generated.js",
+        serializeGeneratedMaps(this.maps),
+        "text/javascript",
+      );
+      this.markExported();
+    });
+    byId("export-json").addEventListener("click", () => {
+      downloadText(
+        "maps.json",
+        `${JSON.stringify(this.maps, null, 4)}\n`,
+        "application/json",
+      );
+      this.markExported();
+    });
+    byId("import-file").addEventListener("change", async (event) => {
+      const [file] = event.target.files;
+      if (!file) return;
+      try {
+        await this.importText(await file.text());
+      } catch (error) {
+        this.setStatus(error.message, true);
+      } finally {
+        event.target.value = "";
+      }
+    });
+    byId("import-text-button").addEventListener("click", async () => {
+      try {
+        await this.importText(byId("import-text").value);
+      } catch (error) {
+        this.setStatus(error.message, true);
+      }
+    });
+    byId("playtest").addEventListener("click", () => this.playtest());
+    byId("open-map-graph").addEventListener("click", () => this.showMapGraph());
+    byId("map-graph-fit").addEventListener("click", () => this.mapGraph.fit());
+    byId("map-graph-relayout").addEventListener("click", () =>
+      this.mapGraph.relayout(),
+    );
+    byId("map-graph-close").addEventListener("click", () =>
+      byId("map-graph-dialog").close(),
+    );
+
+    byId("map-select").addEventListener("change", async (event) => {
+      this.selectedMapId = event.target.value;
+      this.clearSelection();
+      await this.refreshDocumentUI();
+    });
+    byId("new-map").addEventListener("click", async () => {
+      const id = makeUniqueId(
+        "new-room",
+        new Set(this.maps.map((map) => map.id)),
+      );
+      this.commitMutation("Create map", () => this.maps.push(createMap(id)));
+      this.selectedMapId = id;
+      await this.refreshDocumentUI();
+    });
+    byId("duplicate-map").addEventListener("click", async () => {
+      const source = this.currentMap;
+      const id = makeUniqueId(
+        `${source.id}-copy`,
+        new Set(this.maps.map((map) => map.id)),
+      );
+      const duplicate = cloneData(source);
+      duplicate.id = id;
+      this.commitMutation("Duplicate map", () => this.maps.push(duplicate));
+      this.selectedMapId = id;
+      await this.refreshDocumentUI();
+    });
+    byId("copy-current-map").addEventListener("click", () =>
+      this.copyCurrentMap(),
+    );
+    byId("delete-map").addEventListener("click", async () => {
+      if (this.maps.length <= 1)
+        return this.setStatus("The document must keep at least one map.", true);
+      if (
+        !confirm(
+          `Delete map "${this.currentMap.id}"? References will remain visible as validation errors.`,
+        )
+      )
+        return;
+      const index = this.maps.indexOf(this.currentMap);
+      this.commitMutation("Delete map", () => this.maps.splice(index, 1));
+      this.selectedMapId = this.maps[Math.min(index, this.maps.length - 1)].id;
+      this.clearSelection();
+      await this.refreshDocumentUI();
+    });
+    byId("map-camera-zoom").addEventListener("change", (event) => {
+      const zoom = Number(event.target.value);
+      if (!Number.isFinite(zoom) || zoom < 0.25 || zoom > 8) {
+        event.target.value = this.currentMap.camera.zoom;
+        return this.setStatus("Camera zoom must be between 0.25 and 8.", true);
+      }
+      this.commitMutation("Change map camera zoom", () => {
+        this.currentMap.camera.zoom = zoom;
+      });
+      this.validateAndDisplay();
+    });
+    byId("map-id").addEventListener("change", async (event) => {
+      const oldId = this.currentMap.id;
+      const newId = event.target.value.trim();
+      if (
+        !newId ||
+        (newId !== oldId && this.maps.some((map) => map.id === newId))
+      ) {
+        this.setStatus("Map IDs must be nonempty and unique.", true);
+        event.target.value = oldId;
+        return;
+      }
+      if (newId === oldId) {
+        event.target.value = oldId;
+        return;
+      }
+
+      const externalReferences = findExternalMapIdReferences(oldId);
+      if (externalReferences.length > 0) {
+        this.setStatus(
+          `This map is referenced outside generated map data: ${externalReferences.join(
+            ", ",
+          )}. Update those source definitions before renaming the map.`,
+          true,
+        );
+        event.target.value = oldId;
+        return;
+      }
+
+      try {
+        const { candidateMaps, report } = createMapIdRefactorCandidate(
+          this.maps,
+          oldId,
+          newId,
         );
 
-        const section = document.createElement("div");
-        section.className = "palette-category";
-        const title = document.createElement("h3");
-        title.textContent = "Presets";
-        const list = document.createElement("div");
-        list.className = "palette-items";
-
-        for (const [presetId, preset] of Object.entries(ENTITY_PRESETS)) {
-            const visualReference = preset.entity?.visual;
-            const visual = getEntityVisualDefinition(this.currentMap, visualReference);
-            const previewVisual = visual
-                ? { ...visual, transform: preset.entity.transform }
-                : null;
-            const imageStatus = visual ? this.renderer.getVisualImageStatus(visual) : "missing";
-            const missing = !visual || imageStatus === "missing";
-            const visualLabel = visualReference
-                ? `${visualReference.type}:${String(visualReference.id)}`
-                : "no visual";
-            const missingDescription = visual
-                ? `could not load ${visual.path}`
-                : `missing ${visualLabel}`;
-            const card = createVisualPaletteCard({
-                id: presetId,
-                label: preset.label,
-                title: missing
-                    ? `${preset.label} — ${missingDescription}`
-                    : `${preset.label} — ${visualLabel}`,
-                visual: previewVisual,
-                selected: presetId === this.selectedEntityPreset,
-                disabled: missing,
-                missing,
-                onSelect: (selectedPresetId) => {
-                    this.selectedEntityPreset = selectedPresetId;
-                    this.renderEntityPalette();
-                },
-            });
-            list.append(card.button);
-            this.palettePreviews.push({ ...card.preview, palette: "entities" });
-        }
-
-        section.append(title, list);
-        root.append(section);
-        bindPaletteKeyboardNavigation(root, (presetId) => {
-            this.selectedEntityPreset = presetId;
+        this.commitMutation("Rename map", () => {
+          this.maps = candidateMaps;
+          this.selectedMapId = newId;
         });
-    }
+        this.mapGraph.invalidatePositions();
+        await this.refreshDocumentUI();
 
-    renderTriggerList() {
-        const root = byId("trigger-list");
-        root.replaceChildren();
-        for (const [index, trigger] of (this.currentMap.triggers ?? []).entries()) {
-            const button = document.createElement("button");
-            button.type = "button";
-            button.textContent =
-                `${index + 1}. ${trigger.id} — ` +
-                `${trigger.region.col},${trigger.region.row} ` +
-                `${trigger.region.width}×${trigger.region.height}`;
-            button.classList.toggle("selected", trigger.id === this.selectedTriggerId);
-            button.addEventListener("click", () => {
-                this.selectedTriggerId = trigger.id;
-                this.selectedEntityId = null;
-                this.selectedEntryId = null;
-                this.selectedExitIndex = null;
-                this.mode = "triggers";
-                this.updateModeUI();
-                this.renderTriggerList();
-                this.renderInspectors();
-            });
-            root.append(button);
-        }
-    }
-
-    renderExitList() {
-        const root = byId("exit-list");
-        root.replaceChildren();
-        this.currentMap.exits.forEach((exit, index) => {
-            const button = document.createElement("button");
-            button.type = "button";
-            const targetLabel =
-                exit.destination?.type === "random"
-                    ? `random (${exit.destination.choices?.length ?? 0} choices)`
-                    : Object.hasOwn(exit, "targetEdge")
-                      ? `${exit.targetMapId} ${exit.targetEdge} ${exit.targetRange?.[0] ?? "?"}–${exit.targetRange?.[1] ?? "?"}`
-                      : exit.targetMapId;
-            button.textContent = `${index}: ${exit.edge} ${exit.range[0]}–${exit.range[1]} → ${targetLabel}`;
-            button.classList.toggle("selected", index === this.selectedExitIndex);
-            button.addEventListener("click", () => {
-                this.selectedExitIndex = index;
-                this.selectedEntityId = null;
-                this.selectedEntryId = null;
-                this.selectedTriggerId = null;
-                this.mode = "exits";
-                this.updateModeUI();
-                this.renderExitList();
-                this.renderInspectors();
-            });
-            root.append(button);
-        });
-    }
-
-    renderConnectionControls() {
-        const sourceMap = this.currentMap;
-        if (!sourceMap) return;
-
-        const sourceMapInput = byId("connection-source-map");
-        const sourceChanged = sourceMapInput.value !== sourceMap.id;
-        sourceMapInput.value = sourceMap.id;
-
-        const sourceEdgeSelect = byId("connection-source-edge");
-        const sourceEdge = Object.hasOwn(OPPOSITE_EDGE, sourceEdgeSelect.value)
-            ? sourceEdgeSelect.value
-            : "north";
-        sourceEdgeSelect.value = sourceEdge;
-
-        const targetMapSelect = byId("connection-target-map");
-        const previousTargetId = targetMapSelect.value;
-        const targetMaps = this.maps.filter((map) => map.id !== sourceMap.id);
-        targetMapSelect.replaceChildren(...targetMaps.map((map) => new Option(map.id, map.id)));
-
-        if (targetMaps.some((map) => map.id === previousTargetId)) {
-            targetMapSelect.value = previousTargetId;
-        } else if (targetMaps.length > 0) {
-            targetMapSelect.value = targetMaps[0].id;
-        }
-
-        const targetEdge = OPPOSITE_EDGE[sourceEdge];
-        byId("connection-target-edge").value = targetEdge;
-
-        const targetMap = targetMaps.find((map) => map.id === targetMapSelect.value) ?? null;
-        const sourceLimit = getEdgeAxisLength(sourceMap, sourceEdge);
-        const targetLimit = targetMap ? getEdgeAxisLength(targetMap, targetEdge) : 0;
-        const disabled = !targetMap || sourceLimit <= 0 || targetLimit <= 0;
-
-        const sourceStartInput = byId("connection-source-range-start");
-        const sourceEndInput = byId("connection-source-range-end");
-        const targetStartInput = byId("connection-target-range-start");
-        const targetEndInput = byId("connection-target-range-end");
-        const button = byId("create-reciprocal-connection");
-
-        for (const input of [sourceStartInput, sourceEndInput, targetStartInput]) {
-            input.disabled = disabled;
-        }
-        targetEndInput.disabled = disabled;
-        button.disabled = disabled;
-        targetMapSelect.disabled = targetMaps.length === 0;
-
-        sourceStartInput.max = String(Math.max(0, sourceLimit - 1));
-
-        let sourceStart = Number(sourceStartInput.value);
-        if (sourceChanged || !Number.isInteger(sourceStart) || sourceStart < 0) sourceStart = 0;
-        sourceStart = Math.min(sourceStart, Math.max(0, sourceLimit - 1));
-
-        const maximumSourceEnd = Math.min(
-            Math.max(sourceStart, sourceLimit - 1),
-            sourceStart + Math.max(0, targetLimit - 1),
+        const count = report.changedReferences.length;
+        this.setStatus(
+          `Renamed "${oldId}" to "${newId}" and updated ${count} map ${
+            count === 1 ? "reference" : "references"
+          }. Existing development saves using the old ID are not migrated and should be cleared.`,
         );
-        sourceEndInput.max = String(maximumSourceEnd);
+      } catch (error) {
+        event.target.value = oldId;
+        this.setStatus(error.message, true);
+      }
+    });
+    byId("map-group").addEventListener("change", async (event) => {
+      const group = event.target.value.trim();
+      const map = this.currentMap;
+      const previousGroup =
+        typeof map.editorGroup === "string" ? map.editorGroup.trim() : "";
+      const storedGroupIsCanonical = map.editorGroup === previousGroup;
 
-        let sourceEnd = Number(sourceEndInput.value);
-        if (sourceChanged || !Number.isInteger(sourceEnd) || sourceEnd < sourceStart) {
-            sourceEnd = sourceStart;
+      if (
+        group === previousGroup &&
+        (group ? storedGroupIsCanonical : !Object.hasOwn(map, "editorGroup"))
+      ) {
+        event.target.value = previousGroup;
+        return;
+      }
+
+      this.commitMutation("Change map group", () => {
+        if (group) {
+          map.editorGroup = group;
+        } else {
+          delete map.editorGroup;
         }
-        sourceEnd = Math.min(sourceEnd, maximumSourceEnd);
+      });
+      await this.refreshAfterMutation();
+    });
+    byId("resize-map").addEventListener("click", async () => {
+      const width = Number(byId("map-width").value);
+      const height = Number(byId("map-height").value);
+      try {
+        this.commitMutation("Resize map", () =>
+          resizeMap(this.currentMap, width, height),
+        );
+        await this.refreshDocumentUI();
+      } catch (error) {
+        this.setStatus(error.message, true);
+      }
+    });
+    byId("initial-entry").addEventListener("change", (event) => {
+      this.commitMutation("Change initial entry", () => {
+        this.currentMap.initialEntryId = event.target.value;
+      });
+      this.refreshAfterMutation();
+    });
 
-        const sourceLengthDelta = sourceEnd - sourceStart;
-        const maximumTargetStart = Math.max(0, targetLimit - sourceLengthDelta - 1);
-        targetStartInput.max = String(maximumTargetStart);
+    byId("mode-buttons").addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-mode]");
+      if (!button) return;
+      this.mode = button.dataset.mode;
+      this.updateModeUI();
+      this.renderInspectors();
+    });
+    byId("tool-buttons").addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-tool]");
+      if (!button) return;
+      this.tool = button.dataset.tool;
+      this.updateButtonSelection("#tool-buttons button", "tool", this.tool);
+    });
+    byId("active-layer").addEventListener("change", (event) => {
+      this.activeLayer = event.target.value;
+      this.renderPalette();
+    });
+    byId("clear-layer").addEventListener("click", () => {
+      const layerName = this.activeLayer;
+      const warning =
+        layerName === "base"
+          ? "Clearing the base layer will make the map unplayable until floor tiles are added. Clear every cell in the base layer?"
+          : `Clear every cell in the ${layerName} layer?`;
 
-        let targetStart = Number(targetStartInput.value);
-        if (sourceChanged || !Number.isInteger(targetStart) || targetStart < 0) targetStart = 0;
-        targetStart = Math.min(targetStart, maximumTargetStart);
-        const targetEnd = targetStart + sourceLengthDelta;
+      if (!confirm(warning)) return;
 
-        sourceStartInput.value = String(sourceStart);
-        sourceEndInput.value = String(sourceEnd);
-        targetStartInput.value = String(targetStart);
-        targetEndInput.value = String(targetEnd);
+      this.commitMutation("Clear layer", () => {
+        const layer = ensureLayer(this.currentMap, layerName);
 
-        byId("connection-preview").textContent = targetMap
-            ? `${sourceMap.id} ${sourceEdge} ${sourceStart}–${sourceEnd}\n        ↓\n${targetMap.id} ${targetEdge} ${targetStart}–${targetEnd}`
-            : "Choose a target map.";
-    }
-
-    async createReciprocalConnection() {
-        try {
-            const sourceMap = this.currentMap;
-            const targetMapId = byId("connection-target-map").value;
-            const targetMap = this.maps.find((map) => map.id === targetMapId);
-            if (!targetMap) throw new Error("Choose a target map.");
-
-            const sourceEdge = byId("connection-source-edge").value;
-            const targetEdge = byId("connection-target-edge").value;
-            const sourceRange = [
-                Number(byId("connection-source-range-start").value),
-                Number(byId("connection-source-range-end").value),
-            ];
-            const targetRange = [
-                Number(byId("connection-target-range-start").value),
-                Number(byId("connection-target-range-end").value),
-            ];
-            const { sourceExit, targetExit } = createReciprocalEdgeConnection(
-                sourceMap,
-                targetMap,
-                sourceEdge,
-                targetEdge,
-                sourceRange,
-                targetRange,
-            );
-            const sourceExitIndex = sourceMap.exits.length;
-
-            this.commitMutation("Create reciprocal connection", () => {
-                sourceMap.exits.push(sourceExit);
-                targetMap.exits.push(targetExit);
-            });
-
-            this.selectedExitIndex = sourceExitIndex;
-            this.selectedEntityId = null;
-            this.selectedEntryId = null;
-            this.selectedTriggerId = null;
-            this.mode = "exits";
-            await this.refreshAfterMutation();
-            this.updateModeUI();
-            this.setStatus(
-                `Connected "${sourceMap.id}" ${sourceEdge} ${sourceRange[0]}–${sourceRange[1]} to "${targetMap.id}" ${targetEdge} ${targetRange[0]}–${targetRange[1]}. Unsaved editor changes.`,
-            );
-        } catch (error) {
-            this.setStatus(error.message, true);
+        for (const row of layer) {
+          row.fill(EMPTY_TILE_ID);
         }
+      });
+
+      this.refreshAfterMutation();
+    });
+    document.querySelectorAll("[data-layer-visible]").forEach((input) => {
+      input.addEventListener("change", () => {
+        if (input.checked) this.visibleLayers.add(input.dataset.layerVisible);
+        else this.visibleLayers.delete(input.dataset.layerVisible);
+      });
+    });
+    byId("show-grid").addEventListener(
+      "change",
+      (event) => (this.showGrid = event.target.checked),
+    );
+    byId("show-collision").addEventListener(
+      "change",
+      (event) => (this.showCollision = event.target.checked),
+    );
+    byId("show-footprints").addEventListener(
+      "change",
+      (event) => (this.showFootprints = event.target.checked),
+    );
+    byId("zoom-out").addEventListener("click", () => this.changeZoom(-1));
+    byId("zoom-reset").addEventListener("click", () => this.setZoom(1));
+    byId("zoom-in").addEventListener("click", () => this.changeZoom(1));
+    this.canvasScroll.addEventListener(
+      "wheel",
+      (event) => this.onCanvasWheel(event),
+      {
+        passive: false,
+      },
+    );
+    byId("entity-visual-type").addEventListener("change", (event) => {
+      this.populateEntityVisualOptions(event.target.value);
+    });
+    byId("trigger-event-item-use").addEventListener("change", () =>
+      this.updateTriggerItemFieldVisibility(),
+    );
+    byId("add-trigger").addEventListener("click", () => this.addTrigger());
+    byId("add-exit").addEventListener("click", () => this.addExit());
+    byId("connection-source-edge").addEventListener("change", () =>
+      this.renderConnectionControls(),
+    );
+    byId("connection-target-map").addEventListener("change", () =>
+      this.renderConnectionControls(),
+    );
+    for (const id of [
+      "connection-source-range-start",
+      "connection-source-range-end",
+      "connection-target-range-start",
+    ]) {
+      byId(id).addEventListener("input", () => this.renderConnectionControls());
     }
+    byId("create-reciprocal-connection").addEventListener("click", () =>
+      this.createReciprocalConnection(),
+    );
 
-    onCanvasWheel(event) {
-        if (!event.ctrlKey && !event.metaKey) return;
+    this.canvas.addEventListener("pointerdown", (event) =>
+      this.onPointerDown(event),
+    );
+    this.canvas.addEventListener("pointermove", (event) =>
+      this.onPointerMove(event),
+    );
+    this.canvas.addEventListener("pointerup", (event) =>
+      this.onPointerUp(event),
+    );
+    this.canvas.addEventListener("pointercancel", (event) =>
+      this.onPointerUp(event),
+    );
+    this.canvas.addEventListener("pointerleave", () => {
+      if (this.pointerAction?.kind === "brush") {
+        this.pointerAction.lastKey = null;
+      }
+      byId("cursor-position").textContent = "Cell: —";
+    });
+    this.canvas.addEventListener("contextmenu", (event) =>
+      event.preventDefault(),
+    );
 
+    byId("entity-interaction-template").addEventListener("change", () =>
+      this.renderInteractionTemplateDescription(),
+    );
+    byId("insert-entity-interaction-template").addEventListener("click", () =>
+      this.insertSelectedInteractionTemplate(),
+    );
+    byId("entity-interaction").addEventListener("input", () =>
+      this.syncSimpleDialogueFromInteractionJson(),
+    );
+    byId("entity-dialogue-speaker").addEventListener("input", () =>
+      this.syncInteractionJsonFromSimpleDialogue(),
+    );
+    byId("entity-dialogue-pages").addEventListener("input", () =>
+      this.syncInteractionJsonFromSimpleDialogue(),
+    );
+    byId("apply-entity").addEventListener("click", () =>
+      this.applyEntityInspector(),
+    );
+    byId("delete-entity").addEventListener("click", () =>
+      this.deleteSelectedEntity(),
+    );
+    byId("apply-entry").addEventListener("click", () =>
+      this.applyEntryInspector(),
+    );
+    byId("delete-entry").addEventListener("click", () =>
+      this.deleteSelectedEntry(),
+    );
+    byId("apply-trigger").addEventListener("click", () =>
+      this.applyTriggerInspector(),
+    );
+    byId("delete-trigger").addEventListener("click", () =>
+      this.deleteSelectedTrigger(),
+    );
+    byId("move-trigger-up").addEventListener("click", () =>
+      this.moveSelectedTrigger(-1),
+    );
+    byId("move-trigger-down").addEventListener("click", () =>
+      this.moveSelectedTrigger(1),
+    );
+    byId("apply-exit").addEventListener("click", () =>
+      this.applyExitInspector(),
+    );
+    byId("delete-exit").addEventListener("click", () =>
+      this.deleteSelectedExit(),
+    );
+    byId("exit-target-map").addEventListener("change", () =>
+      this.populateExitEntryOptions(),
+    );
+    byId("exit-json").addEventListener(
+      "input",
+      () => (this.exitJsonDirty = true),
+    );
+
+    window.addEventListener("storage", (event) => {
+      if (event.key !== PLAYTEST_RESULT_KEY || !event.newValue) return;
+      try {
+        this.displayPlaytestResult(JSON.parse(event.newValue));
+      } catch (error) {
+        this.displayPlaytestResult({ ok: false, message: error.message });
+      }
+    });
+
+    window.addEventListener("beforeunload", (event) => {
+      if (!this.dirty) return;
+      event.preventDefault();
+      event.returnValue = "";
+    });
+    document.addEventListener("keydown", (event) => {
+      const modifier = event.ctrlKey || event.metaKey;
+      if (modifier && event.key.toLowerCase() === "z") {
         event.preventDefault();
-        const direction = event.deltaY < 0 ? 1 : -1;
-        this.changeZoom(direction, event);
+        event.shiftKey ? this.redo() : this.undo();
+      } else if (modifier && event.key.toLowerCase() === "y") {
+        event.preventDefault();
+        this.redo();
+      } else if (
+        event.key === "Delete" &&
+        !event.target.matches("input, textarea, select")
+      ) {
+        if (this.selectedEntityId) this.deleteSelectedEntity();
+        else if (this.selectedEntryId) this.deleteSelectedEntry();
+        else if (this.selectedTriggerId) this.deleteSelectedTrigger();
+        else if (this.selectedExitIndex !== null) this.deleteSelectedExit();
+      }
+    });
+  }
+
+  snapshot() {
+    return { maps: cloneData(this.maps), selectedMapId: this.selectedMapId };
+  }
+
+  restoreSnapshot(snapshot) {
+    this.maps = cloneData(snapshot.maps);
+    this.selectedMapId = this.maps.some(
+      (map) => map.id === snapshot.selectedMapId,
+    )
+      ? snapshot.selectedMapId
+      : this.maps[0].id;
+    this.mapGraph.invalidatePositions();
+    this.clearSelection();
+  }
+
+  beginTransaction() {
+    if (!this.transactionBefore) this.transactionBefore = this.snapshot();
+  }
+
+  endTransaction(label) {
+    if (!this.transactionBefore) return;
+    const before = this.transactionBefore;
+    this.transactionBefore = null;
+    if (JSON.stringify(before.maps) === JSON.stringify(this.maps)) return;
+    this.undoStack.push(before);
+    if (this.undoStack.length > 100) this.undoStack.shift();
+    this.redoStack = [];
+    this.afterMutation(label);
+  }
+
+  commitMutation(label, mutator) {
+    const before = this.snapshot();
+    mutator();
+    if (JSON.stringify(before.maps) === JSON.stringify(this.maps)) return false;
+    this.undoStack.push(before);
+    if (this.undoStack.length > 100) this.undoStack.shift();
+    this.redoStack = [];
+    this.afterMutation(label);
+    return true;
+  }
+
+  afterMutation(label) {
+    this.dirty = true;
+    this.saveRecovery(false);
+    this.setStatus(`${label}. Unsaved editor changes.`);
+    this.updateUndoButtons();
+    this.validateAndDisplay();
+  }
+
+  async undo() {
+    const snapshot = this.undoStack.pop();
+    if (!snapshot) return;
+    this.redoStack.push(this.snapshot());
+    this.restoreSnapshot(snapshot);
+    this.dirty = true;
+    this.saveRecovery(false);
+    await this.refreshDocumentUI();
+    this.setStatus("Undid the last action.");
+  }
+
+  async redo() {
+    const snapshot = this.redoStack.pop();
+    if (!snapshot) return;
+    this.undoStack.push(this.snapshot());
+    this.restoreSnapshot(snapshot);
+    this.dirty = true;
+    this.saveRecovery(false);
+    await this.refreshDocumentUI();
+    this.setStatus("Redid the last action.");
+  }
+
+  updateUndoButtons() {
+    byId("undo").disabled = this.undoStack.length === 0;
+    byId("redo").disabled = this.redoStack.length === 0;
+  }
+
+  async refreshDocumentUI() {
+    if (!this.currentMap) return;
+    await this.renderer
+      .loadDefinitions(this.currentMap)
+      .catch((error) => this.setStatus(error.message, true));
+    this.renderMapControls();
+    this.renderPalette();
+    this.renderEntityPalette();
+    this.renderTriggerList();
+    this.renderExitList();
+    this.updateModeUI();
+    this.renderInspectors();
+    this.validateAndDisplay();
+    this.updateUndoButtons();
+    this.refreshOpenMapGraph();
+  }
+
+  async refreshAfterMutation() {
+    await this.renderer
+      .loadDefinitions(this.currentMap)
+      .catch((error) => this.setStatus(error.message, true));
+    this.renderMapControls();
+    this.renderPalette();
+    this.renderEntityPalette();
+    this.renderTriggerList();
+    this.renderExitList();
+    this.renderInspectors();
+    this.validateAndDisplay();
+  }
+
+  renderMapControls() {
+    const mapSelect = byId("map-select");
+    const groupedMaps = new Map();
+
+    for (const map of this.maps) {
+      const authoredGroup =
+        typeof map.editorGroup === "string" ? map.editorGroup.trim() : "";
+      const groupName = authoredGroup || "Ungrouped";
+
+      if (!groupedMaps.has(groupName)) {
+        groupedMaps.set(groupName, []);
+      }
+      groupedMaps.get(groupName).push(map);
     }
 
-    applyZoom() {
-        const width = this.canvas.width * this.zoom;
-        const height = this.canvas.height * this.zoom;
-        const cssWidth = `${width}px`;
-        const cssHeight = `${height}px`;
+    const groupNames = [...groupedMaps.keys()].sort((first, second) => {
+      if (first === second) return 0;
+      if (first === "Ungrouped") return 1;
+      if (second === "Ungrouped") return -1;
+      return first.localeCompare(second);
+    });
 
-        if (this.canvas.style.width !== cssWidth) this.canvas.style.width = cssWidth;
-        if (this.canvas.style.height !== cssHeight) this.canvas.style.height = cssHeight;
-        if (this.canvasStage.style.width !== cssWidth) this.canvasStage.style.width = cssWidth;
-        if (this.canvasStage.style.height !== cssHeight) this.canvasStage.style.height = cssHeight;
+    const optionGroups = groupNames.map((groupName) => {
+      const optionGroup = document.createElement("optgroup");
+      optionGroup.label = groupName;
+      optionGroup.append(
+        ...groupedMaps.get(groupName).map((map) => new Option(map.id, map.id)),
+      );
+      return optionGroup;
+    });
 
-        byId("zoom-reset").textContent = `${Math.round(this.zoom * 100)}%`;
-        const zoomIndex = ZOOM_LEVELS.indexOf(this.zoom);
-        byId("zoom-out").disabled = zoomIndex <= 0;
-        byId("zoom-in").disabled = zoomIndex >= ZOOM_LEVELS.length - 1;
+    mapSelect.replaceChildren(...optionGroups);
+    mapSelect.value = this.currentMap.id;
+    byId("map-id").value = this.currentMap.id;
+    byId("map-group").value =
+      typeof this.currentMap.editorGroup === "string"
+        ? this.currentMap.editorGroup.trim()
+        : "";
+    const { width, height } = getMapSize(this.currentMap);
+    byId("map-width").value = width;
+    byId("map-height").value = height;
+    byId("map-camera-zoom").value = this.currentMap.camera.zoom;
+
+    const initialSelect = byId("initial-entry");
+    initialSelect.replaceChildren(
+      ...Object.keys(this.currentMap.entries).map(
+        (entryId) => new Option(entryId, entryId),
+      ),
+    );
+    initialSelect.value = this.currentMap.initialEntryId ?? "";
+    this.renderConnectionControls();
+  }
+
+  updateModeUI() {
+    this.updateButtonSelection("#mode-buttons button", "mode", this.mode);
+    byId("tile-tools-section").hidden = this.mode !== "tiles";
+    byId("palette-section").hidden = this.mode !== "tiles";
+    byId("entity-tools-section").hidden = this.mode !== "entities";
+    byId("entry-tools-section").hidden = this.mode !== "entries";
+    byId("trigger-tools-section").hidden = this.mode !== "triggers";
+    byId("exit-tools-section").hidden = this.mode !== "exits";
+  }
+
+  updateButtonSelection(selector, datasetKey, value) {
+    document.querySelectorAll(selector).forEach((button) => {
+      button.classList.toggle("selected", button.dataset[datasetKey] === value);
+    });
+  }
+
+  renderPalette() {
+    const root = byId("tile-palette");
+    root.setAttribute("role", "listbox");
+    root.setAttribute("aria-label", "Tile palette");
+    root.replaceChildren();
+    this.palettePreviews = this.palettePreviews.filter(
+      (preview) => preview.palette !== "tiles",
+    );
+    const merged = mergeTileDefinitions(this.currentMap);
+    const localIds = new Set(
+      Object.keys(this.currentMap.tiles ?? {}).map(String),
+    );
+    const categories = new Map([
+      [
+        "Utility",
+        [
+          {
+            tileId: EMPTY_TILE_ID,
+            tile: null,
+            label: "Empty",
+          },
+        ],
+      ],
+    ]);
+
+    for (const [rawId, tile] of Object.entries(merged)) {
+      const tileId = Number(rawId);
+      const isLocal = localIds.has(rawId);
+      const meta = TILE_EDITOR_META[tileId];
+      const category = isLocal ? "This map" : (meta?.category ?? "Other");
+      if (!categories.has(category)) categories.set(category, []);
+      categories
+        .get(category)
+        .push({ tileId, tile, label: meta?.label ?? `Tile ${tileId}` });
     }
 
-    getZoomAnchor(event = null) {
-        if (event && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
-            return { clientX: event.clientX, clientY: event.clientY };
-        }
-
-        const rect = this.canvasScroll.getBoundingClientRect();
-        return {
-            clientX: rect.left + this.canvasScroll.clientWidth / 2,
-            clientY: rect.top + this.canvasScroll.clientHeight / 2,
-        };
-    }
-
-    setZoom(nextZoom, event = null) {
-        if (!ZOOM_LEVELS.includes(nextZoom)) {
-            throw new Error(`Unsupported editor zoom level ${String(nextZoom)}.`);
-        }
-
-        const anchor = this.getZoomAnchor(event);
-        const beforeRect = this.canvas.getBoundingClientRect();
-        const sourceX =
-            beforeRect.width > 0
-                ? ((anchor.clientX - beforeRect.left) / beforeRect.width) * this.canvas.width
-                : this.canvas.width / 2;
-        const sourceY =
-            beforeRect.height > 0
-                ? ((anchor.clientY - beforeRect.top) / beforeRect.height) * this.canvas.height
-                : this.canvas.height / 2;
-
-        this.zoom = nextZoom;
-        this.applyZoom();
-
-        const afterRect = this.canvas.getBoundingClientRect();
-        const scaledClientX = afterRect.left + (sourceX / this.canvas.width) * afterRect.width;
-        const scaledClientY = afterRect.top + (sourceY / this.canvas.height) * afterRect.height;
-
-        this.canvasScroll.scrollLeft += scaledClientX - anchor.clientX;
-        this.canvasScroll.scrollTop += scaledClientY - anchor.clientY;
-    }
-
-    changeZoom(direction, event = null) {
-        const currentIndex = ZOOM_LEVELS.indexOf(this.zoom);
-        const nextIndex = Math.max(
-            0,
-            Math.min(ZOOM_LEVELS.length - 1, currentIndex + Math.sign(direction)),
+    for (const [category, items] of categories) {
+      const section = document.createElement("div");
+      section.className = "palette-category";
+      const title = document.createElement("h3");
+      title.textContent = category;
+      const list = document.createElement("div");
+      list.className = "palette-items";
+      for (const item of items) {
+        const incompatible = !canPlaceTile(
+          this.currentMap,
+          this.activeLayer,
+          item.tileId,
+          0,
+          0,
         );
-        if (nextIndex === currentIndex) return;
-        this.setZoom(ZOOM_LEVELS[nextIndex], event);
-    }
-
-    animationLoop(time) {
-        this.renderer.advance(time);
-        this.renderer.render(this.currentMap, {
-            visibleLayers: this.visibleLayers,
-            activeLayer: this.activeLayer,
-            showGrid: this.showGrid,
-            showCollision: this.showCollision,
-            showFootprints: this.showFootprints,
-            selectedEntityId: this.selectedEntityId,
-            selectedEntryId: this.selectedEntryId,
-            showTriggers: this.mode === "triggers",
-            selectedTriggerId: this.selectedTriggerId,
-            selectedExitIndex: this.selectedExitIndex,
-            rectanglePreview: this.rectanglePreview,
-            triggerPreview: this.triggerPreview,
-        });
-        this.applyZoom();
-        for (const preview of this.palettePreviews) {
-            if (preview.visual) {
-                this.renderer.renderVisualPreview(
-                    preview.ctx,
-                    preview.visual,
-                    this.renderer.animationTimeMs,
-                );
-            } else {
-                renderThumbnailPlaceholder(preview.ctx, preview.placeholder);
-            }
-        }
-        requestAnimationFrame((nextTime) => this.animationLoop(nextTime));
-    }
-
-    getCell(event) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = ((event.clientX - rect.left) / rect.width) * this.canvas.width;
-        const y = ((event.clientY - rect.top) / rect.height) * this.canvas.height;
-        const col = Math.floor(x / TILE_SIZE);
-        const row = Math.floor(y / TILE_SIZE);
-        const { width, height } = getMapSize(this.currentMap);
-        if (col < 0 || row < 0 || col >= width || row >= height) return null;
-        return { col, row, x, y };
-    }
-
-    onPointerDown(event) {
-        const cell = this.getCell(event);
-        if (!cell) return;
-        this.canvas.setPointerCapture(event.pointerId);
-        if (this.mode === "tiles") this.startTileAction(event, cell);
-        else if (this.mode === "entities") this.startEntityAction(cell);
-        else if (this.mode === "entries") this.startEntryAction(cell);
-        else if (this.mode === "triggers") this.startTriggerAction(cell);
-        else this.selectExitAt(cell);
-    }
-
-    onPointerMove(event) {
-        const cell = this.getCell(event);
-        if (!cell) {
-            if (this.pointerAction?.kind === "brush") {
-                this.pointerAction.lastKey = null;
-            }
-
-            byId("cursor-position").textContent = "Cell: —";
-            return;
-        }
-
-        byId("cursor-position").textContent = `Cell: ${cell.col}, ${cell.row}`;
-        if (!this.pointerAction) return;
-
-        if (this.pointerAction.kind === "brush") {
-            this.paintCell(cell);
-        } else if (this.pointerAction.kind === "rectangle") {
-            this.rectanglePreview.end = { col: cell.col, row: cell.row };
-        } else if (this.pointerAction.kind === "entity-drag") {
-            const entity = this.currentMap.entities.find(
-                (item) => item.id === this.pointerAction.entityId,
-            );
-            if (entity && canPlaceEntity(this.currentMap, entity, cell.col, cell.row)) {
-                entity.col = cell.col;
-                entity.row = cell.row;
-                this.renderInspectors();
-            }
-        } else if (this.pointerAction.kind === "entry-drag") {
-            const entry = this.currentMap.entries[this.pointerAction.entryId];
-            if (entry) {
-                entry.col = cell.col;
-                entry.row = cell.row;
-                this.renderInspectors();
-            }
-        } else if (this.pointerAction.kind === "trigger-create") {
-            this.triggerPreview.end = { col: cell.col, row: cell.row };
-        } else if (this.pointerAction.kind === "trigger-move") {
-            const trigger = this.currentMap.triggers.find(
-                (candidate) => candidate.id === this.pointerAction.triggerId,
-            );
-            if (trigger) {
-                const { width, height } = getMapSize(this.currentMap);
-                trigger.region.col = Math.max(
-                    0,
-                    Math.min(width - trigger.region.width, cell.col - this.pointerAction.offsetCol),
-                );
-                trigger.region.row = Math.max(
-                    0,
-                    Math.min(
-                        height - trigger.region.height,
-                        cell.row - this.pointerAction.offsetRow,
-                    ),
-                );
-                this.renderInspectors();
-            }
-        } else if (this.pointerAction.kind === "trigger-resize") {
-            this.resizeSelectedTriggerFromPointer(cell);
-        }
-    }
-
-    onPointerUp(event) {
-        if (!this.pointerAction) return;
-        const action = this.pointerAction;
-        this.pointerAction = null;
-        if (action.kind === "rectangle") {
-            const tileId = action.erase ? EMPTY_TILE_ID : this.selectedTileId;
-            fillRectangle(
-                this.currentMap,
-                this.activeLayer,
-                this.rectanglePreview.start,
-                this.rectanglePreview.end,
-                tileId,
-            );
-            this.rectanglePreview = null;
-            this.endTransaction("Rectangle fill");
-        } else if (action.kind === "brush") {
-            this.endTransaction("Tile brush stroke");
-        } else if (action.kind === "entity-drag") {
-            this.endTransaction("Move entity");
-        } else if (action.kind === "entry-drag") {
-            this.endTransaction("Move entry");
-        } else if (action.kind === "trigger-create") {
-            const start = this.triggerPreview.start;
-            const end = this.triggerPreview.end;
-            const region = {
-                col: Math.min(start.col, end.col),
-                row: Math.min(start.row, end.row),
-                width: Math.abs(end.col - start.col) + 1,
-                height: Math.abs(end.row - start.row) + 1,
-            };
-            const trigger = this.createDefaultTrigger(region);
-            this.currentMap.triggers.push(trigger);
-            this.selectedTriggerId = trigger.id;
-            this.triggerPreview = null;
-            this.endTransaction("Create trigger");
-        } else if (action.kind === "trigger-move") {
-            this.endTransaction("Move trigger");
-        } else if (action.kind === "trigger-resize") {
-            this.endTransaction("Resize trigger");
-        }
-        this.refreshAfterMutation();
-        if (this.canvas.hasPointerCapture(event.pointerId))
-            this.canvas.releasePointerCapture(event.pointerId);
-    }
-
-    startTileAction(event, cell) {
-        const layer = this.currentMap.layers[this.activeLayer];
-        if (this.tool === "eyedropper") {
-            if (!layer) return;
-            const tileId = layer[cell.row][cell.col];
-            this.selectedTileId = tileId;
-            this.tool = "pencil";
-            this.updateButtonSelection("#tool-buttons button", "tool", this.tool);
+        const card = createVisualPaletteCard({
+          id: item.tileId,
+          label: item.label,
+          title: `${item.label} (${item.tileId})`,
+          visual: item.tile,
+          selected: item.tileId === this.selectedTileId,
+          onSelect: (rawTileId) => {
+            this.selectedTileId = Number(rawTileId);
             this.renderPalette();
-            return;
-        }
-        if (this.tool === "fill") {
-            const tileId = event.button === 2 ? EMPTY_TILE_ID : this.selectedTileId;
-            this.commitMutation("Flood fill", () =>
-                floodFill(this.currentMap, this.activeLayer, cell.col, cell.row, tileId),
-            );
-            this.refreshAfterMutation();
-            return;
-        }
-        if (this.tool === "rectangle") {
-            this.beginTransaction();
-            this.pointerAction = { kind: "rectangle", erase: event.button === 2 };
-            this.rectanglePreview = {
-                start: { col: cell.col, row: cell.row },
-                end: { col: cell.col, row: cell.row },
-            };
-            return;
-        }
-        this.beginTransaction();
-        this.pointerAction = {
-            kind: "brush",
-            lastKey: null,
-            erase: this.tool === "eraser" || event.button === 2,
-        };
-        this.paintCell(cell);
-    }
-
-    paintCell(cell) {
-        const key = `${cell.col},${cell.row}`;
-        if (this.pointerAction.lastKey === key) return;
-
-        this.pointerAction.lastKey = key;
-
-        const tileId = this.pointerAction.erase ? EMPTY_TILE_ID : this.selectedTileId;
-
-        if (!canPlaceTile(this.currentMap, this.activeLayer, tileId, cell.col, cell.row)) {
-            this.setStatus("Placement rejected: invalid layer or footprint outside the map.", true);
-            return;
-        }
-
-        setTile(this.currentMap, this.activeLayer, cell.col, cell.row, tileId);
-
-        this.setStatus("Painting. Unsaved editor changes.");
-    }
-
-    startEntityAction(cell) {
-        const existing = [...this.currentMap.entities]
-            .reverse()
-            .find((entity) =>
-                getEntityOccupiedCells(this.currentMap, entity).some(
-                    (occupied) => occupied.col === cell.col && occupied.row === cell.row,
-                ),
-            );
-        if (existing) {
-            this.selectedEntityId = existing.id;
-            this.selectedEntryId = null;
-            this.selectedTriggerId = null;
-            this.selectedExitIndex = null;
-            this.beginTransaction();
-            this.pointerAction = { kind: "entity-drag", entityId: existing.id };
-            this.renderInspectors();
-            return;
-        }
-        const preset = ENTITY_PRESETS[this.selectedEntityPreset];
-        const entity = {
-            id: makeUniqueId(
-                this.selectedEntityPreset,
-                new Set(this.currentMap.entities.map((item) => item.id)),
-            ),
-            ...cloneData(preset.entity),
-            col: cell.col,
-            row: cell.row,
-        };
-        if (!canPlaceEntity(this.currentMap, entity)) {
-            this.setStatus(
-                "Placement rejected: entity visual footprint extends outside the map.",
-                true,
-            );
-            return;
-        }
-        this.commitMutation("Place entity", () => this.currentMap.entities.push(entity));
-        this.selectedEntityId = entity.id;
-        this.selectedTriggerId = null;
-        this.renderInspectors();
-        this.refreshAfterMutation();
-    }
-
-    startEntryAction(cell) {
-        const existing = Object.entries(this.currentMap.entries).find(
-            ([, entry]) => entry.col === cell.col && entry.row === cell.row,
-        );
-        if (existing) {
-            this.selectedEntryId = existing[0];
-            this.selectedEntityId = null;
-            this.selectedTriggerId = null;
-            this.selectedExitIndex = null;
-            this.beginTransaction();
-            this.pointerAction = { kind: "entry-drag", entryId: existing[0] };
-            this.renderInspectors();
-            return;
-        }
-        const entryId = makeUniqueId("entry", new Set(Object.keys(this.currentMap.entries)));
-        this.commitMutation("Place entry", () => {
-            this.currentMap.entries[entryId] = {
-                col: cell.col,
-                row: cell.row,
-                facing: { dc: 0, dr: 1 },
-            };
-            if (!this.currentMap.initialEntryId) this.currentMap.initialEntryId = entryId;
+          },
         });
-        this.selectedEntryId = entryId;
-        this.selectedTriggerId = null;
-        this.renderMapControls();
-        this.renderInspectors();
+        if (incompatible) card.button.dataset.incompatible = "true";
+        list.append(card.button);
+        this.palettePreviews.push({ ...card.preview, palette: "tiles" });
+      }
+      section.append(title, list);
+      root.append(section);
+    }
+    bindPaletteKeyboardNavigation(root, (rawTileId) => {
+      this.selectedTileId = Number(rawTileId);
+    });
+  }
+
+  renderEntityPalette() {
+    const root = byId("entity-palette");
+    root.replaceChildren();
+    this.palettePreviews = this.palettePreviews.filter(
+      (preview) => preview.palette !== "entities",
+    );
+
+    const section = document.createElement("div");
+    section.className = "palette-category";
+    const title = document.createElement("h3");
+    title.textContent = "Presets";
+    const list = document.createElement("div");
+    list.className = "palette-items";
+
+    for (const [presetId, preset] of Object.entries(ENTITY_PRESETS)) {
+      const visualReference = preset.entity?.visual;
+      const visual = getEntityVisualDefinition(
+        this.currentMap,
+        visualReference,
+      );
+      const previewVisual = visual
+        ? { ...visual, transform: preset.entity.transform }
+        : null;
+      const imageStatus = visual
+        ? this.renderer.getVisualImageStatus(visual)
+        : "missing";
+      const missing = !visual || imageStatus === "missing";
+      const visualLabel = visualReference
+        ? `${visualReference.type}:${String(visualReference.id)}`
+        : "no visual";
+      const missingDescription = visual
+        ? `could not load ${visual.path}`
+        : `missing ${visualLabel}`;
+      const card = createVisualPaletteCard({
+        id: presetId,
+        label: preset.label,
+        title: missing
+          ? `${preset.label} — ${missingDescription}`
+          : `${preset.label} — ${visualLabel}`,
+        visual: previewVisual,
+        selected: presetId === this.selectedEntityPreset,
+        disabled: missing,
+        missing,
+        onSelect: (selectedPresetId) => {
+          this.selectedEntityPreset = selectedPresetId;
+          this.renderEntityPalette();
+        },
+      });
+      list.append(card.button);
+      this.palettePreviews.push({ ...card.preview, palette: "entities" });
     }
 
-    createDefaultTrigger(region) {
-        return {
-            id: makeUniqueId(
-                "trigger",
-                new Set((this.currentMap.triggers ?? []).map((trigger) => trigger.id)),
-            ),
-            region: { ...region },
-            events: ["enter"],
-            frequency: "always",
-            effects: [
-                {
-                    type: "showText",
-                    pages: ["A trigger fired."],
-                },
-            ],
-        };
-    }
+    section.append(title, list);
+    root.append(section);
+    bindPaletteKeyboardNavigation(root, (presetId) => {
+      this.selectedEntityPreset = presetId;
+    });
+  }
 
-    addTrigger() {
-        const trigger = this.createDefaultTrigger({ col: 0, row: 0, width: 1, height: 1 });
-        this.commitMutation("Add trigger", () => this.currentMap.triggers.push(trigger));
+  renderTriggerList() {
+    const root = byId("trigger-list");
+    root.replaceChildren();
+    for (const [index, trigger] of (this.currentMap.triggers ?? []).entries()) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent =
+        `${index + 1}. ${trigger.id} — ` +
+        `${trigger.region.col},${trigger.region.row} ` +
+        `${trigger.region.width}×${trigger.region.height}`;
+      button.classList.toggle(
+        "selected",
+        trigger.id === this.selectedTriggerId,
+      );
+      button.addEventListener("click", () => {
         this.selectedTriggerId = trigger.id;
         this.selectedEntityId = null;
         this.selectedEntryId = null;
         this.selectedExitIndex = null;
         this.mode = "triggers";
         this.updateModeUI();
-        this.refreshAfterMutation();
-    }
-
-    getSelectedTrigger() {
-        return (this.currentMap.triggers ?? []).find(
-            (trigger) => trigger.id === this.selectedTriggerId,
-        );
-    }
-
-    getTriggerAtCell(cell) {
-        return [...(this.currentMap.triggers ?? [])].reverse().find((trigger) => {
-            const { col, row, width, height } = trigger.region;
-            return (
-                cell.col >= col &&
-                cell.col < col + width &&
-                cell.row >= row &&
-                cell.row < row + height
-            );
-        });
-    }
-
-    getTriggerResizeHandle(cell, trigger) {
-        if (!trigger) return null;
-        const x = trigger.region.col * TILE_SIZE;
-        const y = trigger.region.row * TILE_SIZE;
-        const width = trigger.region.width * TILE_SIZE;
-        const height = trigger.region.height * TILE_SIZE;
-        const handles = [
-            ["nw", x, y],
-            ["n", x + width / 2, y],
-            ["ne", x + width, y],
-            ["w", x, y + height / 2],
-            ["e", x + width, y + height / 2],
-            ["sw", x, y + height],
-            ["s", x + width / 2, y + height],
-            ["se", x + width, y + height],
-        ];
-        const tolerance = 7;
-        return (
-            handles.find(
-                ([, handleX, handleY]) =>
-                    Math.abs(cell.x - handleX) <= tolerance &&
-                    Math.abs(cell.y - handleY) <= tolerance,
-            )?.[0] ?? null
-        );
-    }
-
-    startTriggerAction(cell) {
-        const selected = this.getSelectedTrigger();
-        const resizeHandle = this.getTriggerResizeHandle(cell, selected);
-        if (selected && resizeHandle) {
-            this.beginTransaction();
-            this.pointerAction = {
-                kind: "trigger-resize",
-                triggerId: selected.id,
-                handle: resizeHandle,
-                originalRegion: { ...selected.region },
-            };
-            return;
-        }
-
-        const existing = this.getTriggerAtCell(cell);
-        if (existing) {
-            this.selectedTriggerId = existing.id;
-            this.selectedEntityId = null;
-            this.selectedEntryId = null;
-            this.selectedExitIndex = null;
-            this.beginTransaction();
-            this.pointerAction = {
-                kind: "trigger-move",
-                triggerId: existing.id,
-                offsetCol: cell.col - existing.region.col,
-                offsetRow: cell.row - existing.region.row,
-            };
-            this.renderTriggerList();
-            this.renderInspectors();
-            return;
-        }
-
-        this.clearSelection();
-        this.beginTransaction();
-        this.pointerAction = { kind: "trigger-create" };
-        this.triggerPreview = {
-            start: { col: cell.col, row: cell.row },
-            end: { col: cell.col, row: cell.row },
-        };
+        this.renderTriggerList();
         this.renderInspectors();
+      });
+      root.append(button);
     }
+  }
 
-    resizeSelectedTriggerFromPointer(cell) {
-        const action = this.pointerAction;
-        const trigger = this.currentMap.triggers.find(
-            (candidate) => candidate.id === action.triggerId,
-        );
-        if (!trigger) return;
-
-        const original = action.originalRegion;
-        let left = original.col;
-        let right = original.col + original.width - 1;
-        let top = original.row;
-        let bottom = original.row + original.height - 1;
-
-        if (action.handle.includes("w")) left = Math.min(cell.col, right);
-        if (action.handle.includes("e")) right = Math.max(cell.col, left);
-        if (action.handle.includes("n")) top = Math.min(cell.row, bottom);
-        if (action.handle.includes("s")) bottom = Math.max(cell.row, top);
-
-        trigger.region.col = left;
-        trigger.region.row = top;
-        trigger.region.width = right - left + 1;
-        trigger.region.height = bottom - top + 1;
-        this.renderInspectors();
-    }
-
-    selectExitAt(cell) {
-        const { width, height } = getMapSize(this.currentMap);
-        const candidates = [];
-        if (cell.row === 0) candidates.push(["north", cell.col]);
-        if (cell.row === height - 1) candidates.push(["south", cell.col]);
-        if (cell.col === 0) candidates.push(["west", cell.row]);
-        if (cell.col === width - 1) candidates.push(["east", cell.row]);
-        const index = this.currentMap.exits.findIndex((exit) =>
-            candidates.some(
-                ([edge, axis]) =>
-                    exit.edge === edge && axis >= exit.range[0] && axis <= exit.range[1],
-            ),
-        );
-        if (index >= 0) {
-            this.selectedExitIndex = index;
-            this.selectedEntityId = null;
-            this.selectedEntryId = null;
-            this.selectedTriggerId = null;
-            this.renderExitList();
-            this.renderInspectors();
-        }
-    }
-
-    clearSelection() {
-        this.selectedEntityId = null;
-        this.selectedEntryId = null;
-        this.selectedTriggerId = null;
-        this.selectedExitIndex = null;
-    }
-
-    renderInspectors() {
-        byId("map-inspector").hidden = Boolean(
-            this.selectedEntityId ||
-            this.selectedEntryId ||
-            this.selectedTriggerId ||
-            this.selectedExitIndex !== null,
-        );
-        byId("entity-inspector").hidden = !this.selectedEntityId;
-        byId("entry-inspector").hidden = !this.selectedEntryId;
-        byId("trigger-inspector").hidden = !this.selectedTriggerId;
-        byId("exit-inspector").hidden = this.selectedExitIndex === null;
-
-        if (this.selectedEntityId) this.renderEntityInspector();
-        if (this.selectedEntryId) this.renderEntryInspector();
-        if (this.selectedTriggerId) this.renderTriggerInspector();
-        if (this.selectedExitIndex !== null) this.renderExitInspector();
-        const selection = this.selectedEntityId
-            ? `Entity: ${this.selectedEntityId}`
-            : this.selectedEntryId
-              ? `Entry: ${this.selectedEntryId}`
-              : this.selectedTriggerId
-                ? `Trigger: ${this.selectedTriggerId}`
-                : this.selectedExitIndex !== null
-                  ? `Exit: ${this.selectedExitIndex}`
-                  : "No selection";
-        byId("selection-status").textContent = selection;
-    }
-
-    renderEntityInspector() {
-        const entity = this.currentMap.entities.find((item) => item.id === this.selectedEntityId);
-        if (!entity) return this.clearSelection();
-        byId("entity-id").value = entity.id;
-        byId("entity-visual-type").value = entity.visual.type;
-        this.populateEntityVisualOptions(entity.visual.type, entity.visual.id);
-        byId("entity-flip-x").checked = entity.transform.flipX;
-        byId("entity-flip-y").checked = entity.transform.flipY;
-        byId("entity-col").value = entity.col;
-        byId("entity-row").value = entity.row;
-        byId("entity-active").checked = entity.active;
-        byId("entity-collision").checked = entity.collision;
-        byId("entity-interaction").value = entity.interaction
-            ? JSON.stringify(entity.interaction, null, 4)
-            : "";
-        this.renderInteractionTemplateDescription();
-        this.renderSimpleDialogueInspector(entity.interaction);
-    }
-
-    renderSimpleDialogueInspector(interaction) {
-        const section = byId("entity-simple-dialogue");
-        const effect = findPrimaryShowTextEffect(interaction);
-        section.hidden = !effect;
-
-        if (!effect) {
-            byId("entity-dialogue-speaker").value = "";
-            byId("entity-dialogue-pages").value = "";
-            return;
-        }
-
-        byId("entity-dialogue-speaker").value =
-            typeof effect.speaker === "string" ? effect.speaker : "";
-        byId("entity-dialogue-pages").value = formatDialoguePages(effect.pages);
-    }
-
-    syncSimpleDialogueFromInteractionJson() {
-        const text = byId("entity-interaction").value.trim();
-        if (!text) {
-            this.renderSimpleDialogueInspector(null);
-            return;
-        }
-
-        try {
-            this.renderSimpleDialogueInspector(JSON.parse(text));
-        } catch {
-            byId("entity-simple-dialogue").hidden = true;
-        }
-    }
-
-    syncInteractionJsonFromSimpleDialogue() {
-        const interactionText = byId("entity-interaction").value.trim();
-        if (!interactionText) return;
-
-        let interaction;
-        try {
-            interaction = JSON.parse(interactionText);
-        } catch {
-            return;
-        }
-
-        const effect = findPrimaryShowTextEffect(interaction);
-        if (!effect) return;
-
-        const speaker = byId("entity-dialogue-speaker").value.trim();
-        if (speaker) effect.speaker = speaker;
-        else delete effect.speaker;
-        effect.pages = parseDialoguePages(byId("entity-dialogue-pages").value);
-
-        byId("entity-interaction").value = JSON.stringify(interaction, null, 4);
-    }
-
-    applyEntityInspector() {
-        const entity = this.currentMap.entities.find((item) => item.id === this.selectedEntityId);
-        if (!entity) return;
-        try {
-            const newId = byId("entity-id").value.trim();
-            const col = Number(byId("entity-col").value);
-            const row = Number(byId("entity-row").value);
-            const interactionText = byId("entity-interaction").value.trim();
-            const interaction = interactionText ? JSON.parse(interactionText) : null;
-            const visual = this.readEntityVisualInspector();
-            const { width, height } = getMapSize(this.currentMap);
-            if (
-                !newId ||
-                (newId !== entity.id && this.currentMap.entities.some((item) => item.id === newId))
-            ) {
-                throw new Error("Entity IDs must be nonempty and unique within the map.");
-            }
-            if (
-                !Number.isInteger(col) ||
-                !Number.isInteger(row) ||
-                col < 0 ||
-                row < 0 ||
-                col >= width ||
-                row >= height
-            ) {
-                throw new Error("Entity position must be an integer cell inside the map.");
-            }
-            if (!canPlaceEntity(this.currentMap, { ...entity, visual }, col, row)) {
-                throw new Error(
-                    "Entity visual is invalid or its footprint extends outside the map.",
-                );
-            }
-            this.commitMutation("Edit entity", () => {
-                if (newId !== entity.id) renameEntity(this.maps, this.currentMap, entity, newId);
-                entity.visual = visual;
-                entity.transform = {
-                    flipX: byId("entity-flip-x").checked,
-                    flipY: byId("entity-flip-y").checked,
-                };
-                entity.col = col;
-                entity.row = row;
-                entity.active = byId("entity-active").checked;
-                entity.collision = byId("entity-collision").checked;
-                entity.interaction = interaction;
-            });
-            this.selectedEntityId = newId;
-            this.refreshAfterMutation();
-        } catch (error) {
-            this.setStatus(error.message, true);
-        }
-    }
-
-    deleteSelectedEntity() {
-        const index = this.currentMap.entities.findIndex(
-            (item) => item.id === this.selectedEntityId,
-        );
-        if (index < 0) return;
-        this.commitMutation("Delete entity", () => this.currentMap.entities.splice(index, 1));
-        this.selectedEntityId = null;
-        this.refreshAfterMutation();
-    }
-
-    renderTriggerInspector() {
-        const trigger = this.getSelectedTrigger();
-        if (!trigger) return this.clearSelection();
-
-        byId("trigger-id").value = trigger.id;
-        byId("trigger-col").value = trigger.region.col;
-        byId("trigger-row").value = trigger.region.row;
-        byId("trigger-width").value = trigger.region.width;
-        byId("trigger-height").value = trigger.region.height;
-        byId("trigger-event-enter").checked = trigger.events.includes("enter");
-        byId("trigger-event-exit").checked = trigger.events.includes("exit");
-        byId("trigger-event-step").checked = trigger.events.includes("step");
-        byId("trigger-frequency").value = trigger.frequency ?? "always";
-        byId("trigger-condition").value = trigger.condition
-            ? JSON.stringify(trigger.condition, null, 4)
-            : "";
-        byId("trigger-effects").value = JSON.stringify(trigger.effects, null, 4);
-
-        const index = this.currentMap.triggers.indexOf(trigger);
-        byId("move-trigger-up").disabled = index <= 0;
-        byId("move-trigger-down").disabled =
-            index < 0 || index >= this.currentMap.triggers.length - 1;
-    }
-
-    applyTriggerInspector() {
-        const trigger = this.getSelectedTrigger();
-        if (!trigger) return;
-
-        try {
-            const id = byId("trigger-id").value.trim();
-            const region = {
-                col: Number(byId("trigger-col").value),
-                row: Number(byId("trigger-row").value),
-                width: Number(byId("trigger-width").value),
-                height: Number(byId("trigger-height").value),
-            };
-            const events = [
-                ["enter", byId("trigger-event-enter").checked],
-                ["exit", byId("trigger-event-exit").checked],
-                ["step", byId("trigger-event-step").checked],
-            ]
-                .filter(([, enabled]) => enabled)
-                .map(([eventType]) => eventType);
-            const frequency = byId("trigger-frequency").value;
-            const conditionText = byId("trigger-condition").value.trim();
-            const effectsText = byId("trigger-effects").value.trim();
-            const condition = conditionText ? JSON.parse(conditionText) : null;
-            const effects = JSON.parse(effectsText);
-            const { width, height } = getMapSize(this.currentMap);
-
-            if (
-                !id ||
-                (id !== trigger.id &&
-                    this.currentMap.triggers.some((candidate) => candidate.id === id))
-            ) {
-                throw new Error("Trigger IDs must be nonempty and unique within the map.");
-            }
-            if (
-                !Number.isInteger(region.col) ||
-                !Number.isInteger(region.row) ||
-                !Number.isInteger(region.width) ||
-                !Number.isInteger(region.height) ||
-                region.col < 0 ||
-                region.row < 0 ||
-                region.width < 1 ||
-                region.height < 1 ||
-                region.col + region.width > width ||
-                region.row + region.height > height
-            ) {
-                throw new Error("Trigger region must be an integer rectangle inside the map.");
-            }
-            if (events.length === 0) {
-                throw new Error("Select at least one trigger event.");
-            }
-            if (!Array.isArray(effects) || effects.length === 0) {
-                throw new Error("Trigger effects JSON must be a nonempty array.");
-            }
-            if (
-                condition !== null &&
-                (!condition || typeof condition !== "object" || Array.isArray(condition))
-            ) {
-                throw new Error("Trigger condition JSON must be an object or blank.");
-            }
-
-            const previousId = trigger.id;
-            this.commitMutation("Edit trigger", () => {
-                trigger.id = id;
-                trigger.region = region;
-                trigger.events = events;
-                trigger.frequency = frequency;
-                if (condition === null) delete trigger.condition;
-                else trigger.condition = condition;
-                trigger.effects = effects;
-            });
-            this.selectedTriggerId = id;
-            this.refreshAfterMutation();
-
-            if (previousId !== id) {
-                this.setStatus(
-                    `Renamed trigger "${previousId}" to "${id}". Existing development saves are not migrated.`,
-                );
-            }
-        } catch (error) {
-            this.setStatus(error.message, true);
-        }
-    }
-
-    moveSelectedTrigger(direction) {
-        const trigger = this.getSelectedTrigger();
-        if (!trigger) return;
-        const index = this.currentMap.triggers.indexOf(trigger);
-        const targetIndex = index + direction;
-        if (targetIndex < 0 || targetIndex >= this.currentMap.triggers.length) return;
-
-        this.commitMutation("Reorder trigger", () => {
-            this.currentMap.triggers.splice(index, 1);
-            this.currentMap.triggers.splice(targetIndex, 0, trigger);
-        });
-        this.refreshAfterMutation();
-    }
-
-    deleteSelectedTrigger() {
-        const index = this.currentMap.triggers.findIndex(
-            (trigger) => trigger.id === this.selectedTriggerId,
-        );
-        if (index < 0) return;
-        this.commitMutation("Delete trigger", () => this.currentMap.triggers.splice(index, 1));
-        this.selectedTriggerId = null;
-        this.refreshAfterMutation();
-    }
-
-    renderEntryInspector() {
-        const entry = this.currentMap.entries[this.selectedEntryId];
-        if (!entry) return this.clearSelection();
-        byId("entry-id").value = this.selectedEntryId;
-        byId("entry-col").value = entry.col;
-        byId("entry-row").value = entry.row;
-        byId("entry-facing").value = facingName(entry.facing);
-        byId("entry-initial").checked = this.currentMap.initialEntryId === this.selectedEntryId;
-        const references = this.findEntryReferences(this.currentMap.id, this.selectedEntryId);
-        const referenceRoot = byId("entry-references");
-        referenceRoot.replaceChildren();
-        if (references.length === 0) {
-            referenceRoot.textContent = "No exits or teleports reference this entry.";
-        } else {
-            const heading = document.createElement("strong");
-            heading.textContent = "Referenced by:";
-            const list = document.createElement("ul");
-            for (const reference of references) {
-                const item = document.createElement("li");
-                item.textContent = reference;
-                list.append(item);
-            }
-            referenceRoot.append(heading, list);
-        }
-    }
-
-    findEntryReferences(mapId, entryId) {
-        const references = [];
-        const walk = (value, path) => {
-            if (Array.isArray(value))
-                return value.forEach((entry, index) => walk(entry, `${path}[${index}]`));
-            if (!value || typeof value !== "object") return;
-            const targetsMap = value.targetMapId === mapId || value.mapId === mapId;
-            if (targetsMap && value.entryId === entryId) references.push(path);
-            for (const [key, child] of Object.entries(value)) walk(child, `${path}.${key}`);
-        };
-        this.maps.forEach((map) => walk(map, map.id));
-        return references;
-    }
-
-    applyEntryInspector() {
-        const entry = this.currentMap.entries[this.selectedEntryId];
-        if (!entry) return;
-        try {
-            const oldId = this.selectedEntryId;
-            const newId = byId("entry-id").value.trim();
-            const col = Number(byId("entry-col").value);
-            const row = Number(byId("entry-row").value);
-            const { width, height } = getMapSize(this.currentMap);
-            if (!newId || (newId !== oldId && Object.hasOwn(this.currentMap.entries, newId))) {
-                throw new Error("Entry IDs must be nonempty and unique within the map.");
-            }
-            if (
-                !Number.isInteger(col) ||
-                !Number.isInteger(row) ||
-                col < 0 ||
-                row < 0 ||
-                col >= width ||
-                row >= height
-            ) {
-                throw new Error("Entry position must be an integer cell inside the map.");
-            }
-            this.commitMutation("Edit entry", () => {
-                if (newId !== oldId) renameEntry(this.maps, this.currentMap, oldId, newId);
-                const edited = this.currentMap.entries[newId];
-                edited.col = col;
-                edited.row = row;
-                edited.facing = cloneData(directionVectors[byId("entry-facing").value]);
-                if (byId("entry-initial").checked) this.currentMap.initialEntryId = newId;
-            });
-            this.selectedEntryId = newId;
-            this.refreshAfterMutation();
-        } catch (error) {
-            this.setStatus(error.message, true);
-        }
-    }
-
-    deleteSelectedEntry() {
-        const ids = Object.keys(this.currentMap.entries);
-        if (ids.length <= 1) return this.setStatus("A map must keep at least one entry.", true);
-        const id = this.selectedEntryId;
-        this.commitMutation("Delete entry", () => {
-            delete this.currentMap.entries[id];
-            if (this.currentMap.initialEntryId === id) {
-                this.currentMap.initialEntryId = Object.keys(this.currentMap.entries)[0];
-            }
-        });
-        this.selectedEntryId = null;
-        this.refreshAfterMutation();
-    }
-
-    addExit() {
-        const map = this.currentMap;
-        const targetMap = this.maps[0];
-        const exit = {
-            edge: "north",
-            range: [0, 0],
-            targetMapId: targetMap.id,
-            entryId: targetMap.initialEntryId ?? Object.keys(targetMap.entries)[0],
-        };
-        this.commitMutation("Add exit", () => map.exits.push(exit));
-        this.selectedExitIndex = map.exits.length - 1;
+  renderExitList() {
+    const root = byId("exit-list");
+    root.replaceChildren();
+    this.currentMap.exits.forEach((exit, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      const targetLabel =
+        exit.destination?.type === "random"
+          ? `random (${exit.destination.choices?.length ?? 0} choices)`
+          : Object.hasOwn(exit, "targetEdge")
+            ? `${exit.targetMapId} ${exit.targetEdge} ${exit.targetRange?.[0] ?? "?"}–${exit.targetRange?.[1] ?? "?"}`
+            : exit.targetMapId;
+      button.textContent = `${index}: ${exit.edge} ${exit.range[0]}–${exit.range[1]} → ${targetLabel}`;
+      button.classList.toggle("selected", index === this.selectedExitIndex);
+      button.addEventListener("click", () => {
+        this.selectedExitIndex = index;
         this.selectedEntityId = null;
         this.selectedEntryId = null;
         this.selectedTriggerId = null;
         this.mode = "exits";
-        this.refreshAfterMutation();
+        this.updateModeUI();
+        this.renderExitList();
+        this.renderInspectors();
+      });
+      root.append(button);
+    });
+  }
+
+  renderConnectionControls() {
+    const sourceMap = this.currentMap;
+    if (!sourceMap) return;
+
+    const sourceMapInput = byId("connection-source-map");
+    const sourceChanged = sourceMapInput.value !== sourceMap.id;
+    sourceMapInput.value = sourceMap.id;
+
+    const sourceEdgeSelect = byId("connection-source-edge");
+    const sourceEdge = Object.hasOwn(OPPOSITE_EDGE, sourceEdgeSelect.value)
+      ? sourceEdgeSelect.value
+      : "north";
+    sourceEdgeSelect.value = sourceEdge;
+
+    const targetMapSelect = byId("connection-target-map");
+    const previousTargetId = targetMapSelect.value;
+    const targetMaps = this.maps.filter((map) => map.id !== sourceMap.id);
+    targetMapSelect.replaceChildren(
+      ...targetMaps.map((map) => new Option(map.id, map.id)),
+    );
+
+    if (targetMaps.some((map) => map.id === previousTargetId)) {
+      targetMapSelect.value = previousTargetId;
+    } else if (targetMaps.length > 0) {
+      targetMapSelect.value = targetMaps[0].id;
     }
 
-    renderExitInspector() {
-        const exit = this.currentMap.exits[this.selectedExitIndex];
-        if (!exit) {
-            this.selectedExitIndex = null;
-            return this.renderInspectors();
-        }
-        byId("exit-edge").value = exit.edge;
-        byId("exit-range-start").value = exit.range[0];
-        byId("exit-range-end").value = exit.range[1];
-        const targetMapSelect = byId("exit-target-map");
-        targetMapSelect.replaceChildren(...this.maps.map((map) => new Option(map.id, map.id)));
-        const isRandom = exit.destination?.type === "random";
-        targetMapSelect.disabled = isRandom;
-        targetMapSelect.value = isRandom ? (this.maps[0]?.id ?? "") : exit.targetMapId;
-        const isEntryTarget = !isRandom && Object.hasOwn(exit, "entryId");
-        const isEdgeTarget = !isRandom && Object.hasOwn(exit, "targetEdge");
-        this.populateExitEntryOptions(isEntryTarget ? exit.entryId : null);
-        byId("exit-entry-target-fields").hidden = !isEntryTarget;
-        byId("exit-edge-target-fields").hidden = !isEdgeTarget;
-        byId("exit-target-entry").disabled = !isEntryTarget;
-        if (isEdgeTarget) {
-            byId("exit-target-edge").value = exit.targetEdge;
-            byId("exit-target-range-start").value = exit.targetRange?.[0] ?? 0;
-            byId("exit-target-range-end").value = exit.targetRange?.[1] ?? 0;
-        }
-        byId("exit-json").value = JSON.stringify(exit, null, 4);
-        this.exitJsonDirty = false;
+    const targetEdge = OPPOSITE_EDGE[sourceEdge];
+    byId("connection-target-edge").value = targetEdge;
+
+    const targetMap =
+      targetMaps.find((map) => map.id === targetMapSelect.value) ?? null;
+    const sourceLimit = getEdgeAxisLength(sourceMap, sourceEdge);
+    const targetLimit = targetMap
+      ? getEdgeAxisLength(targetMap, targetEdge)
+      : 0;
+    const disabled = !targetMap || sourceLimit <= 0 || targetLimit <= 0;
+
+    const sourceStartInput = byId("connection-source-range-start");
+    const sourceEndInput = byId("connection-source-range-end");
+    const targetStartInput = byId("connection-target-range-start");
+    const targetEndInput = byId("connection-target-range-end");
+    const button = byId("create-reciprocal-connection");
+
+    for (const input of [sourceStartInput, sourceEndInput, targetStartInput]) {
+      input.disabled = disabled;
+    }
+    targetEndInput.disabled = disabled;
+    button.disabled = disabled;
+    targetMapSelect.disabled = targetMaps.length === 0;
+
+    sourceStartInput.max = String(Math.max(0, sourceLimit - 1));
+
+    let sourceStart = Number(sourceStartInput.value);
+    if (sourceChanged || !Number.isInteger(sourceStart) || sourceStart < 0)
+      sourceStart = 0;
+    sourceStart = Math.min(sourceStart, Math.max(0, sourceLimit - 1));
+
+    const maximumSourceEnd = Math.min(
+      Math.max(sourceStart, sourceLimit - 1),
+      sourceStart + Math.max(0, targetLimit - 1),
+    );
+    sourceEndInput.max = String(maximumSourceEnd);
+
+    let sourceEnd = Number(sourceEndInput.value);
+    if (
+      sourceChanged ||
+      !Number.isInteger(sourceEnd) ||
+      sourceEnd < sourceStart
+    ) {
+      sourceEnd = sourceStart;
+    }
+    sourceEnd = Math.min(sourceEnd, maximumSourceEnd);
+
+    const sourceLengthDelta = sourceEnd - sourceStart;
+    const maximumTargetStart = Math.max(0, targetLimit - sourceLengthDelta - 1);
+    targetStartInput.max = String(maximumTargetStart);
+
+    let targetStart = Number(targetStartInput.value);
+    if (sourceChanged || !Number.isInteger(targetStart) || targetStart < 0)
+      targetStart = 0;
+    targetStart = Math.min(targetStart, maximumTargetStart);
+    const targetEnd = targetStart + sourceLengthDelta;
+
+    sourceStartInput.value = String(sourceStart);
+    sourceEndInput.value = String(sourceEnd);
+    targetStartInput.value = String(targetStart);
+    targetEndInput.value = String(targetEnd);
+
+    byId("connection-preview").textContent = targetMap
+      ? `${sourceMap.id} ${sourceEdge} ${sourceStart}–${sourceEnd}\n        ↓\n${targetMap.id} ${targetEdge} ${targetStart}–${targetEnd}`
+      : "Choose a target map.";
+  }
+
+  async createReciprocalConnection() {
+    try {
+      const sourceMap = this.currentMap;
+      const targetMapId = byId("connection-target-map").value;
+      const targetMap = this.maps.find((map) => map.id === targetMapId);
+      if (!targetMap) throw new Error("Choose a target map.");
+
+      const sourceEdge = byId("connection-source-edge").value;
+      const targetEdge = byId("connection-target-edge").value;
+      const sourceRange = [
+        Number(byId("connection-source-range-start").value),
+        Number(byId("connection-source-range-end").value),
+      ];
+      const targetRange = [
+        Number(byId("connection-target-range-start").value),
+        Number(byId("connection-target-range-end").value),
+      ];
+      const { sourceExit, targetExit } = createReciprocalEdgeConnection(
+        sourceMap,
+        targetMap,
+        sourceEdge,
+        targetEdge,
+        sourceRange,
+        targetRange,
+      );
+      const sourceExitIndex = sourceMap.exits.length;
+
+      this.commitMutation("Create reciprocal connection", () => {
+        sourceMap.exits.push(sourceExit);
+        targetMap.exits.push(targetExit);
+      });
+
+      this.selectedExitIndex = sourceExitIndex;
+      this.selectedEntityId = null;
+      this.selectedEntryId = null;
+      this.selectedTriggerId = null;
+      this.mode = "exits";
+      await this.refreshAfterMutation();
+      this.updateModeUI();
+      this.setStatus(
+        `Connected "${sourceMap.id}" ${sourceEdge} ${sourceRange[0]}–${sourceRange[1]} to "${targetMap.id}" ${targetEdge} ${targetRange[0]}–${targetRange[1]}. Unsaved editor changes.`,
+      );
+    } catch (error) {
+      this.setStatus(error.message, true);
+    }
+  }
+
+  onCanvasWheel(event) {
+    if (!event.ctrlKey && !event.metaKey) return;
+
+    event.preventDefault();
+    const direction = event.deltaY < 0 ? 1 : -1;
+    this.changeZoom(direction, event);
+  }
+
+  applyZoom() {
+    const width = this.canvas.width * this.zoom;
+    const height = this.canvas.height * this.zoom;
+    const cssWidth = `${width}px`;
+    const cssHeight = `${height}px`;
+
+    if (this.canvas.style.width !== cssWidth)
+      this.canvas.style.width = cssWidth;
+    if (this.canvas.style.height !== cssHeight)
+      this.canvas.style.height = cssHeight;
+    if (this.canvasStage.style.width !== cssWidth)
+      this.canvasStage.style.width = cssWidth;
+    if (this.canvasStage.style.height !== cssHeight)
+      this.canvasStage.style.height = cssHeight;
+
+    byId("zoom-reset").textContent = `${Math.round(this.zoom * 100)}%`;
+    const zoomIndex = ZOOM_LEVELS.indexOf(this.zoom);
+    byId("zoom-out").disabled = zoomIndex <= 0;
+    byId("zoom-in").disabled = zoomIndex >= ZOOM_LEVELS.length - 1;
+  }
+
+  getZoomAnchor(event = null) {
+    if (
+      event &&
+      Number.isFinite(event.clientX) &&
+      Number.isFinite(event.clientY)
+    ) {
+      return { clientX: event.clientX, clientY: event.clientY };
     }
 
-    populateExitEntryOptions(preferredId = null) {
-        const targetMap = this.maps.find((map) => map.id === byId("exit-target-map").value);
-        const select = byId("exit-target-entry");
-        select.replaceChildren(
-            ...Object.keys(targetMap?.entries ?? {}).map((id) => new Option(id, id)),
+    const rect = this.canvasScroll.getBoundingClientRect();
+    return {
+      clientX: rect.left + this.canvasScroll.clientWidth / 2,
+      clientY: rect.top + this.canvasScroll.clientHeight / 2,
+    };
+  }
+
+  setZoom(nextZoom, event = null) {
+    if (!ZOOM_LEVELS.includes(nextZoom)) {
+      throw new Error(`Unsupported editor zoom level ${String(nextZoom)}.`);
+    }
+
+    const anchor = this.getZoomAnchor(event);
+    const beforeRect = this.canvas.getBoundingClientRect();
+    const sourceX =
+      beforeRect.width > 0
+        ? ((anchor.clientX - beforeRect.left) / beforeRect.width) *
+          this.canvas.width
+        : this.canvas.width / 2;
+    const sourceY =
+      beforeRect.height > 0
+        ? ((anchor.clientY - beforeRect.top) / beforeRect.height) *
+          this.canvas.height
+        : this.canvas.height / 2;
+
+    this.zoom = nextZoom;
+    this.applyZoom();
+
+    const afterRect = this.canvas.getBoundingClientRect();
+    const scaledClientX =
+      afterRect.left + (sourceX / this.canvas.width) * afterRect.width;
+    const scaledClientY =
+      afterRect.top + (sourceY / this.canvas.height) * afterRect.height;
+
+    this.canvasScroll.scrollLeft += scaledClientX - anchor.clientX;
+    this.canvasScroll.scrollTop += scaledClientY - anchor.clientY;
+  }
+
+  changeZoom(direction, event = null) {
+    const currentIndex = ZOOM_LEVELS.indexOf(this.zoom);
+    const nextIndex = Math.max(
+      0,
+      Math.min(ZOOM_LEVELS.length - 1, currentIndex + Math.sign(direction)),
+    );
+    if (nextIndex === currentIndex) return;
+    this.setZoom(ZOOM_LEVELS[nextIndex], event);
+  }
+
+  animationLoop(time) {
+    this.renderer.advance(time);
+    this.renderer.render(this.currentMap, {
+      visibleLayers: this.visibleLayers,
+      activeLayer: this.activeLayer,
+      showGrid: this.showGrid,
+      showCollision: this.showCollision,
+      showFootprints: this.showFootprints,
+      selectedEntityId: this.selectedEntityId,
+      selectedEntryId: this.selectedEntryId,
+      showTriggers: this.mode === "triggers",
+      selectedTriggerId: this.selectedTriggerId,
+      selectedExitIndex: this.selectedExitIndex,
+      rectanglePreview: this.rectanglePreview,
+      triggerPreview: this.triggerPreview,
+    });
+    this.applyZoom();
+    for (const preview of this.palettePreviews) {
+      if (preview.visual) {
+        this.renderer.renderVisualPreview(
+          preview.ctx,
+          preview.visual,
+          this.renderer.animationTimeMs,
         );
-        if (preferredId && Object.hasOwn(targetMap?.entries ?? {}, preferredId))
-            select.value = preferredId;
+      } else {
+        renderThumbnailPlaceholder(preview.ctx, preview.placeholder);
+      }
+    }
+    requestAnimationFrame((nextTime) => this.animationLoop(nextTime));
+  }
+
+  getCell(event) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * this.canvas.width;
+    const y = ((event.clientY - rect.top) / rect.height) * this.canvas.height;
+    const col = Math.floor(x / TILE_SIZE);
+    const row = Math.floor(y / TILE_SIZE);
+    const { width, height } = getMapSize(this.currentMap);
+    if (col < 0 || row < 0 || col >= width || row >= height) return null;
+    return { col, row, x, y };
+  }
+
+  onPointerDown(event) {
+    const cell = this.getCell(event);
+    if (!cell) return;
+    this.canvas.setPointerCapture(event.pointerId);
+    if (this.mode === "tiles") this.startTileAction(event, cell);
+    else if (this.mode === "entities") this.startEntityAction(cell);
+    else if (this.mode === "entries") this.startEntryAction(cell);
+    else if (this.mode === "triggers") this.startTriggerAction(cell);
+    else this.selectExitAt(cell);
+  }
+
+  onPointerMove(event) {
+    const cell = this.getCell(event);
+    if (!cell) {
+      if (this.pointerAction?.kind === "brush") {
+        this.pointerAction.lastKey = null;
+      }
+
+      byId("cursor-position").textContent = "Cell: —";
+      return;
     }
 
-    applyExitInspector() {
-        const exit = this.currentMap.exits[this.selectedExitIndex];
-        if (!exit) return;
-        try {
-            const reciprocal = findReciprocalEdgeExit(this.maps, this.currentMap, exit);
-            let replacement;
-            if (this.exitJsonDirty) {
-                replacement = JSON.parse(byId("exit-json").value);
-            } else if (exit.destination?.type === "random") {
-                replacement = cloneData(exit);
-                replacement.edge = byId("exit-edge").value;
-                replacement.range = [
-                    Number(byId("exit-range-start").value),
-                    Number(byId("exit-range-end").value),
-                ];
-            } else if (Object.hasOwn(exit, "entryId")) {
-                replacement = {
-                    edge: byId("exit-edge").value,
-                    range: [
-                        Number(byId("exit-range-start").value),
-                        Number(byId("exit-range-end").value),
-                    ],
-                    targetMapId: byId("exit-target-map").value,
-                    entryId: byId("exit-target-entry").value,
-                };
-            } else {
-                replacement = cloneData(exit);
-                replacement.edge = byId("exit-edge").value;
-                replacement.range = [
-                    Number(byId("exit-range-start").value),
-                    Number(byId("exit-range-end").value),
-                ];
-                replacement.targetMapId = byId("exit-target-map").value;
-                if (Object.hasOwn(exit, "targetEdge")) {
-                    replacement.targetEdge = byId("exit-target-edge").value;
-                    replacement.targetRange = [
-                        Number(byId("exit-target-range-start").value),
-                        Number(byId("exit-target-range-end").value),
-                    ];
-                }
-            }
-            if (
-                !Array.isArray(replacement.range) ||
-                replacement.range.length !== 2 ||
-                !replacement.range.every(Number.isInteger)
-            ) {
-                throw new Error("Exit range must contain two integers.");
-            }
-            if (replacement.range[0] < 0 || replacement.range[1] < replacement.range[0]) {
-                throw new Error("Exit range must contain ordered non-negative integers.");
-            }
-            const sourceLimit = getEdgeAxisLength(this.currentMap, replacement.edge);
-            if (replacement.range[1] >= sourceLimit) {
-                throw new Error(`Exit range exceeds the ${replacement.edge} edge.`);
-            }
+    byId("cursor-position").textContent = `Cell: ${cell.col}, ${cell.row}`;
+    if (!this.pointerAction) return;
 
-            const destinations =
-                replacement.destination?.type === "random"
-                    ? (replacement.destination.choices ?? [])
-                    : [replacement];
-            for (const [choiceIndex, destination] of destinations.entries()) {
-                if (!Object.hasOwn(destination, "targetEdge")) continue;
-                const choiceLabel =
-                    replacement.destination?.type === "random"
-                        ? `Random destination choice ${choiceIndex}`
-                        : "Target doorway";
-                if (
-                    !Array.isArray(destination.targetRange) ||
-                    destination.targetRange.length !== 2 ||
-                    !destination.targetRange.every(Number.isInteger) ||
-                    destination.targetRange[0] < 0 ||
-                    destination.targetRange[1] < destination.targetRange[0]
-                ) {
-                    throw new Error(
-                        `${choiceLabel} range must contain ordered non-negative integers.`,
-                    );
-                }
-                if (destination.targetEdge !== OPPOSITE_EDGE[replacement.edge]) {
-                    throw new Error(`${choiceLabel} edge must be opposite the source edge.`);
-                }
-                const sourceLength = replacement.range[1] - replacement.range[0];
-                const targetLength = destination.targetRange[1] - destination.targetRange[0];
-                if (sourceLength !== targetLength) {
-                    throw new Error(
-                        `${choiceLabel} must contain the same number of cells as the source range.`,
-                    );
-                }
-                const targetMap = this.maps.find((map) => map.id === destination.targetMapId);
-                if (!targetMap) throw new Error(`${choiceLabel} targets a missing map.`);
-                const targetLimit = getEdgeAxisLength(targetMap, destination.targetEdge);
-                if (destination.targetRange[1] >= targetLimit) {
-                    throw new Error(`${choiceLabel} range exceeds the target edge.`);
-                }
-            }
-            const replacementIsDirectEdgeExit =
-                replacement.destination?.type !== "random" &&
-                Object.hasOwn(replacement, "targetEdge");
-            let reciprocalReplacement = null;
-            let reciprocalTargetMap = null;
-
-            if (reciprocal && replacementIsDirectEdgeExit) {
-                reciprocalTargetMap = this.maps.find((map) => map.id === replacement.targetMapId);
-                if (!reciprocalTargetMap) {
-                    throw new Error("The reciprocal exit's new target map does not exist.");
-                }
-                reciprocalReplacement = updateReciprocalEdgeExitGeometry(
-                    reciprocal.exit,
-                    this.currentMap.id,
-                    replacement,
-                );
-
-                const overlap = (reciprocalTargetMap.exits ?? []).findIndex(
-                    (candidate, index) =>
-                        !(reciprocal.map === reciprocalTargetMap && index === reciprocal.index) &&
-                        candidate?.edge === reciprocalReplacement.edge &&
-                        Array.isArray(candidate.range) &&
-                        candidate.range.length === 2 &&
-                        candidate.range[0] <= reciprocalReplacement.range[1] &&
-                        reciprocalReplacement.range[0] <= candidate.range[1],
-                );
-                if (overlap >= 0) {
-                    throw new Error(
-                        `The linked target doorway overlaps exit ${overlap} in "${reciprocalTargetMap.id}".`,
-                    );
-                }
-            }
-
-            this.commitMutation("Edit exit", () => {
-                this.currentMap.exits[this.selectedExitIndex] = replacement;
-
-                if (!reciprocal) return;
-                if (!replacementIsDirectEdgeExit) {
-                    reciprocal.map.exits.splice(reciprocal.index, 1);
-                    return;
-                }
-
-                if (reciprocal.map === reciprocalTargetMap) {
-                    reciprocal.map.exits[reciprocal.index] = reciprocalReplacement;
-                    return;
-                }
-
-                reciprocal.map.exits.splice(reciprocal.index, 1);
-                reciprocalTargetMap.exits.push(reciprocalReplacement);
-            });
-            this.refreshAfterMutation();
-        } catch (error) {
-            this.setStatus(error.message, true);
-        }
-    }
-
-    deleteSelectedExit() {
-        if (this.selectedExitIndex === null) return;
-        this.commitMutation("Delete exit", () =>
-            this.currentMap.exits.splice(this.selectedExitIndex, 1),
+    if (this.pointerAction.kind === "brush") {
+      this.paintCell(cell);
+    } else if (this.pointerAction.kind === "rectangle") {
+      this.rectanglePreview.end = { col: cell.col, row: cell.row };
+    } else if (this.pointerAction.kind === "entity-drag") {
+      const entity = this.currentMap.entities.find(
+        (item) => item.id === this.pointerAction.entityId,
+      );
+      if (
+        entity &&
+        canPlaceEntity(this.currentMap, entity, cell.col, cell.row)
+      ) {
+        entity.col = cell.col;
+        entity.row = cell.row;
+        this.renderInspectors();
+      }
+    } else if (this.pointerAction.kind === "entry-drag") {
+      const entry = this.currentMap.entries[this.pointerAction.entryId];
+      if (entry) {
+        entry.col = cell.col;
+        entry.row = cell.row;
+        this.renderInspectors();
+      }
+    } else if (this.pointerAction.kind === "trigger-create") {
+      this.triggerPreview.end = { col: cell.col, row: cell.row };
+    } else if (this.pointerAction.kind === "trigger-move") {
+      const trigger = this.currentMap.triggers.find(
+        (candidate) => candidate.id === this.pointerAction.triggerId,
+      );
+      if (trigger) {
+        const { width, height } = getMapSize(this.currentMap);
+        trigger.region.col = Math.max(
+          0,
+          Math.min(
+            width - trigger.region.width,
+            cell.col - this.pointerAction.offsetCol,
+          ),
         );
-        this.selectedExitIndex = null;
-        this.refreshAfterMutation();
+        trigger.region.row = Math.max(
+          0,
+          Math.min(
+            height - trigger.region.height,
+            cell.row - this.pointerAction.offsetRow,
+          ),
+        );
+        this.renderInspectors();
+      }
+    } else if (this.pointerAction.kind === "trigger-resize") {
+      this.resizeSelectedTriggerFromPointer(cell);
+    }
+  }
+
+  onPointerUp(event) {
+    if (!this.pointerAction) return;
+    const action = this.pointerAction;
+    this.pointerAction = null;
+    if (action.kind === "rectangle") {
+      const tileId = action.erase ? EMPTY_TILE_ID : this.selectedTileId;
+      fillRectangle(
+        this.currentMap,
+        this.activeLayer,
+        this.rectanglePreview.start,
+        this.rectanglePreview.end,
+        tileId,
+      );
+      this.rectanglePreview = null;
+      this.endTransaction("Rectangle fill");
+    } else if (action.kind === "brush") {
+      this.endTransaction("Tile brush stroke");
+    } else if (action.kind === "entity-drag") {
+      this.endTransaction("Move entity");
+    } else if (action.kind === "entry-drag") {
+      this.endTransaction("Move entry");
+    } else if (action.kind === "trigger-create") {
+      const start = this.triggerPreview.start;
+      const end = this.triggerPreview.end;
+      const region = {
+        col: Math.min(start.col, end.col),
+        row: Math.min(start.row, end.row),
+        width: Math.abs(end.col - start.col) + 1,
+        height: Math.abs(end.row - start.row) + 1,
+      };
+      const trigger = this.createDefaultTrigger(region);
+      this.currentMap.triggers.push(trigger);
+      this.selectedTriggerId = trigger.id;
+      this.triggerPreview = null;
+      this.endTransaction("Create trigger");
+    } else if (action.kind === "trigger-move") {
+      this.endTransaction("Move trigger");
+    } else if (action.kind === "trigger-resize") {
+      this.endTransaction("Resize trigger");
+    }
+    this.refreshAfterMutation();
+    if (this.canvas.hasPointerCapture(event.pointerId))
+      this.canvas.releasePointerCapture(event.pointerId);
+  }
+
+  startTileAction(event, cell) {
+    const layer = this.currentMap.layers[this.activeLayer];
+    if (this.tool === "eyedropper") {
+      if (!layer) return;
+      const tileId = layer[cell.row][cell.col];
+      this.selectedTileId = tileId;
+      this.tool = "pencil";
+      this.updateButtonSelection("#tool-buttons button", "tool", this.tool);
+      this.renderPalette();
+      return;
+    }
+    if (this.tool === "fill") {
+      const tileId = event.button === 2 ? EMPTY_TILE_ID : this.selectedTileId;
+      this.commitMutation("Flood fill", () =>
+        floodFill(
+          this.currentMap,
+          this.activeLayer,
+          cell.col,
+          cell.row,
+          tileId,
+        ),
+      );
+      this.refreshAfterMutation();
+      return;
+    }
+    if (this.tool === "rectangle") {
+      this.beginTransaction();
+      this.pointerAction = { kind: "rectangle", erase: event.button === 2 };
+      this.rectanglePreview = {
+        start: { col: cell.col, row: cell.row },
+        end: { col: cell.col, row: cell.row },
+      };
+      return;
+    }
+    this.beginTransaction();
+    this.pointerAction = {
+      kind: "brush",
+      lastKey: null,
+      erase: this.tool === "eraser" || event.button === 2,
+    };
+    this.paintCell(cell);
+  }
+
+  paintCell(cell) {
+    const key = `${cell.col},${cell.row}`;
+    if (this.pointerAction.lastKey === key) return;
+
+    this.pointerAction.lastKey = key;
+
+    const tileId = this.pointerAction.erase
+      ? EMPTY_TILE_ID
+      : this.selectedTileId;
+
+    if (
+      !canPlaceTile(
+        this.currentMap,
+        this.activeLayer,
+        tileId,
+        cell.col,
+        cell.row,
+      )
+    ) {
+      this.setStatus(
+        "Placement rejected: invalid layer or footprint outside the map.",
+        true,
+      );
+      return;
     }
 
-    validateAndDisplay() {
-        const errors = validateEditorDocument(this.maps);
-        const root = byId("validation-output");
-        root.replaceChildren();
-        if (errors.length === 0) {
-            const ok = document.createElement("span");
-            ok.className = "validation-ok";
-            ok.textContent = "No immediate structural errors.";
-            root.append(ok);
-        } else {
-            const heading = document.createElement("strong");
-            heading.textContent = `${errors.length} issue${errors.length === 1 ? "" : "s"}`;
-            const list = document.createElement("ul");
-            list.className = "validation-errors";
-            for (const error of errors.slice(0, 30)) {
-                const item = document.createElement("li");
-                item.textContent = error;
-                list.append(item);
-            }
-            root.append(heading, list);
-        }
-        return errors;
+    setTile(this.currentMap, this.activeLayer, cell.col, cell.row, tileId);
+
+    this.setStatus("Painting. Unsaved editor changes.");
+  }
+
+  startEntityAction(cell) {
+    const existing = [...this.currentMap.entities]
+      .reverse()
+      .find((entity) =>
+        getEntityOccupiedCells(this.currentMap, entity).some(
+          (occupied) => occupied.col === cell.col && occupied.row === cell.row,
+        ),
+      );
+    if (existing) {
+      this.selectedEntityId = existing.id;
+      this.selectedEntryId = null;
+      this.selectedTriggerId = null;
+      this.selectedExitIndex = null;
+      this.beginTransaction();
+      this.pointerAction = { kind: "entity-drag", entityId: existing.id };
+      this.renderInspectors();
+      return;
+    }
+    const preset = ENTITY_PRESETS[this.selectedEntityPreset];
+    const entity = {
+      id: makeUniqueId(
+        this.selectedEntityPreset,
+        new Set(this.currentMap.entities.map((item) => item.id)),
+      ),
+      ...cloneData(preset.entity),
+      col: cell.col,
+      row: cell.row,
+    };
+    if (!canPlaceEntity(this.currentMap, entity)) {
+      this.setStatus(
+        "Placement rejected: entity visual footprint extends outside the map.",
+        true,
+      );
+      return;
+    }
+    this.commitMutation("Place entity", () =>
+      this.currentMap.entities.push(entity),
+    );
+    this.selectedEntityId = entity.id;
+    this.selectedTriggerId = null;
+    this.renderInspectors();
+    this.refreshAfterMutation();
+  }
+
+  startEntryAction(cell) {
+    const existing = Object.entries(this.currentMap.entries).find(
+      ([, entry]) => entry.col === cell.col && entry.row === cell.row,
+    );
+    if (existing) {
+      this.selectedEntryId = existing[0];
+      this.selectedEntityId = null;
+      this.selectedTriggerId = null;
+      this.selectedExitIndex = null;
+      this.beginTransaction();
+      this.pointerAction = { kind: "entry-drag", entryId: existing[0] };
+      this.renderInspectors();
+      return;
+    }
+    const entryId = makeUniqueId(
+      "entry",
+      new Set(Object.keys(this.currentMap.entries)),
+    );
+    this.commitMutation("Place entry", () => {
+      this.currentMap.entries[entryId] = {
+        col: cell.col,
+        row: cell.row,
+        facing: { dc: 0, dr: 1 },
+      };
+      if (!this.currentMap.initialEntryId)
+        this.currentMap.initialEntryId = entryId;
+    });
+    this.selectedEntryId = entryId;
+    this.selectedTriggerId = null;
+    this.renderMapControls();
+    this.renderInspectors();
+  }
+
+  createDefaultTrigger(region) {
+    return {
+      id: makeUniqueId(
+        "trigger",
+        new Set((this.currentMap.triggers ?? []).map((trigger) => trigger.id)),
+      ),
+      region: { ...region },
+      events: ["enter"],
+      frequency: "always",
+      effects: [
+        {
+          type: "showText",
+          pages: ["A trigger fired."],
+        },
+      ],
+    };
+  }
+
+  addTrigger() {
+    const trigger = this.createDefaultTrigger({
+      col: 0,
+      row: 0,
+      width: 1,
+      height: 1,
+    });
+    this.commitMutation("Add trigger", () =>
+      this.currentMap.triggers.push(trigger),
+    );
+    this.selectedTriggerId = trigger.id;
+    this.selectedEntityId = null;
+    this.selectedEntryId = null;
+    this.selectedExitIndex = null;
+    this.mode = "triggers";
+    this.updateModeUI();
+    this.refreshAfterMutation();
+  }
+
+  getSelectedTrigger() {
+    return (this.currentMap.triggers ?? []).find(
+      (trigger) => trigger.id === this.selectedTriggerId,
+    );
+  }
+
+  getTriggerAtCell(cell) {
+    return [...(this.currentMap.triggers ?? [])].reverse().find((trigger) => {
+      const { col, row, width, height } = trigger.region;
+      return (
+        cell.col >= col &&
+        cell.col < col + width &&
+        cell.row >= row &&
+        cell.row < row + height
+      );
+    });
+  }
+
+  getTriggerResizeHandle(cell, trigger) {
+    if (!trigger) return null;
+    const x = trigger.region.col * TILE_SIZE;
+    const y = trigger.region.row * TILE_SIZE;
+    const width = trigger.region.width * TILE_SIZE;
+    const height = trigger.region.height * TILE_SIZE;
+    const handles = [
+      ["nw", x, y],
+      ["n", x + width / 2, y],
+      ["ne", x + width, y],
+      ["w", x, y + height / 2],
+      ["e", x + width, y + height / 2],
+      ["sw", x, y + height],
+      ["s", x + width / 2, y + height],
+      ["se", x + width, y + height],
+    ];
+    const tolerance = 7;
+    return (
+      handles.find(
+        ([, handleX, handleY]) =>
+          Math.abs(cell.x - handleX) <= tolerance &&
+          Math.abs(cell.y - handleY) <= tolerance,
+      )?.[0] ?? null
+    );
+  }
+
+  startTriggerAction(cell) {
+    const selected = this.getSelectedTrigger();
+    const resizeHandle = this.getTriggerResizeHandle(cell, selected);
+    if (selected && resizeHandle) {
+      this.beginTransaction();
+      this.pointerAction = {
+        kind: "trigger-resize",
+        triggerId: selected.id,
+        handle: resizeHandle,
+        originalRegion: { ...selected.region },
+      };
+      return;
     }
 
-    saveRecovery(showStatus) {
-        localStorage.setItem(EDITOR_STORAGE_KEY, JSON.stringify(this.maps));
-        this.updateRecoveryButton();
-        if (showStatus) this.setStatus("Recovery copy saved in localStorage.");
+    const existing = this.getTriggerAtCell(cell);
+    if (existing) {
+      this.selectedTriggerId = existing.id;
+      this.selectedEntityId = null;
+      this.selectedEntryId = null;
+      this.selectedExitIndex = null;
+      this.beginTransaction();
+      this.pointerAction = {
+        kind: "trigger-move",
+        triggerId: existing.id,
+        offsetCol: cell.col - existing.region.col,
+        offsetRow: cell.row - existing.region.row,
+      };
+      this.renderTriggerList();
+      this.renderInspectors();
+      return;
     }
 
-    updateRecoveryButton() {
-        byId("restore-recovery").disabled = !localStorage.getItem(EDITOR_STORAGE_KEY);
-        byId("restore-backup").disabled = !localStorage.getItem(EDITOR_BACKUP_KEY);
+    this.clearSelection();
+    this.beginTransaction();
+    this.pointerAction = { kind: "trigger-create" };
+    this.triggerPreview = {
+      start: { col: cell.col, row: cell.row },
+      end: { col: cell.col, row: cell.row },
+    };
+    this.renderInspectors();
+  }
+
+  resizeSelectedTriggerFromPointer(cell) {
+    const action = this.pointerAction;
+    const trigger = this.currentMap.triggers.find(
+      (candidate) => candidate.id === action.triggerId,
+    );
+    if (!trigger) return;
+
+    const original = action.originalRegion;
+    let left = original.col;
+    let right = original.col + original.width - 1;
+    let top = original.row;
+    let bottom = original.row + original.height - 1;
+
+    if (action.handle.includes("w")) left = Math.min(cell.col, right);
+    if (action.handle.includes("e")) right = Math.max(cell.col, left);
+    if (action.handle.includes("n")) top = Math.min(cell.row, bottom);
+    if (action.handle.includes("s")) bottom = Math.max(cell.row, top);
+
+    trigger.region.col = left;
+    trigger.region.row = top;
+    trigger.region.width = right - left + 1;
+    trigger.region.height = bottom - top + 1;
+    this.renderInspectors();
+  }
+
+  selectExitAt(cell) {
+    const { width, height } = getMapSize(this.currentMap);
+    const candidates = [];
+    if (cell.row === 0) candidates.push(["north", cell.col]);
+    if (cell.row === height - 1) candidates.push(["south", cell.col]);
+    if (cell.col === 0) candidates.push(["west", cell.row]);
+    if (cell.col === width - 1) candidates.push(["east", cell.row]);
+    const index = this.currentMap.exits.findIndex((exit) =>
+      candidates.some(
+        ([edge, axis]) =>
+          exit.edge === edge && axis >= exit.range[0] && axis <= exit.range[1],
+      ),
+    );
+    if (index >= 0) {
+      this.selectedExitIndex = index;
+      this.selectedEntityId = null;
+      this.selectedEntryId = null;
+      this.selectedTriggerId = null;
+      this.renderExitList();
+      this.renderInspectors();
+    }
+  }
+
+  clearSelection() {
+    this.selectedEntityId = null;
+    this.selectedEntryId = null;
+    this.selectedTriggerId = null;
+    this.selectedExitIndex = null;
+  }
+
+  renderInspectors() {
+    byId("map-inspector").hidden = Boolean(
+      this.selectedEntityId ||
+      this.selectedEntryId ||
+      this.selectedTriggerId ||
+      this.selectedExitIndex !== null,
+    );
+    byId("entity-inspector").hidden = !this.selectedEntityId;
+    byId("entry-inspector").hidden = !this.selectedEntryId;
+    byId("trigger-inspector").hidden = !this.selectedTriggerId;
+    byId("exit-inspector").hidden = this.selectedExitIndex === null;
+
+    if (this.selectedEntityId) this.renderEntityInspector();
+    if (this.selectedEntryId) this.renderEntryInspector();
+    if (this.selectedTriggerId) this.renderTriggerInspector();
+    if (this.selectedExitIndex !== null) this.renderExitInspector();
+    const selection = this.selectedEntityId
+      ? `Entity: ${this.selectedEntityId}`
+      : this.selectedEntryId
+        ? `Entry: ${this.selectedEntryId}`
+        : this.selectedTriggerId
+          ? `Trigger: ${this.selectedTriggerId}`
+          : this.selectedExitIndex !== null
+            ? `Exit: ${this.selectedExitIndex}`
+            : "No selection";
+    byId("selection-status").textContent = selection;
+  }
+
+  renderEntityInspector() {
+    const entity = this.currentMap.entities.find(
+      (item) => item.id === this.selectedEntityId,
+    );
+    if (!entity) return this.clearSelection();
+    byId("entity-id").value = entity.id;
+    byId("entity-visual-type").value = entity.visual.type;
+    this.populateEntityVisualOptions(entity.visual.type, entity.visual.id);
+    byId("entity-flip-x").checked = entity.transform.flipX;
+    byId("entity-flip-y").checked = entity.transform.flipY;
+    byId("entity-col").value = entity.col;
+    byId("entity-row").value = entity.row;
+    byId("entity-active").checked = entity.active;
+    byId("entity-collision").checked = entity.collision;
+    byId("entity-interaction").value = entity.interaction
+      ? JSON.stringify(entity.interaction, null, 4)
+      : "";
+    this.renderInteractionTemplateDescription();
+    this.renderSimpleDialogueInspector(entity.interaction);
+  }
+
+  renderSimpleDialogueInspector(interaction) {
+    const section = byId("entity-simple-dialogue");
+    const effect = findPrimaryShowTextEffect(interaction);
+    section.hidden = !effect;
+
+    if (!effect) {
+      byId("entity-dialogue-speaker").value = "";
+      byId("entity-dialogue-pages").value = "";
+      return;
     }
 
-    async restoreRecovery() {
-        const raw = localStorage.getItem(EDITOR_STORAGE_KEY);
-        if (!raw) return;
-        if (!confirm("Replace the working document with the local recovery copy?")) return;
-        localStorage.setItem(EDITOR_BACKUP_KEY, JSON.stringify(this.maps));
-        this.maps = JSON.parse(raw);
-        this.mapGraph.invalidatePositions();
-        this.selectedMapId = this.maps[0].id;
-        this.undoStack = [];
-        this.redoStack = [];
-        this.clearSelection();
-        this.dirty = true;
-        await this.refreshDocumentUI();
-        this.setStatus("Recovery copy restored.");
+    byId("entity-dialogue-speaker").value =
+      typeof effect.speaker === "string" ? effect.speaker : "";
+    byId("entity-dialogue-pages").value = formatDialoguePages(effect.pages);
+  }
+
+  syncSimpleDialogueFromInteractionJson() {
+    const text = byId("entity-interaction").value.trim();
+    if (!text) {
+      this.renderSimpleDialogueInspector(null);
+      return;
     }
 
-    async restorePreImportBackup() {
-        const raw = localStorage.getItem(EDITOR_BACKUP_KEY);
-        if (!raw) return;
-        if (!confirm("Replace the working document with the pre-import backup?")) return;
-        this.maps = JSON.parse(raw);
-        this.mapGraph.invalidatePositions();
-        this.selectedMapId = this.maps[0].id;
-        this.undoStack = [];
-        this.redoStack = [];
-        this.clearSelection();
-        this.dirty = true;
-        this.saveRecovery(false);
-        await this.refreshDocumentUI();
-        this.setStatus("Pre-import backup restored.");
+    try {
+      this.renderSimpleDialogueInspector(JSON.parse(text));
+    } catch {
+      byId("entity-simple-dialogue").hidden = true;
+    }
+  }
+
+  syncInteractionJsonFromSimpleDialogue() {
+    const interactionText = byId("entity-interaction").value.trim();
+    if (!interactionText) return;
+
+    let interaction;
+    try {
+      interaction = JSON.parse(interactionText);
+    } catch {
+      return;
     }
 
-    async importText(text) {
-        const imported = parseImportedMaps(text);
-        localStorage.setItem(EDITOR_BACKUP_KEY, JSON.stringify(this.maps));
-        this.updateRecoveryButton();
-        this.maps = cloneData(imported);
-        this.mapGraph.invalidatePositions();
-        this.selectedMapId = this.maps[0]?.id ?? null;
-        this.undoStack = [];
-        this.redoStack = [];
-        this.clearSelection();
-        this.dirty = true;
-        this.saveRecovery(false);
-        await this.refreshDocumentUI();
+    const effect = findPrimaryShowTextEffect(interaction);
+    if (!effect) return;
+
+    const speaker = byId("entity-dialogue-speaker").value.trim();
+    if (speaker) effect.speaker = speaker;
+    else delete effect.speaker;
+    effect.pages = parseDialoguePages(byId("entity-dialogue-pages").value);
+
+    byId("entity-interaction").value = JSON.stringify(interaction, null, 4);
+  }
+
+  applyEntityInspector() {
+    const entity = this.currentMap.entities.find(
+      (item) => item.id === this.selectedEntityId,
+    );
+    if (!entity) return;
+    try {
+      const newId = byId("entity-id").value.trim();
+      const col = Number(byId("entity-col").value);
+      const row = Number(byId("entity-row").value);
+      const interactionText = byId("entity-interaction").value.trim();
+      const interaction = interactionText ? JSON.parse(interactionText) : null;
+      const visual = this.readEntityVisualInspector();
+      const { width, height } = getMapSize(this.currentMap);
+      if (
+        !newId ||
+        (newId !== entity.id &&
+          this.currentMap.entities.some((item) => item.id === newId))
+      ) {
+        throw new Error(
+          "Entity IDs must be nonempty and unique within the map.",
+        );
+      }
+      if (
+        !Number.isInteger(col) ||
+        !Number.isInteger(row) ||
+        col < 0 ||
+        row < 0 ||
+        col >= width ||
+        row >= height
+      ) {
+        throw new Error(
+          "Entity position must be an integer cell inside the map.",
+        );
+      }
+      if (!canPlaceEntity(this.currentMap, { ...entity, visual }, col, row)) {
+        throw new Error(
+          "Entity visual is invalid or its footprint extends outside the map.",
+        );
+      }
+      this.commitMutation("Edit entity", () => {
+        if (newId !== entity.id)
+          renameEntity(this.maps, this.currentMap, entity, newId);
+        entity.visual = visual;
+        entity.transform = {
+          flipX: byId("entity-flip-x").checked,
+          flipY: byId("entity-flip-y").checked,
+        };
+        entity.col = col;
+        entity.row = row;
+        entity.active = byId("entity-active").checked;
+        entity.collision = byId("entity-collision").checked;
+        entity.interaction = interaction;
+      });
+      this.selectedEntityId = newId;
+      this.refreshAfterMutation();
+    } catch (error) {
+      this.setStatus(error.message, true);
+    }
+  }
+
+  deleteSelectedEntity() {
+    const index = this.currentMap.entities.findIndex(
+      (item) => item.id === this.selectedEntityId,
+    );
+    if (index < 0) return;
+    this.commitMutation("Delete entity", () =>
+      this.currentMap.entities.splice(index, 1),
+    );
+    this.selectedEntityId = null;
+    this.refreshAfterMutation();
+  }
+
+  renderTriggerInspector() {
+    const trigger = this.getSelectedTrigger();
+    if (!trigger) return this.clearSelection();
+
+    byId("trigger-id").value = trigger.id;
+    byId("trigger-col").value = trigger.region.col;
+    byId("trigger-row").value = trigger.region.row;
+    byId("trigger-width").value = trigger.region.width;
+    byId("trigger-height").value = trigger.region.height;
+    byId("trigger-event-enter").checked = trigger.events.includes("enter");
+    byId("trigger-event-exit").checked = trigger.events.includes("exit");
+    byId("trigger-event-step").checked = trigger.events.includes("step");
+    byId("trigger-event-item-use").checked = trigger.events.includes("itemUse");
+    this.populateTriggerItemOptions(trigger.itemId ?? null);
+    this.updateTriggerItemFieldVisibility();
+    byId("trigger-frequency").value = trigger.frequency ?? "always";
+    byId("trigger-condition").value = trigger.condition
+      ? JSON.stringify(trigger.condition, null, 4)
+      : "";
+    byId("trigger-effects").value = JSON.stringify(trigger.effects, null, 4);
+
+    const index = this.currentMap.triggers.indexOf(trigger);
+    byId("move-trigger-up").disabled = index <= 0;
+    byId("move-trigger-down").disabled =
+      index < 0 || index >= this.currentMap.triggers.length - 1;
+  }
+
+  applyTriggerInspector() {
+    const trigger = this.getSelectedTrigger();
+    if (!trigger) return;
+
+    try {
+      const id = byId("trigger-id").value.trim();
+      const region = {
+        col: Number(byId("trigger-col").value),
+        row: Number(byId("trigger-row").value),
+        width: Number(byId("trigger-width").value),
+        height: Number(byId("trigger-height").value),
+      };
+      const events = [
+        ["enter", byId("trigger-event-enter").checked],
+        ["exit", byId("trigger-event-exit").checked],
+        ["step", byId("trigger-event-step").checked],
+        ["itemUse", byId("trigger-event-item-use").checked],
+      ]
+        .filter(([, enabled]) => enabled)
+        .map(([eventType]) => eventType);
+      const frequency = byId("trigger-frequency").value;
+      const itemId = events.includes("itemUse")
+        ? byId("trigger-item-id").value
+        : null;
+      const conditionText = byId("trigger-condition").value.trim();
+      const effectsText = byId("trigger-effects").value.trim();
+      const condition = conditionText ? JSON.parse(conditionText) : null;
+      const effects = JSON.parse(effectsText);
+      const { width, height } = getMapSize(this.currentMap);
+
+      if (
+        !id ||
+        (id !== trigger.id &&
+          this.currentMap.triggers.some((candidate) => candidate.id === id))
+      ) {
+        throw new Error(
+          "Trigger IDs must be nonempty and unique within the map.",
+        );
+      }
+      if (
+        !Number.isInteger(region.col) ||
+        !Number.isInteger(region.row) ||
+        !Number.isInteger(region.width) ||
+        !Number.isInteger(region.height) ||
+        region.col < 0 ||
+        region.row < 0 ||
+        region.width < 1 ||
+        region.height < 1 ||
+        region.col + region.width > width ||
+        region.row + region.height > height
+      ) {
+        throw new Error(
+          "Trigger region must be an integer rectangle inside the map.",
+        );
+      }
+      if (events.length === 0) {
+        throw new Error("Select at least one trigger event.");
+      }
+      if (events.includes("itemUse") && !Object.hasOwn(ITEMS, itemId)) {
+        throw new Error("Item-use triggers must select a defined item.");
+      }
+      if (!Array.isArray(effects) || effects.length === 0) {
+        throw new Error("Trigger effects JSON must be a nonempty array.");
+      }
+      if (
+        condition !== null &&
+        (!condition ||
+          typeof condition !== "object" ||
+          Array.isArray(condition))
+      ) {
+        throw new Error("Trigger condition JSON must be an object or blank.");
+      }
+
+      const previousId = trigger.id;
+      this.commitMutation("Edit trigger", () => {
+        trigger.id = id;
+        trigger.region = region;
+        trigger.events = events;
+        if (itemId === null) delete trigger.itemId;
+        else trigger.itemId = itemId;
+        trigger.frequency = frequency;
+        if (condition === null) delete trigger.condition;
+        else trigger.condition = condition;
+        trigger.effects = effects;
+      });
+      this.selectedTriggerId = id;
+      this.refreshAfterMutation();
+
+      if (previousId !== id) {
         this.setStatus(
-            "Imported map data. The previous document was stored as a pre-import backup.",
+          `Renamed trigger "${previousId}" to "${id}". Existing development saves are not migrated.`,
         );
+      }
+    } catch (error) {
+      this.setStatus(error.message, true);
     }
+  }
 
-    async copyCurrentMap() {
-        const text = JSON.stringify(this.currentMap, null, 4);
+  moveSelectedTrigger(direction) {
+    const trigger = this.getSelectedTrigger();
+    if (!trigger) return;
+    const index = this.currentMap.triggers.indexOf(trigger);
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= this.currentMap.triggers.length)
+      return;
 
-        try {
-            await navigator.clipboard.writeText(text);
-            this.setStatus(`Copied map "${this.currentMap.id}".`);
-        } catch {
-            this.setStatus("The browser did not allow clipboard access.", true);
+    this.commitMutation("Reorder trigger", () => {
+      this.currentMap.triggers.splice(index, 1);
+      this.currentMap.triggers.splice(targetIndex, 0, trigger);
+    });
+    this.refreshAfterMutation();
+  }
+
+  deleteSelectedTrigger() {
+    const index = this.currentMap.triggers.findIndex(
+      (trigger) => trigger.id === this.selectedTriggerId,
+    );
+    if (index < 0) return;
+    this.commitMutation("Delete trigger", () =>
+      this.currentMap.triggers.splice(index, 1),
+    );
+    this.selectedTriggerId = null;
+    this.refreshAfterMutation();
+  }
+
+  renderEntryInspector() {
+    const entry = this.currentMap.entries[this.selectedEntryId];
+    if (!entry) return this.clearSelection();
+    byId("entry-id").value = this.selectedEntryId;
+    byId("entry-col").value = entry.col;
+    byId("entry-row").value = entry.row;
+    byId("entry-facing").value = facingName(entry.facing);
+    byId("entry-initial").checked =
+      this.currentMap.initialEntryId === this.selectedEntryId;
+    const references = this.findEntryReferences(
+      this.currentMap.id,
+      this.selectedEntryId,
+    );
+    const referenceRoot = byId("entry-references");
+    referenceRoot.replaceChildren();
+    if (references.length === 0) {
+      referenceRoot.textContent = "No exits or teleports reference this entry.";
+    } else {
+      const heading = document.createElement("strong");
+      heading.textContent = "Referenced by:";
+      const list = document.createElement("ul");
+      for (const reference of references) {
+        const item = document.createElement("li");
+        item.textContent = reference;
+        list.append(item);
+      }
+      referenceRoot.append(heading, list);
+    }
+  }
+
+  findEntryReferences(mapId, entryId) {
+    const references = [];
+    const walk = (value, path) => {
+      if (Array.isArray(value))
+        return value.forEach((entry, index) =>
+          walk(entry, `${path}[${index}]`),
+        );
+      if (!value || typeof value !== "object") return;
+      const targetsMap = value.targetMapId === mapId || value.mapId === mapId;
+      if (targetsMap && value.entryId === entryId) references.push(path);
+      for (const [key, child] of Object.entries(value))
+        walk(child, `${path}.${key}`);
+    };
+    this.maps.forEach((map) => walk(map, map.id));
+    return references;
+  }
+
+  applyEntryInspector() {
+    const entry = this.currentMap.entries[this.selectedEntryId];
+    if (!entry) return;
+    try {
+      const oldId = this.selectedEntryId;
+      const newId = byId("entry-id").value.trim();
+      const col = Number(byId("entry-col").value);
+      const row = Number(byId("entry-row").value);
+      const { width, height } = getMapSize(this.currentMap);
+      if (
+        !newId ||
+        (newId !== oldId && Object.hasOwn(this.currentMap.entries, newId))
+      ) {
+        throw new Error(
+          "Entry IDs must be nonempty and unique within the map.",
+        );
+      }
+      if (
+        !Number.isInteger(col) ||
+        !Number.isInteger(row) ||
+        col < 0 ||
+        row < 0 ||
+        col >= width ||
+        row >= height
+      ) {
+        throw new Error(
+          "Entry position must be an integer cell inside the map.",
+        );
+      }
+      this.commitMutation("Edit entry", () => {
+        if (newId !== oldId)
+          renameEntry(this.maps, this.currentMap, oldId, newId);
+        const edited = this.currentMap.entries[newId];
+        edited.col = col;
+        edited.row = row;
+        edited.facing = cloneData(directionVectors[byId("entry-facing").value]);
+        if (byId("entry-initial").checked)
+          this.currentMap.initialEntryId = newId;
+      });
+      this.selectedEntryId = newId;
+      this.refreshAfterMutation();
+    } catch (error) {
+      this.setStatus(error.message, true);
+    }
+  }
+
+  deleteSelectedEntry() {
+    const ids = Object.keys(this.currentMap.entries);
+    if (ids.length <= 1)
+      return this.setStatus("A map must keep at least one entry.", true);
+    const id = this.selectedEntryId;
+    this.commitMutation("Delete entry", () => {
+      delete this.currentMap.entries[id];
+      if (this.currentMap.initialEntryId === id) {
+        this.currentMap.initialEntryId = Object.keys(
+          this.currentMap.entries,
+        )[0];
+      }
+    });
+    this.selectedEntryId = null;
+    this.refreshAfterMutation();
+  }
+
+  addExit() {
+    const map = this.currentMap;
+    const targetMap = this.maps[0];
+    const exit = {
+      edge: "north",
+      range: [0, 0],
+      targetMapId: targetMap.id,
+      entryId: targetMap.initialEntryId ?? Object.keys(targetMap.entries)[0],
+    };
+    this.commitMutation("Add exit", () => map.exits.push(exit));
+    this.selectedExitIndex = map.exits.length - 1;
+    this.selectedEntityId = null;
+    this.selectedEntryId = null;
+    this.selectedTriggerId = null;
+    this.mode = "exits";
+    this.refreshAfterMutation();
+  }
+
+  renderExitInspector() {
+    const exit = this.currentMap.exits[this.selectedExitIndex];
+    if (!exit) {
+      this.selectedExitIndex = null;
+      return this.renderInspectors();
+    }
+    byId("exit-edge").value = exit.edge;
+    byId("exit-range-start").value = exit.range[0];
+    byId("exit-range-end").value = exit.range[1];
+    const targetMapSelect = byId("exit-target-map");
+    targetMapSelect.replaceChildren(
+      ...this.maps.map((map) => new Option(map.id, map.id)),
+    );
+    const isRandom = exit.destination?.type === "random";
+    targetMapSelect.disabled = isRandom;
+    targetMapSelect.value = isRandom
+      ? (this.maps[0]?.id ?? "")
+      : exit.targetMapId;
+    const isEntryTarget = !isRandom && Object.hasOwn(exit, "entryId");
+    const isEdgeTarget = !isRandom && Object.hasOwn(exit, "targetEdge");
+    this.populateExitEntryOptions(isEntryTarget ? exit.entryId : null);
+    byId("exit-entry-target-fields").hidden = !isEntryTarget;
+    byId("exit-edge-target-fields").hidden = !isEdgeTarget;
+    byId("exit-target-entry").disabled = !isEntryTarget;
+    if (isEdgeTarget) {
+      byId("exit-target-edge").value = exit.targetEdge;
+      byId("exit-target-range-start").value = exit.targetRange?.[0] ?? 0;
+      byId("exit-target-range-end").value = exit.targetRange?.[1] ?? 0;
+    }
+    byId("exit-json").value = JSON.stringify(exit, null, 4);
+    this.exitJsonDirty = false;
+  }
+
+  populateExitEntryOptions(preferredId = null) {
+    const targetMap = this.maps.find(
+      (map) => map.id === byId("exit-target-map").value,
+    );
+    const select = byId("exit-target-entry");
+    select.replaceChildren(
+      ...Object.keys(targetMap?.entries ?? {}).map((id) => new Option(id, id)),
+    );
+    if (preferredId && Object.hasOwn(targetMap?.entries ?? {}, preferredId))
+      select.value = preferredId;
+  }
+
+  applyExitInspector() {
+    const exit = this.currentMap.exits[this.selectedExitIndex];
+    if (!exit) return;
+    try {
+      const reciprocal = findReciprocalEdgeExit(
+        this.maps,
+        this.currentMap,
+        exit,
+      );
+      let replacement;
+      if (this.exitJsonDirty) {
+        replacement = JSON.parse(byId("exit-json").value);
+      } else if (exit.destination?.type === "random") {
+        replacement = cloneData(exit);
+        replacement.edge = byId("exit-edge").value;
+        replacement.range = [
+          Number(byId("exit-range-start").value),
+          Number(byId("exit-range-end").value),
+        ];
+      } else if (Object.hasOwn(exit, "entryId")) {
+        replacement = {
+          edge: byId("exit-edge").value,
+          range: [
+            Number(byId("exit-range-start").value),
+            Number(byId("exit-range-end").value),
+          ],
+          targetMapId: byId("exit-target-map").value,
+          entryId: byId("exit-target-entry").value,
+        };
+      } else {
+        replacement = cloneData(exit);
+        replacement.edge = byId("exit-edge").value;
+        replacement.range = [
+          Number(byId("exit-range-start").value),
+          Number(byId("exit-range-end").value),
+        ];
+        replacement.targetMapId = byId("exit-target-map").value;
+        if (Object.hasOwn(exit, "targetEdge")) {
+          replacement.targetEdge = byId("exit-target-edge").value;
+          replacement.targetRange = [
+            Number(byId("exit-target-range-start").value),
+            Number(byId("exit-target-range-end").value),
+          ];
         }
-    }
+      }
+      if (
+        !Array.isArray(replacement.range) ||
+        replacement.range.length !== 2 ||
+        !replacement.range.every(Number.isInteger)
+      ) {
+        throw new Error("Exit range must contain two integers.");
+      }
+      if (
+        replacement.range[0] < 0 ||
+        replacement.range[1] < replacement.range[0]
+      ) {
+        throw new Error(
+          "Exit range must contain ordered non-negative integers.",
+        );
+      }
+      const sourceLimit = getEdgeAxisLength(this.currentMap, replacement.edge);
+      if (replacement.range[1] >= sourceLimit) {
+        throw new Error(`Exit range exceeds the ${replacement.edge} edge.`);
+      }
 
-    refreshOpenMapGraph() {
-        const dialog = byId("map-graph-dialog");
-        if (!dialog.open) return;
+      const destinations =
+        replacement.destination?.type === "random"
+          ? (replacement.destination.choices ?? [])
+          : [replacement];
+      for (const [choiceIndex, destination] of destinations.entries()) {
+        if (!Object.hasOwn(destination, "targetEdge")) continue;
+        const choiceLabel =
+          replacement.destination?.type === "random"
+            ? `Random destination choice ${choiceIndex}`
+            : "Target doorway";
+        if (
+          !Array.isArray(destination.targetRange) ||
+          destination.targetRange.length !== 2 ||
+          !destination.targetRange.every(Number.isInteger) ||
+          destination.targetRange[0] < 0 ||
+          destination.targetRange[1] < destination.targetRange[0]
+        ) {
+          throw new Error(
+            `${choiceLabel} range must contain ordered non-negative integers.`,
+          );
+        }
+        if (destination.targetEdge !== OPPOSITE_EDGE[replacement.edge]) {
+          throw new Error(
+            `${choiceLabel} edge must be opposite the source edge.`,
+          );
+        }
+        const sourceLength = replacement.range[1] - replacement.range[0];
+        const targetLength =
+          destination.targetRange[1] - destination.targetRange[0];
+        if (sourceLength !== targetLength) {
+          throw new Error(
+            `${choiceLabel} must contain the same number of cells as the source range.`,
+          );
+        }
+        const targetMap = this.maps.find(
+          (map) => map.id === destination.targetMapId,
+        );
+        if (!targetMap)
+          throw new Error(`${choiceLabel} targets a missing map.`);
+        const targetLimit = getEdgeAxisLength(
+          targetMap,
+          destination.targetEdge,
+        );
+        if (destination.targetRange[1] >= targetLimit) {
+          throw new Error(`${choiceLabel} range exceeds the target edge.`);
+        }
+      }
+      const replacementIsDirectEdgeExit =
+        replacement.destination?.type !== "random" &&
+        Object.hasOwn(replacement, "targetEdge");
+      let reciprocalReplacement = null;
+      let reciprocalTargetMap = null;
 
-        this.mapGraph.render(this.maps, {
-            selectedMapId: this.selectedMapId,
-        });
-        this.mapGraph.resize();
-    }
+      if (reciprocal && replacementIsDirectEdgeExit) {
+        reciprocalTargetMap = this.maps.find(
+          (map) => map.id === replacement.targetMapId,
+        );
+        if (!reciprocalTargetMap) {
+          throw new Error(
+            "The reciprocal exit's new target map does not exist.",
+          );
+        }
+        reciprocalReplacement = updateReciprocalEdgeExitGeometry(
+          reciprocal.exit,
+          this.currentMap.id,
+          replacement,
+        );
 
-    showMapGraph() {
-        const dialog = byId("map-graph-dialog");
-        dialog.showModal();
+        const overlap = (reciprocalTargetMap.exits ?? []).findIndex(
+          (candidate, index) =>
+            !(
+              reciprocal.map === reciprocalTargetMap &&
+              index === reciprocal.index
+            ) &&
+            candidate?.edge === reciprocalReplacement.edge &&
+            Array.isArray(candidate.range) &&
+            candidate.range.length === 2 &&
+            candidate.range[0] <= reciprocalReplacement.range[1] &&
+            reciprocalReplacement.range[0] <= candidate.range[1],
+        );
+        if (overlap >= 0) {
+          throw new Error(
+            `The linked target doorway overlaps exit ${overlap} in "${reciprocalTargetMap.id}".`,
+          );
+        }
+      }
 
-        requestAnimationFrame(() => {
-            this.refreshOpenMapGraph();
-            this.mapGraph.fit();
-        });
-    }
+      this.commitMutation("Edit exit", () => {
+        this.currentMap.exits[this.selectedExitIndex] = replacement;
 
-    async openMapFromGraph(mapId) {
-        if (!this.maps.some((map) => map.id === mapId)) {
-            this.setStatus(`Map "${mapId}" does not exist.`, true);
-            return;
+        if (!reciprocal) return;
+        if (!replacementIsDirectEdgeExit) {
+          reciprocal.map.exits.splice(reciprocal.index, 1);
+          return;
         }
 
-        this.selectedMapId = mapId;
-        this.clearSelection();
-
-        const dialog = byId("map-graph-dialog");
-        if (dialog.open) dialog.close();
-
-        await this.refreshDocumentUI();
-        this.setStatus(`Opened map "${mapId}" from the map graph.`);
-    }
-
-    playtest() {
-        const errors = this.validateAndDisplay();
-        if (errors.length > 0) {
-            this.setStatus("Resolve immediate structural errors before playtesting.", true);
-            return;
+        if (reciprocal.map === reciprocalTargetMap) {
+          reciprocal.map.exits[reciprocal.index] = reciprocalReplacement;
+          return;
         }
-        localStorage.setItem(PLAYTEST_STORAGE_KEY, JSON.stringify(this.maps));
-        localStorage.removeItem(PLAYTEST_RESULT_KEY);
-        const result = byId("playtest-output");
-        result.className = "playtest-result";
-        result.textContent = "Full game validation is running in the playtest window.";
-        const popup = window.open("../index.html?editorPlaytest=1", "_blank");
-        if (popup) popup.opener = null;
-        if (!popup) {
-            this.setStatus("The browser blocked the playtest window.", true);
-            return;
-        }
-        this.setStatus("Opened the current working document in the real game.");
+
+        reciprocal.map.exits.splice(reciprocal.index, 1);
+        reciprocalTargetMap.exits.push(reciprocalReplacement);
+      });
+      this.refreshAfterMutation();
+    } catch (error) {
+      this.setStatus(error.message, true);
+    }
+  }
+
+  deleteSelectedExit() {
+    if (this.selectedExitIndex === null) return;
+    this.commitMutation("Delete exit", () =>
+      this.currentMap.exits.splice(this.selectedExitIndex, 1),
+    );
+    this.selectedExitIndex = null;
+    this.refreshAfterMutation();
+  }
+
+  validateAndDisplay() {
+    const errors = validateEditorDocument(this.maps);
+    const root = byId("validation-output");
+    root.replaceChildren();
+    if (errors.length === 0) {
+      const ok = document.createElement("span");
+      ok.className = "validation-ok";
+      ok.textContent = "No immediate structural errors.";
+      root.append(ok);
+    } else {
+      const heading = document.createElement("strong");
+      heading.textContent = `${errors.length} issue${errors.length === 1 ? "" : "s"}`;
+      const list = document.createElement("ul");
+      list.className = "validation-errors";
+      for (const error of errors.slice(0, 30)) {
+        const item = document.createElement("li");
+        item.textContent = error;
+        list.append(item);
+      }
+      root.append(heading, list);
+    }
+    return errors;
+  }
+
+  saveRecovery(showStatus) {
+    localStorage.setItem(EDITOR_STORAGE_KEY, JSON.stringify(this.maps));
+    this.updateRecoveryButton();
+    if (showStatus) this.setStatus("Recovery copy saved in localStorage.");
+  }
+
+  updateRecoveryButton() {
+    byId("restore-recovery").disabled =
+      !localStorage.getItem(EDITOR_STORAGE_KEY);
+    byId("restore-backup").disabled = !localStorage.getItem(EDITOR_BACKUP_KEY);
+  }
+
+  async restoreRecovery() {
+    const raw = localStorage.getItem(EDITOR_STORAGE_KEY);
+    if (!raw) return;
+    if (!confirm("Replace the working document with the local recovery copy?"))
+      return;
+    localStorage.setItem(EDITOR_BACKUP_KEY, JSON.stringify(this.maps));
+    this.maps = JSON.parse(raw);
+    this.mapGraph.invalidatePositions();
+    this.selectedMapId = this.maps[0].id;
+    this.undoStack = [];
+    this.redoStack = [];
+    this.clearSelection();
+    this.dirty = true;
+    await this.refreshDocumentUI();
+    this.setStatus("Recovery copy restored.");
+  }
+
+  async restorePreImportBackup() {
+    const raw = localStorage.getItem(EDITOR_BACKUP_KEY);
+    if (!raw) return;
+    if (!confirm("Replace the working document with the pre-import backup?"))
+      return;
+    this.maps = JSON.parse(raw);
+    this.mapGraph.invalidatePositions();
+    this.selectedMapId = this.maps[0].id;
+    this.undoStack = [];
+    this.redoStack = [];
+    this.clearSelection();
+    this.dirty = true;
+    this.saveRecovery(false);
+    await this.refreshDocumentUI();
+    this.setStatus("Pre-import backup restored.");
+  }
+
+  async importText(text) {
+    const imported = parseImportedMaps(text);
+    localStorage.setItem(EDITOR_BACKUP_KEY, JSON.stringify(this.maps));
+    this.updateRecoveryButton();
+    this.maps = cloneData(imported);
+    this.mapGraph.invalidatePositions();
+    this.selectedMapId = this.maps[0]?.id ?? null;
+    this.undoStack = [];
+    this.redoStack = [];
+    this.clearSelection();
+    this.dirty = true;
+    this.saveRecovery(false);
+    await this.refreshDocumentUI();
+    this.setStatus(
+      "Imported map data. The previous document was stored as a pre-import backup.",
+    );
+  }
+
+  async copyCurrentMap() {
+    const text = JSON.stringify(this.currentMap, null, 4);
+
+    try {
+      await navigator.clipboard.writeText(text);
+      this.setStatus(`Copied map "${this.currentMap.id}".`);
+    } catch {
+      this.setStatus("The browser did not allow clipboard access.", true);
+    }
+  }
+
+  refreshOpenMapGraph() {
+    const dialog = byId("map-graph-dialog");
+    if (!dialog.open) return;
+
+    this.mapGraph.render(this.maps, {
+      selectedMapId: this.selectedMapId,
+    });
+    this.mapGraph.resize();
+  }
+
+  showMapGraph() {
+    const dialog = byId("map-graph-dialog");
+    dialog.showModal();
+
+    requestAnimationFrame(() => {
+      this.refreshOpenMapGraph();
+      this.mapGraph.fit();
+    });
+  }
+
+  async openMapFromGraph(mapId) {
+    if (!this.maps.some((map) => map.id === mapId)) {
+      this.setStatus(`Map "${mapId}" does not exist.`, true);
+      return;
     }
 
-    displayPlaytestResult(result) {
-        const element = byId("playtest-output");
-        element.className = `playtest-result ${result.ok ? "ok" : "error"}`;
-        element.textContent = result.ok
-            ? "Full game validation passed and the playtest started."
-            : `Full game validation failed: ${result.message}`;
-    }
+    this.selectedMapId = mapId;
+    this.clearSelection();
 
-    markExported() {
-        this.dirty = false;
-        this.setStatus("Exported the current generated map data.");
-    }
+    const dialog = byId("map-graph-dialog");
+    if (dialog.open) dialog.close();
 
-    setStatus(message, isError = false) {
-        const element = byId("document-status");
-        element.textContent = message;
-        element.style.color = isError ? "#f0a1a7" : "";
+    await this.refreshDocumentUI();
+    this.setStatus(`Opened map "${mapId}" from the map graph.`);
+  }
+
+  playtest() {
+    const errors = this.validateAndDisplay();
+    if (errors.length > 0) {
+      this.setStatus(
+        "Resolve immediate structural errors before playtesting.",
+        true,
+      );
+      return;
     }
+    localStorage.setItem(PLAYTEST_STORAGE_KEY, JSON.stringify(this.maps));
+    localStorage.removeItem(PLAYTEST_RESULT_KEY);
+    const result = byId("playtest-output");
+    result.className = "playtest-result";
+    result.textContent =
+      "Full game validation is running in the playtest window.";
+    const popup = window.open("../index.html?editorPlaytest=1", "_blank");
+    if (popup) popup.opener = null;
+    if (!popup) {
+      this.setStatus("The browser blocked the playtest window.", true);
+      return;
+    }
+    this.setStatus("Opened the current working document in the real game.");
+  }
+
+  displayPlaytestResult(result) {
+    const element = byId("playtest-output");
+    element.className = `playtest-result ${result.ok ? "ok" : "error"}`;
+    element.textContent = result.ok
+      ? "Full game validation passed and the playtest started."
+      : `Full game validation failed: ${result.message}`;
+  }
+
+  markExported() {
+    this.dirty = false;
+    this.setStatus("Exported the current generated map data.");
+  }
+
+  setStatus(message, isError = false) {
+    const element = byId("document-status");
+    element.textContent = message;
+    element.style.color = isError ? "#f0a1a7" : "";
+  }
 }
 
 if (typeof document !== "undefined") {
-    const editor = new MapEditor();
-    editor.start().catch((error) => {
-        console.error(error);
-        byId("document-status").textContent = error.message;
-    });
+  const editor = new MapEditor();
+  editor.start().catch((error) => {
+    console.error(error);
+    byId("document-status").textContent = error.message;
+  });
 }

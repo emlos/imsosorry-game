@@ -333,14 +333,28 @@ musicEvents: [
 }
 ```
 
-## 16. Use item, then teleport after dialogue
+## 16. Use an item, then teleport after dialogue
+
+Global item:
 
 ```js
 "odd-key": {
     name: "Odd Key",
-    icon: "./assets/items/odd-key.png",
+    visual: { type: "sprite", id: "signal-beacon" },
     description: "It fits no visible lock.",
     usable: true,
+}
+```
+
+Map trigger:
+
+```js
+{
+    id: "odd-key-space",
+    region: { col: 0, row: 0, width: 10, height: 8 },
+    events: ["itemUse"],
+    itemId: "odd-key",
+    frequency: "always",
     effects: [
         {
             type: "showText",

@@ -199,6 +199,7 @@ triggers: [
         id: "hallway-distortion",
         region: { col: 3, row: 4, width: 5, height: 2 },
         events: ["enter"],
+        // itemId: "pink-orb", // required for itemUse
         frequency: "once-per-visit",
         condition: { notFlag: "hallway.resolved" }, // optional
         effects: [
@@ -215,11 +216,13 @@ Rules:
 - `region.col` and `region.row` are non-negative integers.
 - `region.width` and `region.height` are positive integers.
 - The complete rectangle must fit inside the map.
-- `events` is a non-empty, duplicate-free list containing `enter`, `exit`, and/or `step`.
+- `events` is a non-empty, duplicate-free list containing `enter`, `exit`, `step`, and/or `itemUse`.
+- `itemId` is required exactly when `events` contains `itemUse`; the item must exist in `ITEMS`.
 - `frequency` is optional and defaults to `always`; supported values are `always`, `once-per-visit`, and `once-per-save`.
 - `condition` is optional.
 - `effects` is a non-empty effect sequence.
 - Overlapping rectangles are valid and execute in array order.
+- `enter`, `exit`, and `step` are evaluated after completed tile movement. `itemUse` is dispatched by the inventory while the player stands in the region.
 - The regions have no rendering or collision of their own.
 
 The editor's Trigger mode creates, moves, resizes, reorders, and overlays these rectangles. Its inspector edits condition and effect arrays as JSON.

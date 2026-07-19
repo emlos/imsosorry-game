@@ -1,4 +1,4 @@
-# Yume Prototype v0.9
+# Yume Prototype v0.9.1
 Generated from the project source on 2026-07-19.
 
 ---
@@ -118,11 +118,11 @@ Important dialogue rule: `showText` must be the final reachable effect in its ar
 ```text
 Entity interaction (`handler: "effects"`)
 Tile interaction (`handler: "effects"`)
-Usable item (`ITEMS[itemId].effects`)
+Usable item universal effects (`ITEMS[itemId].effects`, optional)
 Map `onEnter`
 Map `onExit`
 Map `musicEvents[].effects`
-Map `triggers[].effects`
+Map `triggers[].effects` (`enter`, `exit`, `step`, or contextual `itemUse`)
 `showText.afterClose`
 `random.choices[].effects`
 ```
@@ -306,7 +306,7 @@ Map IDs and entity IDs are technical references. Keep them stable once content b
 editorGroup: "Forest"
 ```
 
-Changing a map ID is a reference refactor. The editor updates map-owned references on a clone and commits only if valid. References in external registries such as `ITEMS`, global `TILES`, `SPRITES`, or presets block the rename and must be changed in source code first.
+Changing a map ID is a reference refactor. The editor updates map-owned references on a clone and commits only if valid. References in external registries such as global `TILES`, `SPRITES`, or presets block the rename and must be changed in source code first. Global item definitions are not allowed to contain map destinations.
 
 Old development saves are not migrated when map IDs change.
 
@@ -375,7 +375,7 @@ For that reason, random effect IDs used by different interactive tile definition
 
 ```js
 usable: true,
-effects: [/* ... */]
+effects: [/* optional universal effects */]
 ```
 
 The owner is:
@@ -384,7 +384,7 @@ The owner is:
 item:<itemId>
 ```
 
-Item effects have no implicit source map during startup validation. Effects that require a local map target must provide `mapId` unless the runtime context supplies one. Teleport effects always specify a map and entry.
+Global item effects may play sounds, change flags, heal, or perform other universally valid work. They cannot contain `teleport` or explicit `mapId` fields. Context-dependent behavior belongs in a map trigger with `events: ["itemUse"]`.
 
 ### 4. Map entry
 
@@ -452,6 +452,7 @@ triggers: [
             height: 2,
         },
         events: ["enter"],
+        // itemId: "pink-orb", // required when events includes itemUse
         frequency: "always",
         condition: { flag: "world.changed" }, // optional
         effects: [/* non-empty effect array */],
@@ -466,6 +467,7 @@ Event types:
 - `enter`: the previous tile was outside and the new tile is inside.
 - `exit`: the previous tile was inside and the new tile is outside.
 - `step`: the completed movement ends inside. If the same trigger lists both `enter` and `step`, entering reports `enter` and executes the effects once for that movement.
+- `itemUse`: the player uses `trigger.itemId` while standing inside the region. This event is dispatched from inventory use rather than movement.
 
 Frequency values:
 
@@ -1434,6 +1436,7 @@ triggers: [
         id: "hallway-distortion",
         region: { col: 3, row: 4, width: 5, height: 2 },
         events: ["enter"],
+        // itemId: "pink-orb", // required for itemUse
         frequency: "once-per-visit",
         condition: { notFlag: "hallway.resolved" }, // optional
         effects: [
@@ -1450,11 +1453,13 @@ Rules:
 - `region.col` and `region.row` are non-negative integers.
 - `region.width` and `region.height` are positive integers.
 - The complete rectangle must fit inside the map.
-- `events` is a non-empty, duplicate-free list containing `enter`, `exit`, and/or `step`.
+- `events` is a non-empty, duplicate-free list containing `enter`, `exit`, `step`, and/or `itemUse`.
+- `itemId` is required exactly when `events` contains `itemUse`; the item must exist in `ITEMS`.
 - `frequency` is optional and defaults to `always`; supported values are `always`, `once-per-visit`, and `once-per-save`.
 - `condition` is optional.
 - `effects` is a non-empty effect sequence.
 - Overlapping rectangles are valid and execute in array order.
+- `enter`, `exit`, and `step` are evaluated after completed tile movement. `itemUse` is dispatched by the inventory while the player stands in the region.
 - The regions have no rendering or collision of their own.
 
 The editor's Trigger mode creates, moves, resizes, reorders, and overlays these rectangles. Its inspector edits condition and effect arrays as JSON.
@@ -2359,14 +2364,14 @@ The generated snippets intentionally omit collision, footprint, conditions, and 
 
 # Items and Inventory
 
-Items are defined in `items.js`.
+Items are defined globally in `items.js`. Their definitions contain only universal information: display text, an inventory visual, whether the item can be used, and optional effects that make sense in every map.
 
-## Unusable/passive item
+## Passive item
 
 ```js
 "test-token": {
     name: "Test Token",
-    icon: "./assets/items/token.png",
+    visual: { type: "sprite", id: "signal-beacon" },
     description: "A small token.",
     usable: false,
 }
@@ -2374,42 +2379,78 @@ Items are defined in `items.js`.
 
 A passive item must not define `effects`.
 
-## Usable item
+## Usable item with contextual behavior
 
 ```js
 "pink-orb": {
     name: "Pink Orb",
-    icon: "./assets/items/pink-orb.png",
+    visual: { type: "sprite", id: "pink-orb" },
     description: "A warm pink sphere.",
     usable: true,
-    effects: [
-        { type: "playSound", soundId: "item-use" },
-        {
-            type: "showText",
-            speaker: "Pink Orb",
-            pages: ["The orb grows warm."],
-            afterClose: [
-                {
-                    type: "teleport",
-                    mapId: "room-other",
-                    entryId: "fromOrb",
-                },
-            ],
-        },
-    ],
 }
 ```
 
-Required fields:
+The item does not name a map or entry. A map trigger defines what using it means in that location:
+
+```js
+triggers: [
+    {
+        id: "pink-orb-return",
+        region: { col: 0, row: 0, width: 12, height: 8 },
+        events: ["itemUse"],
+        itemId: "pink-orb",
+        frequency: "always",
+        effects: [
+            { type: "playSound", soundId: "item-use" },
+            {
+                type: "teleport",
+                mapId: "folded-room",
+                entryId: "from-orb",
+            },
+        ],
+    },
+]
+```
+
+`itemUse` runs only when the player uses the matching item while their current tile is inside the trigger rectangle. Overlapping matches execute in map trigger-array order. Like movement triggers, processing stops when an earlier trigger changes maps, opens dialogue, or otherwise leaves world mode.
+
+Required item fields:
 
 ```text
 name
-icon
+visual
 description
 usable
 ```
 
-`effects` is required when `usable: true` and forbidden when `usable: false`.
+`visual` currently references a global sprite:
+
+```js
+visual: { type: "sprite", id: "lantern" }
+```
+
+The inventory uses the sprite's atlas frame, default animation, and pixel-art rendering. The same sprite reference can therefore drive an animated world entity and its animated inventory icon.
+
+## Universal item effects
+
+A usable item may still define `effects` when they are genuinely independent of map structure:
+
+```js
+"music-box": {
+    name: "Music Box",
+    visual: { type: "sprite", id: "signal-beacon" },
+    description: "It plays the same note everywhere.",
+    usable: true,
+    effects: [
+        { type: "playSound", soundId: "item-use" },
+        { type: "setFlag", flag: "musicBox.used", value: true },
+    ],
+}
+```
+
+Global item effects run first. When they finish, the game dispatches the contextual `itemUse` event if the player remains in the same map. Animated camera effects and dialogue closure are awaited, including `showText.afterClose` chains.
+
+Global item effects may not contain `teleport` or an explicit `mapId`. Put those effects in a map `itemUse` trigger instead. Runtime validation rejects violations rather than silently rewriting them.
 
 ## Ownership
 
@@ -2421,14 +2462,12 @@ inventory: {
 }
 ```
 
-Use:
+Use conditions:
 
 ```js
 { hasItem: "pink-orb" }
 { notItem: "pink-orb" }
 ```
-
-for conditions.
 
 Use effects:
 
@@ -2437,49 +2476,48 @@ Use effects:
 { type: "removeItem", itemId: "pink-orb", quantity: 1 }
 ```
 
-## Collectible pattern
+Universal item effects use the deterministic random owner:
 
-Entity:
+```text
+item:<itemId>
+```
+
+Contextual trigger effects use:
+
+```text
+map:<mapId>:trigger:<triggerId>
+```
+
+## Collectible pattern
 
 ```js
 {
-    id: "pink-orb",
+    id: "lantern-fragment-pickup",
     active: true,
-    col: 4,
-    row: 3,
-    visual: { type: "sprite", id: "pink-orb" },
+    col: 3,
+    row: 1,
+    visual: { type: "sprite", id: "lantern" },
     transform: { flipX: false, flipY: false },
     collision: false,
     interaction: {
         handler: "effects",
         triggers: ["action", "touch"],
         effects: [
-            { type: "addItem", itemId: "pink-orb", quantity: 1 },
             { type: "playSound", soundId: "orb-collect" },
+            { type: "addItem", itemId: "lantern-fragment", quantity: 1 },
+            {
+                type: "setEntityActive",
+                entityId: "lantern-fragment-pickup",
+                active: false,
+            },
         ],
-        message: "You found the pink orb.",
+        message: "Pick up the lantern fragment.",
     },
-    condition: { notItem: "pink-orb" },
+    condition: null,
 }
 ```
 
-The presence condition makes current inventory ownership authoritative, including after reload.
-
-## Item effect context
-
-Usable items execute with owner:
-
-```text
-item:<itemId>
-```
-
-This gives item random effects stable save-specific streams.
-
-Because item definitions are outside map data, map-ID refactors in the editor cannot rewrite them. The editor detects and blocks a map rename when an item still references that map.
-
-## Current limitation
-
-Inventory icons are static standalone image paths. Animated/atlas-backed icons are not implemented.
+The persistent entity-state change makes the pickup disappear and remain gone after saving. The item definition and entity can reference the same animated sprite.
 
 ---
 
@@ -2818,14 +2856,28 @@ musicEvents: [
 }
 ```
 
-## 16. Use item, then teleport after dialogue
+## 16. Use an item, then teleport after dialogue
+
+Global item:
 
 ```js
 "odd-key": {
     name: "Odd Key",
-    icon: "./assets/items/odd-key.png",
+    visual: { type: "sprite", id: "signal-beacon" },
     description: "It fits no visible lock.",
     usable: true,
+}
+```
+
+Map trigger:
+
+```js
+{
+    id: "odd-key-space",
+    region: { col: 0, row: 0, width: 10, height: 8 },
+    events: ["itemUse"],
+    itemId: "odd-key",
+    frequency: "always",
     effects: [
         {
             type: "showText",
@@ -2880,7 +2932,9 @@ No game logic changes are required when using existing tile fields.
 1. Add `ITEMS[itemId]` in `items.js`.
 2. Add icon art.
 3. Choose passive or usable.
-4. For usable items, add a valid non-empty effect array.
+4. Assign `visual: { type: "sprite", id }`.
+5. For universally valid behavior, optionally add a non-empty effect array.
+6. For map-dependent behavior, add an `itemUse` trigger to the relevant map instead of referencing a map from `ITEMS`.
 5. Search map-ID references before renaming targeted maps.
 
 ## Add a sound

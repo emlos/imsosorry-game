@@ -113,11 +113,11 @@ Important dialogue rule: `showText` must be the final reachable effect in its ar
 ```text
 Entity interaction (`handler: "effects"`)
 Tile interaction (`handler: "effects"`)
-Usable item (`ITEMS[itemId].effects`)
+Usable item universal effects (`ITEMS[itemId].effects`, optional)
 Map `onEnter`
 Map `onExit`
 Map `musicEvents[].effects`
-Map `triggers[].effects`
+Map `triggers[].effects` (`enter`, `exit`, `step`, or contextual `itemUse`)
 `showText.afterClose`
 `random.choices[].effects`
 ```

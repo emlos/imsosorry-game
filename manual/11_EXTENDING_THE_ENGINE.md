@@ -34,7 +34,9 @@ No game logic changes are required when using existing tile fields.
 1. Add `ITEMS[itemId]` in `items.js`.
 2. Add icon art.
 3. Choose passive or usable.
-4. For usable items, add a valid non-empty effect array.
+4. Assign `visual: { type: "sprite", id }`.
+5. For universally valid behavior, optionally add a non-empty effect array.
+6. For map-dependent behavior, add an `itemUse` trigger to the relevant map instead of referencing a map from `ITEMS`.
 5. Search map-ID references before renaming targeted maps.
 
 ## Add a sound

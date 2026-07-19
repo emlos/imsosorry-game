@@ -1,13 +1,13 @@
 # Items and Inventory
 
-Items are defined in `items.js`.
+Items are defined globally in `items.js`. Their definitions contain only universal information: display text, an inventory visual, whether the item can be used, and optional effects that make sense in every map.
 
-## Unusable/passive item
+## Passive item
 
 ```js
 "test-token": {
     name: "Test Token",
-    icon: "./assets/items/token.png",
+    visual: { type: "sprite", id: "signal-beacon" },
     description: "A small token.",
     usable: false,
 }
@@ -15,42 +15,78 @@ Items are defined in `items.js`.
 
 A passive item must not define `effects`.
 
-## Usable item
+## Usable item with contextual behavior
 
 ```js
 "pink-orb": {
     name: "Pink Orb",
-    icon: "./assets/items/pink-orb.png",
+    visual: { type: "sprite", id: "pink-orb" },
     description: "A warm pink sphere.",
     usable: true,
-    effects: [
-        { type: "playSound", soundId: "item-use" },
-        {
-            type: "showText",
-            speaker: "Pink Orb",
-            pages: ["The orb grows warm."],
-            afterClose: [
-                {
-                    type: "teleport",
-                    mapId: "room-other",
-                    entryId: "fromOrb",
-                },
-            ],
-        },
-    ],
 }
 ```
 
-Required fields:
+The item does not name a map or entry. A map trigger defines what using it means in that location:
+
+```js
+triggers: [
+    {
+        id: "pink-orb-return",
+        region: { col: 0, row: 0, width: 12, height: 8 },
+        events: ["itemUse"],
+        itemId: "pink-orb",
+        frequency: "always",
+        effects: [
+            { type: "playSound", soundId: "item-use" },
+            {
+                type: "teleport",
+                mapId: "folded-room",
+                entryId: "from-orb",
+            },
+        ],
+    },
+]
+```
+
+`itemUse` runs only when the player uses the matching item while their current tile is inside the trigger rectangle. Overlapping matches execute in map trigger-array order. Like movement triggers, processing stops when an earlier trigger changes maps, opens dialogue, or otherwise leaves world mode.
+
+Required item fields:
 
 ```text
 name
-icon
+visual
 description
 usable
 ```
 
-`effects` is required when `usable: true` and forbidden when `usable: false`.
+`visual` currently references a global sprite:
+
+```js
+visual: { type: "sprite", id: "lantern" }
+```
+
+The inventory uses the sprite's atlas frame, default animation, and pixel-art rendering. The same sprite reference can therefore drive an animated world entity and its animated inventory icon.
+
+## Universal item effects
+
+A usable item may still define `effects` when they are genuinely independent of map structure:
+
+```js
+"music-box": {
+    name: "Music Box",
+    visual: { type: "sprite", id: "signal-beacon" },
+    description: "It plays the same note everywhere.",
+    usable: true,
+    effects: [
+        { type: "playSound", soundId: "item-use" },
+        { type: "setFlag", flag: "musicBox.used", value: true },
+    ],
+}
+```
+
+Global item effects run first. When they finish, the game dispatches the contextual `itemUse` event if the player remains in the same map. Animated camera effects and dialogue closure are awaited, including `showText.afterClose` chains.
+
+Global item effects may not contain `teleport` or an explicit `mapId`. Put those effects in a map `itemUse` trigger instead. Runtime validation rejects violations rather than silently rewriting them.
 
 ## Ownership
 
@@ -62,14 +98,12 @@ inventory: {
 }
 ```
 
-Use:
+Use conditions:
 
 ```js
 { hasItem: "pink-orb" }
 { notItem: "pink-orb" }
 ```
-
-for conditions.
 
 Use effects:
 
@@ -78,46 +112,45 @@ Use effects:
 { type: "removeItem", itemId: "pink-orb", quantity: 1 }
 ```
 
-## Collectible pattern
+Universal item effects use the deterministic random owner:
 
-Entity:
+```text
+item:<itemId>
+```
+
+Contextual trigger effects use:
+
+```text
+map:<mapId>:trigger:<triggerId>
+```
+
+## Collectible pattern
 
 ```js
 {
-    id: "pink-orb",
+    id: "lantern-fragment-pickup",
     active: true,
-    col: 4,
-    row: 3,
-    visual: { type: "sprite", id: "pink-orb" },
+    col: 3,
+    row: 1,
+    visual: { type: "sprite", id: "lantern" },
     transform: { flipX: false, flipY: false },
     collision: false,
     interaction: {
         handler: "effects",
         triggers: ["action", "touch"],
         effects: [
-            { type: "addItem", itemId: "pink-orb", quantity: 1 },
             { type: "playSound", soundId: "orb-collect" },
+            { type: "addItem", itemId: "lantern-fragment", quantity: 1 },
+            {
+                type: "setEntityActive",
+                entityId: "lantern-fragment-pickup",
+                active: false,
+            },
         ],
-        message: "You found the pink orb.",
+        message: "Pick up the lantern fragment.",
     },
-    condition: { notItem: "pink-orb" },
+    condition: null,
 }
 ```
 
-The presence condition makes current inventory ownership authoritative, including after reload.
-
-## Item effect context
-
-Usable items execute with owner:
-
-```text
-item:<itemId>
-```
-
-This gives item random effects stable save-specific streams.
-
-Because item definitions are outside map data, map-ID refactors in the editor cannot rewrite them. The editor detects and blocks a map rename when an item still references that map.
-
-## Current limitation
-
-Inventory icons are static standalone image paths. Animated/atlas-backed icons are not implemented.
+The persistent entity-state change makes the pickup disappear and remain gone after saving. The item definition and entity can reference the same animated sprite.

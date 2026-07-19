@@ -1,6 +1,6 @@
-# Yume Prototype v0.9 — Authoring Manual
+# Yume Prototype v0.9.1 — Authoring Manual
 
-This manual documents the systems present in the attached `0.9` project. It is intended as the central reference for map authoring, editor use, interactions, hooks, conditions, effects, deterministic randomness, music, assets, and common recipes.
+This manual documents the systems present in the attached `0.9.1` project. It is intended as the central reference for map authoring, editor use, interactions, hooks, conditions, effects, deterministic randomness, music, assets, and common recipes.
 
 The code is strict by design. Most authored objects accept only the documented keys; a misspelled or unsupported key should fail during game initialization or Playtest rather than being silently ignored.
 
@@ -15,7 +15,7 @@ The code is strict by design. Most authored objects accept only the documented k
 - `06_RANDOMNESS.md` — save-seeded deterministic random choices.
 - `07_MUSIC_AND_AUDIO.md` — map music, transitions, events, SFX, and stingers.
 - `08_ASSETS_ANIMATION_ATLASES.md` — tile/sprite formats and atlas packing.
-- `09_ITEMS_AND_INVENTORY.md` — item definitions and usable-item effects.
+- `09_ITEMS_AND_INVENTORY.md` — item definitions, animated inventory visuals, universal effects, and contextual item-use triggers.
 - `10_RECIPES.md` — pasteable patterns for common game events.
 - `11_EXTENDING_THE_ENGINE.md` — files and checklists for adding new engine capabilities.
 - `12_VALIDATION_AND_GOTCHAS.md` — strict rules and common failure modes.

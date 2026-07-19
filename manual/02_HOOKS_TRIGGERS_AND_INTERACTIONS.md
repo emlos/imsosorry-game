@@ -44,7 +44,7 @@ For that reason, random effect IDs used by different interactive tile definition
 
 ```js
 usable: true,
-effects: [/* ... */]
+effects: [/* optional universal effects */]
 ```
 
 The owner is:
@@ -53,7 +53,7 @@ The owner is:
 item:<itemId>
 ```
 
-Item effects have no implicit source map during startup validation. Effects that require a local map target must provide `mapId` unless the runtime context supplies one. Teleport effects always specify a map and entry.
+Global item effects may play sounds, change flags, heal, or perform other universally valid work. They cannot contain `teleport` or explicit `mapId` fields. Context-dependent behavior belongs in a map trigger with `events: ["itemUse"]`.
 
 ### 4. Map entry
 
@@ -121,6 +121,7 @@ triggers: [
             height: 2,
         },
         events: ["enter"],
+        // itemId: "pink-orb", // required when events includes itemUse
         frequency: "always",
         condition: { flag: "world.changed" }, // optional
         effects: [/* non-empty effect array */],
@@ -135,6 +136,7 @@ Event types:
 - `enter`: the previous tile was outside and the new tile is inside.
 - `exit`: the previous tile was inside and the new tile is outside.
 - `step`: the completed movement ends inside. If the same trigger lists both `enter` and `step`, entering reports `enter` and executes the effects once for that movement.
+- `itemUse`: the player uses `trigger.itemId` while standing inside the region. This event is dispatched from inventory use rather than movement.
 
 Frequency values:
 

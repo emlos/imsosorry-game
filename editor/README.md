@@ -33,7 +33,7 @@ The graph is read-only. Drag the background to pan, use the mouse wheel to zoom,
 
 ## Map ID refactors
 
-Changing a map ID is an atomic reference refactor, not an ordinary label edit. The editor rewrites map-owned exits, teleport interactions, trigger effects, nested effects, cross-map entity effects, and map-specific tile interactions on a cloned document, validates the candidate, and commits only when the result is valid. References found in read-only source registries such as `ITEMS`, global `TILES`, `SPRITES`, or entity presets block the operation and report their source paths; update those source definitions before retrying.
+Changing a map ID is an atomic reference refactor, not an ordinary label edit. The editor rewrites map-owned exits, teleport interactions, trigger effects, nested effects, cross-map entity effects, and map-specific tile interactions on a cloned document, validates the candidate, and commits only when the result is valid. References found in read-only source registries such as global `TILES`, `SPRITES`, or entity presets block the operation and report their source paths; update those source definitions before retrying. Global item definitions cannot contain map destinations.
 
 Development saves are not migrated when a map ID changes. Clear old development save slots after a successful ID refactor. Prefer keeping technical map IDs stable and use `editorGroup` or authored dialogue for human-readable organization.
 
@@ -57,3 +57,5 @@ The entity inspector has horizontal and vertical flip controls. Mirroring is sto
 ## Camera authoring
 
 Every map has `camera: { zoom, follow: "player" }`. The map panel edits the default zoom. Camera movement, follow changes, shake, reset, and animated zoom are authored as ordinary effects in trigger/entity JSON. Nonzero camera durations block the rest of that effect sequence until the animation completes.
+
+Trigger mode supports `itemUse` events. Select the item in the trigger inspector; the trigger fires when that item is used while the player stands inside its rectangle.
