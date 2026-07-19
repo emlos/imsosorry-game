@@ -8,7 +8,6 @@ export const ATLAS_PATHS = {
     player: "./assets/atlases/player.png",
 };
 
-//TODO: figure out a neat way to allow to reuse tiles with mirroring - same for sprites
 export const TILE_IDS = {
     FLOOR: 0,
     FLOOR_ALT: 1,

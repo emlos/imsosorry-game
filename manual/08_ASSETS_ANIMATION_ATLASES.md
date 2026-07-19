@@ -206,6 +206,7 @@ newPreset: {
     entity: {
         active: true,
         visual: { type: "sprite", id: "new-sprite" },
+        transform: { flipX: false, flipY: false },
         collision: true,
         interaction: null,
     },

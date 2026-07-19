@@ -91,6 +91,8 @@ Old saves retain old map IDs and are not migrated.
 
 Entities use `visual: { type, id }`. `type` is `"sprite"` or `"tile"`; the old entity `spriteId` property and `setEntitySprite` effect are not supported. Use `setEntityVisual` for runtime changes.
 
+Every entity also requires `transform: { flipX, flipY }` with explicit booleans. These flags affect rendering only. They do not change occupied cells, collision, interaction reach, or depth sorting. Tile-layer cells have no transform schema; use a tile-backed entity when a unique tile visual needs mirroring.
+
 ## Entity ID refactors
 
 Entity IDs are map-local but can be referenced by effects. Use the editor's rename operation rather than editing the string in one place.

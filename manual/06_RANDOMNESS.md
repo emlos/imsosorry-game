@@ -150,6 +150,7 @@ Author the entity inactive:
     col: 5,
     row: 3,
     visual: { type: "sprite", id: "robed-figure" },
+    transform: { flipX: false, flipY: false },
     collision: false,
     interaction: null,
 }

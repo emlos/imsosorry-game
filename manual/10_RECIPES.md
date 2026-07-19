@@ -102,6 +102,7 @@ interaction: {
     col: 3,
     row: 2,
     visual: { type: "sprite", id: "blue-orb" },
+    transform: { flipX: false, flipY: false },
     collision: false,
     interaction: {
         handler: "effects",

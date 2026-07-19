@@ -1,4 +1,4 @@
-// Yume v0.8.6 authoring templates.
+// Yume v0.8.7 authoring templates.
 // These are examples to paste into the appropriate definitions; this file is not imported.
 
 // -----------------------------------------------------------------------------
@@ -29,6 +29,7 @@ const entity = {
     col: 2,
     row: 3,
     visual: { type: "sprite", id: "placeholder" },
+    transform: { flipX: false, flipY: false },
     collision: false,
     interaction: null,
     // condition: { notFlag: "entity.removed" },

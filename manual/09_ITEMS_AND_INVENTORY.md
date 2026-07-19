@@ -89,6 +89,7 @@ Entity:
     col: 4,
     row: 3,
     visual: { type: "sprite", id: "pink-orb" },
+    transform: { flipX: false, flipY: false },
     collision: false,
     interaction: {
         handler: "effects",

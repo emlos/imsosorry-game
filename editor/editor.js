@@ -932,6 +932,9 @@ export class MapEditor {
         for (const [presetId, preset] of Object.entries(ENTITY_PRESETS)) {
             const visualReference = preset.entity?.visual;
             const visual = getEntityVisualDefinition(this.currentMap, visualReference);
+            const previewVisual = visual
+                ? { ...visual, transform: preset.entity.transform }
+                : null;
             const imageStatus = visual ? this.renderer.getVisualImageStatus(visual) : "missing";
             const missing = !visual || imageStatus === "missing";
             const visualLabel = visualReference
@@ -946,7 +949,7 @@ export class MapEditor {
                 title: missing
                     ? `${preset.label} — ${missingDescription}`
                     : `${preset.label} — ${visualLabel}`,
-                visual,
+                visual: previewVisual,
                 selected: presetId === this.selectedEntityPreset,
                 disabled: missing,
                 missing,
@@ -1712,6 +1715,8 @@ export class MapEditor {
         byId("entity-id").value = entity.id;
         byId("entity-visual-type").value = entity.visual.type;
         this.populateEntityVisualOptions(entity.visual.type, entity.visual.id);
+        byId("entity-flip-x").checked = entity.transform.flipX;
+        byId("entity-flip-y").checked = entity.transform.flipY;
         byId("entity-col").value = entity.col;
         byId("entity-row").value = entity.row;
         byId("entity-active").checked = entity.active;
@@ -1810,6 +1815,10 @@ export class MapEditor {
             this.commitMutation("Edit entity", () => {
                 if (newId !== entity.id) renameEntity(this.maps, this.currentMap, entity, newId);
                 entity.visual = visual;
+                entity.transform = {
+                    flipX: byId("entity-flip-x").checked,
+                    flipY: byId("entity-flip-y").checked,
+                };
                 entity.col = col;
                 entity.row = row;
                 entity.active = byId("entity-active").checked;

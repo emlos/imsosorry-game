@@ -2,10 +2,10 @@ import { OPPOSITE_EDGE, getEdgePosition, getRangeLength } from "../map-edges.js"
 import { SPRITES } from "../sprites.js";
 import { EMPTY_TILE_ID, TILE_IDS, TILES } from "../tiles.js";
 
-export const EDITOR_STORAGE_KEY = "yume-map-editor-recovery-v3";
-export const EDITOR_BACKUP_KEY = "yume-map-editor-pre-import-backup-v3";
-export const PLAYTEST_STORAGE_KEY = "yume-map-editor-playtest-maps-v3";
-export const PLAYTEST_RESULT_KEY = "yume-map-editor-playtest-result-v3";
+export const EDITOR_STORAGE_KEY = "yume-map-editor-recovery-v4";
+export const EDITOR_BACKUP_KEY = "yume-map-editor-pre-import-backup-v4";
+export const PLAYTEST_STORAGE_KEY = "yume-map-editor-playtest-maps-v4";
+export const PLAYTEST_RESULT_KEY = "yume-map-editor-playtest-result-v4";
 
 export function cloneData(value) {
     return structuredClone(value);
@@ -1090,6 +1090,20 @@ export function validateEditorDocument(maps) {
             } else {
                 errors.push(
                     `Entity "${entity.id}" in "${map.id}" visual type must be "sprite" or "tile".`,
+                );
+            }
+            if (
+                !entity.transform ||
+                typeof entity.transform !== "object" ||
+                Array.isArray(entity.transform) ||
+                Object.keys(entity.transform).some(
+                    (key) => key !== "flipX" && key !== "flipY",
+                ) ||
+                typeof entity.transform.flipX !== "boolean" ||
+                typeof entity.transform.flipY !== "boolean"
+            ) {
+                errors.push(
+                    `Entity "${entity.id}" in "${map.id}" needs transform with boolean flipX and flipY values.`,
                 );
             }
             if (!canPlaceEntity(map, entity)) {

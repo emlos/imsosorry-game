@@ -1,4 +1,4 @@
-# Yume Prototype v0.8.6
+# Yume Prototype v0.8.7
 
 ---
 
@@ -216,7 +216,7 @@ The editor works on a cloned map document. It does not modify live game state or
 - Atlas-aware static and animated previews.
 - Grid, layer, collision, footprint, entry, exit, and rectangular-trigger overlays.
 - Canvas zoom from 50% to 400%, including Ctrl/Cmd-wheel zoom.
-- Place entities from presets, drag them, delete them, and choose either a sprite visual or a reusable tile visual.
+- Place entities from presets, drag them, delete them, choose either a sprite visual or a reusable tile visual, and flip them horizontally or vertically.
 - Start entity interactions from semantic templates, edit the resulting JSON, and edit the primary dialogue fields for compatible interactions.
 - Place and edit entries, facing directions, and entry IDs.
 - Create rectangular triggers by dragging, then move, resize, reorder, and edit their event/frequency/condition/effect definitions.
@@ -238,7 +238,7 @@ The editor does not currently:
 - Simulate all runtime flags, random choices, and mutations.
 - Edit live save data.
 - Edit existing foreground layers.
-- Add mirroring transforms.
+- Mirror ordinary tile-layer placements.
 
 Advanced behavior is still authored by editing JSON fields or code definitions.
 
@@ -1306,6 +1306,7 @@ Cardinal facings:
     col: 4,
     row: 3,
     visual: { type: "sprite", id: "receiver" },
+    transform: { flipX: false, flipY: false },
     collision: true,
     interaction: null,
     condition: { notFlag: "receiver.removed" }, // optional
@@ -1321,6 +1322,7 @@ A unique interactive placement can reuse any tile visual without duplicating it 
     col: 4,
     row: 6,
     visual: { type: "tile", id: TILE_IDS.TREE },
+    transform: { flipX: true, flipY: false },
     collision: true,
     interaction: {
         handler: "effects",
@@ -1337,8 +1339,11 @@ Rules:
 - IDs are unique within one map.
 - Positions are non-negative integer cells.
 - Sprite-backed entities occupy one cell. Tile-backed entities use the referenced tile footprint.
+- `transform` is required and contains boolean `flipX` and `flipY` values.
+- Mirroring affects drawing only; footprint, collision, interaction cells, and depth sorting are unchanged.
+- Ordinary tile-layer placements do not support mirroring.
 - `active` is saved runtime state and can be mutated.
-- `visual`, `collision`, position, and active state can be changed persistently.
+- `visual`, `transform`, `collision`, position, and active state are represented in persistent entity state.
 - `condition` controls authored presence in addition to runtime `active`.
 - `interaction` must be `null` or a valid interaction.
 - Collision plus a `touch` interaction is forbidden.
@@ -1631,6 +1636,7 @@ Author the entity inactive:
     col: 5,
     row: 3,
     visual: { type: "sprite", id: "robed-figure" },
+    transform: { flipX: false, flipY: false },
     collision: false,
     interaction: null,
 }
@@ -2198,6 +2204,7 @@ newPreset: {
     entity: {
         active: true,
         visual: { type: "sprite", id: "new-sprite" },
+        transform: { flipX: false, flipY: false },
         collision: true,
         interaction: null,
     },
@@ -2363,6 +2370,7 @@ Entity:
     col: 4,
     row: 3,
     visual: { type: "sprite", id: "pink-orb" },
+    transform: { flipX: false, flipY: false },
     collision: false,
     interaction: {
         handler: "effects",
@@ -2501,6 +2509,7 @@ interaction: {
     col: 3,
     row: 2,
     visual: { type: "sprite", id: "blue-orb" },
+    transform: { flipX: false, flipY: false },
     collision: false,
     interaction: {
         handler: "effects",
@@ -3046,6 +3055,8 @@ Old saves retain old map IDs and are not migrated.
 ## Entity visual schema
 
 Entities use `visual: { type, id }`. `type` is `"sprite"` or `"tile"`; the old entity `spriteId` property and `setEntitySprite` effect are not supported. Use `setEntityVisual` for runtime changes.
+
+Every entity also requires `transform: { flipX, flipY }` with explicit booleans. These flags affect rendering only. They do not change occupied cells, collision, interaction reach, or depth sorting. Tile-layer cells have no transform schema; use a tile-backed entity when a unique tile visual needs mirroring.
 
 ## Entity ID refactors
 

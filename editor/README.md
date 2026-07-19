@@ -25,10 +25,6 @@ Maps may define an optional `editorGroup` string. The editor uses it to organize
 
 editor does not create tile or sprite assets, edit atlas coordinates, edit animation clips, visually construct conditions/effect sequences, simulate runtime mutations, or modify live save data.
 
-## TODO
-
-- connected to TODO in sprite/tile.js - button to set whether current tile/entity should be mirrored
-
 ## Read-only map graph
 
 Use **Map graph** in the top toolbar to open a derived project overview. The graph contains one node per map, compound regions for `editorGroup` values, solid arrows for edge exits, and dashed arrows for entity, tile, or trigger teleports. Edge links display their source and target doorway ranges; repeated non-exit links of the same type are aggregated and labelled with a count. Broken map references appear as explicit missing-destination nodes.
@@ -55,3 +51,5 @@ The connection form authors separate source and target ranges. After choosing th
 Entity placement uses one animated thumbnail card per `ENTITY_PRESETS` entry. Presets may reference either a sprite or a tile visual. Click a card to choose it, or use the arrow keys, Home, and End while the palette has focus. Missing visual definitions appear as disabled placeholder cards; the entity inspector visual controls remain available for changing already-placed entities.
 
 Entity interaction templates are catalog entries in `editor-catalog.js`. Selecting one only replaces the inspector draft; normal entity application and strict document/runtime validation still decide whether the authored interaction is valid.
+
+The entity inspector has horizontal and vertical flip controls. Mirroring is stored per entity as `transform: { flipX, flipY }`; it changes drawing only. Placement cells, tile-backed footprints, collision, interactions, and depth sorting do not change. Ordinary tile-layer placements are not mirrored.

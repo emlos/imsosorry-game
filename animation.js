@@ -39,21 +39,28 @@ export function resolveVisualFrame(visual, animationId, elapsedMs) {
 
 export function drawImageVisual(ctx, image, visual, frame, drawX, drawY) {
     const [width, height] = visual.size;
+    const flipX = visual.transform?.flipX === true;
+    const flipY = visual.transform?.flipY === true;
+
+    ctx.save();
+    ctx.translate(drawX + (flipX ? width : 0), drawY + (flipY ? height : 0));
+    ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
 
     if (frame === null) {
-        ctx.drawImage(image, drawX, drawY, width, height);
-        return;
+        ctx.drawImage(image, 0, 0, width, height);
+    } else {
+        ctx.drawImage(
+            image,
+            frame.sourceX,
+            frame.sourceY,
+            frame.sourceWidth,
+            frame.sourceHeight,
+            0,
+            0,
+            width,
+            height,
+        );
     }
 
-    ctx.drawImage(
-        image,
-        frame.sourceX,
-        frame.sourceY,
-        frame.sourceWidth,
-        frame.sourceHeight,
-        drawX,
-        drawY,
-        width,
-        height,
-    );
+    ctx.restore();
 }

@@ -86,12 +86,17 @@ function createEntityState(entity) {
         col: entity.col,
         row: entity.row,
         visual: structuredClone(entity.visual),
+        transform: structuredClone(entity.transform),
         collision: entity.collision,
     };
 }
 
 function entityVisualsEqual(first, second) {
     return first.type === second.type && first.id === second.id;
+}
+
+function entityTransformsEqual(first, second) {
+    return first.flipX === second.flipX && first.flipY === second.flipY;
 }
 
 function createMapState(map) {
@@ -781,6 +786,7 @@ export class Game {
                 "col",
                 "row",
                 "visual",
+                "transform",
                 "collision",
                 "interaction",
                 "condition",
@@ -794,6 +800,7 @@ export class Game {
         requireBoolean(entity.active, `${entityLabel}.active`);
 
         this.validateEntityVisualReference(map.id, entity.visual, entityLabel);
+        this.validateEntityTransform(entity.transform, entityLabel);
         this.validateEntityPlacement(map.id, entity.col, entity.row, entity.visual, entityLabel);
 
         requireBoolean(entity.collision, `${entityLabel}.collision`);
@@ -1459,6 +1466,13 @@ export class Game {
         }
     }
 
+    validateEntityTransform(transform, label) {
+        requireObject(transform, `${label}.transform`);
+        requireExactKeys(transform, new Set(["flipX", "flipY"]), `${label}.transform`);
+        requireBoolean(transform.flipX, `${label}.transform.flipX`);
+        requireBoolean(transform.flipY, `${label}.transform.flipY`);
+    }
+
     validateEntityVisualReference(mapId, visual, label) {
         requireObject(visual, `${label}.visual`);
         requireExactKeys(visual, new Set(["type", "id"]), `${label}.visual`);
@@ -1831,6 +1845,9 @@ export class Game {
                 }
                 if (!entityVisualsEqual(runtimeEntity.visual, definition.visual)) {
                     changes.visual = structuredClone(runtimeEntity.visual);
+                }
+                if (!entityTransformsEqual(runtimeEntity.transform, definition.transform)) {
+                    changes.transform = structuredClone(runtimeEntity.transform);
                 }
                 if (runtimeEntity.collision !== definition.collision) {
                     changes.collision = runtimeEntity.collision;
@@ -2233,7 +2250,7 @@ export class Game {
             requirePlainObject(changes, `Saved entity "${map.id}.${entityId}"`);
             requireExactKeys(
                 changes,
-                new Set(["active", "col", "row", "visual", "collision"]),
+                new Set(["active", "col", "row", "visual", "transform", "collision"]),
                 `Saved entity "${map.id}.${entityId}"`,
             );
             if (Object.keys(changes).length === 0) {
@@ -2273,6 +2290,14 @@ export class Game {
                     `Saved entity "${map.id}.${entityId}"`,
                 );
                 runtimeEntity.visual = structuredClone(changes.visual);
+            }
+
+            if (Object.hasOwn(changes, "transform")) {
+                this.validateEntityTransform(
+                    changes.transform,
+                    `Saved entity "${map.id}.${entityId}"`,
+                );
+                runtimeEntity.transform = structuredClone(changes.transform);
             }
 
             if (Object.hasOwn(changes, "collision")) {
@@ -3606,7 +3631,14 @@ export class Game {
 
         const animationId = resolveAnimationId(visual, [visual.defaultAnimation]);
         const frame = resolveVisualFrame(visual, animationId, this.ambientAnimationTimeMs);
-        drawImageVisual(this.ctx, image, { ...visual, size: [width, height] }, frame, drawX, drawY);
+        drawImageVisual(
+            this.ctx,
+            image,
+            { ...visual, size: [width, height], transform: entity.state.transform },
+            frame,
+            drawX,
+            drawY,
+        );
     }
 
     loop(time) {

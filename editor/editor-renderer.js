@@ -215,7 +215,7 @@ export class EditorRenderer {
         drawImageVisual(
             this.ctx,
             record.image,
-            { ...visual, size: [width, height] },
+            { ...visual, size: [width, height], transform: entity.transform },
             frame,
             drawX,
             drawY,

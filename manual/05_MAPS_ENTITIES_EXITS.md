@@ -134,6 +134,7 @@ Cardinal facings:
     col: 4,
     row: 3,
     visual: { type: "sprite", id: "receiver" },
+    transform: { flipX: false, flipY: false },
     collision: true,
     interaction: null,
     condition: { notFlag: "receiver.removed" }, // optional
@@ -149,6 +150,7 @@ A unique interactive placement can reuse any tile visual without duplicating it 
     col: 4,
     row: 6,
     visual: { type: "tile", id: TILE_IDS.TREE },
+    transform: { flipX: true, flipY: false },
     collision: true,
     interaction: {
         handler: "effects",
@@ -165,8 +167,11 @@ Rules:
 - IDs are unique within one map.
 - Positions are non-negative integer cells.
 - Sprite-backed entities occupy one cell. Tile-backed entities use the referenced tile footprint.
+- `transform` is required and contains boolean `flipX` and `flipY` values.
+- Mirroring affects drawing only; footprint, collision, interaction cells, and depth sorting are unchanged.
+- Ordinary tile-layer placements do not support mirroring.
 - `active` is saved runtime state and can be mutated.
-- `visual`, `collision`, position, and active state can be changed persistently.
+- `visual`, `transform`, `collision`, position, and active state are represented in persistent entity state.
 - `condition` controls authored presence in addition to runtime `active`.
 - `interaction` must be `null` or a valid interaction.
 - Collision plus a `touch` interaction is forbidden.

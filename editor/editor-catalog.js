@@ -275,6 +275,7 @@ export const ENTITY_PRESETS = {
         entity: {
             active: true,
             visual: { type: "sprite", id: "placeholder" },
+            transform: { flipX: false, flipY: false },
             collision: false,
             interaction: null,
         },
@@ -284,6 +285,7 @@ export const ENTITY_PRESETS = {
         entity: {
             active: true,
             visual: { type: "tile", id: TILE_IDS.TREE },
+            transform: { flipX: false, flipY: false },
             collision: true,
             interaction: {
                 handler: "effects",
@@ -302,6 +304,7 @@ export const ENTITY_PRESETS = {
         entity: {
             active: true,
             visual: { type: "sprite", id: "door" },
+            transform: { flipX: false, flipY: false },
             collision: true,
             interaction: null,
         },
@@ -311,6 +314,7 @@ export const ENTITY_PRESETS = {
         entity: {
             active: true,
             visual: { type: "sprite", id: "save-point" },
+            transform: { flipX: false, flipY: false },
             collision: true,
             interaction: createSavePointInteraction(),
         },
@@ -320,6 +324,7 @@ export const ENTITY_PRESETS = {
         entity: {
             active: true,
             visual: { type: "sprite", id: "animated-save-point" },
+            transform: { flipX: false, flipY: false },
             collision: true,
             interaction: createSavePointInteraction(),
         },
@@ -330,6 +335,7 @@ export const ENTITY_PRESETS = {
         entity: {
             active: true,
             visual: { type: "sprite", id: "glittering-crystal" },
+            transform: { flipX: false, flipY: false },
             collision: true,
             interaction: {
                 handler: "effects",
@@ -348,6 +354,7 @@ export const ENTITY_PRESETS = {
         entity: {
             active: true,
             visual: { type: "sprite", id: "crystal-totem" },
+            transform: { flipX: false, flipY: false },
             collision: true,
             interaction: {
                 handler: "effects",
@@ -366,6 +373,7 @@ export const ENTITY_PRESETS = {
         entity: {
             active: true,
             visual: { type: "sprite", id: "arcane-vat" },
+            transform: { flipX: false, flipY: false },
             collision: true,
             interaction: {
                 handler: "effects",
@@ -385,6 +393,7 @@ export const ENTITY_PRESETS = {
         entity: {
             active: true,
             visual: { type: "sprite", id: "forest-sign" },
+            transform: { flipX: false, flipY: false },
             collision: true,
             interaction: null,
         },
@@ -394,6 +403,7 @@ export const ENTITY_PRESETS = {
         entity: {
             active: true,
             visual: { type: "sprite", id: "lantern" },
+            transform: { flipX: false, flipY: false },
             collision: true,
             interaction: null,
         },
@@ -403,6 +413,7 @@ export const ENTITY_PRESETS = {
         entity: {
             active: true,
             visual: { type: "sprite", id: "control-console" },
+            transform: { flipX: false, flipY: false },
             collision: true,
             interaction: null,
         },
@@ -412,6 +423,7 @@ export const ENTITY_PRESETS = {
         entity: {
             active: true,
             visual: { type: "sprite", id: "signal-beacon" },
+            transform: { flipX: false, flipY: false },
             collision: true,
             interaction: null,
         },
