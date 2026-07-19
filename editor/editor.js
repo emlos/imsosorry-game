@@ -3,7 +3,14 @@ import { ITEMS } from "../items.js";
 import { MAPS } from "../maps.js";
 import { SPRITES } from "../sprites.js";
 import { EMPTY_TILE_ID, TILE_IDS, TILE_SIZE, TILES } from "../tiles.js";
-import { ENTITY_PRESETS, SPRITE_EDITOR_META, TILE_EDITOR_META } from "./editor-catalog.js";
+import {
+    ENTITY_PRESETS,
+    INTERACTION_TEMPLATES,
+    SPRITE_EDITOR_META,
+    TILE_EDITOR_META,
+    createInteractionFromTemplate,
+    getInteractionTemplate,
+} from "./editor-catalog.js";
 import {
     EDITOR_BACKUP_KEY,
     EDITOR_STORAGE_KEY,
@@ -249,10 +256,66 @@ export class MapEditor {
     }
 
     async start() {
+        this.populateInteractionTemplateOptions();
         this.bindEvents();
         await this.refreshDocumentUI();
         this.updateRecoveryButton();
         requestAnimationFrame((time) => this.animationLoop(time));
+    }
+
+    populateInteractionTemplateOptions() {
+        const select = byId("entity-interaction-template");
+        select.replaceChildren(
+            ...INTERACTION_TEMPLATES.map((template) => new Option(template.label, template.id)),
+        );
+        if (select.options.length > 0) select.selectedIndex = 0;
+        this.renderInteractionTemplateDescription();
+    }
+
+    getInteractionTemplateContext(entity = null) {
+        return {
+            map: this.currentMap,
+            maps: this.maps,
+            entity,
+            itemIds: Object.keys(ITEMS),
+        };
+    }
+
+    renderInteractionTemplateDescription() {
+        const select = byId("entity-interaction-template");
+        const template = getInteractionTemplate(select.value);
+        const entity = this.currentMap?.entities.find((item) => item.id === this.selectedEntityId);
+        const context = this.getInteractionTemplateContext(entity ?? null);
+        const notice = template?.notice?.(context) ?? "";
+        byId("entity-interaction-template-description").textContent = template
+            ? [template.description, notice].filter(Boolean).join(" ")
+            : "";
+    }
+
+    insertSelectedInteractionTemplate() {
+        const entity = this.currentMap.entities.find((item) => item.id === this.selectedEntityId);
+        if (!entity) return;
+
+        try {
+            const templateId = byId("entity-interaction-template").value;
+            const template = getInteractionTemplate(templateId);
+            const draftEntityId = byId("entity-id").value.trim() || entity.id;
+            const context = this.getInteractionTemplateContext({
+                ...entity,
+                id: draftEntityId,
+            });
+            const interaction = createInteractionFromTemplate(templateId, context);
+            byId("entity-interaction").value = JSON.stringify(interaction, null, 4);
+            this.syncSimpleDialogueFromInteractionJson();
+            const notice = template?.notice?.(context) ?? "";
+            this.setStatus(
+                `Inserted ${template?.label ?? templateId} into the inspector. ` +
+                    `Click Apply to save it to the entity.${notice ? ` ${notice}` : ""}`,
+                Boolean(notice),
+            );
+        } catch (error) {
+            this.setStatus(error.message, true);
+        }
     }
 
     populateEntityVisualOptions(type, selectedId = null) {
@@ -554,6 +617,12 @@ export class MapEditor {
         });
         this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
+        byId("entity-interaction-template").addEventListener("change", () =>
+            this.renderInteractionTemplateDescription(),
+        );
+        byId("insert-entity-interaction-template").addEventListener("click", () =>
+            this.insertSelectedInteractionTemplate(),
+        );
         byId("entity-interaction").addEventListener("input", () =>
             this.syncSimpleDialogueFromInteractionJson(),
         );
@@ -1650,6 +1719,7 @@ export class MapEditor {
         byId("entity-interaction").value = entity.interaction
             ? JSON.stringify(entity.interaction, null, 4)
             : "";
+        this.renderInteractionTemplateDescription();
         this.renderSimpleDialogueInspector(entity.interaction);
     }
 

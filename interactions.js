@@ -10,6 +10,21 @@ import {
 export const INTERACTION_TRIGGERS = new Set(["action", "touch"]);
 const MUSIC_TRANSITION_POLICIES = new Set(["inherit", "replace", "crossfade", "silence"]);
 
+function cloneDefinition(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+
+function buildInteractionBase(handler, triggers, condition, message) {
+    const interaction = {
+        handler,
+        triggers: [...triggers],
+    };
+
+    if (condition !== undefined) interaction.condition = cloneDefinition(condition);
+    if (message !== undefined) interaction.message = message;
+    return interaction;
+}
+
 function validateMusicTransitionOptions(value, label) {
     if (
         value.musicTransition !== undefined &&
@@ -27,30 +42,6 @@ function validateMusicTransitionOptions(value, label) {
     }
 }
 
-//TODO: define a default for every common interaction tyoe, inside INTERACTION_HANDLERS
-const DEFAULT_SAVE_POINT_PAGES = [
-    "A small light holds perfectly still inside the glass.",
-    "For a moment, the shape of the dream becomes easy to remember.",
-];
-
-export function createSavePointInteraction({
-    speaker = "Save Point",
-    pages = DEFAULT_SAVE_POINT_PAGES,
-} = {}) {
-    return {
-        handler: "effects",
-        triggers: ["action"],
-        effects: [
-            {
-                type: "showText",
-                speaker,
-                pages: [...pages],
-                afterClose: [{ type: "saveGame" }],
-            },
-        ],
-    };
-}
-
 export function findPrimaryShowTextEffect(interaction) {
     if (interaction?.handler !== "effects" || !Array.isArray(interaction.effects)) return null;
 
@@ -62,6 +53,23 @@ export const INTERACTION_HANDLERS = new Map([
         "effects",
         {
             allowedKeys: new Set(["handler", "triggers", "condition", "effects", "message"]),
+
+            createDefault({
+                triggers = ["action"],
+                condition,
+                effects = [
+                    {
+                        type: "showText",
+                        pages: ["Describe this object."],
+                    },
+                ],
+                message,
+            } = {}) {
+                return {
+                    ...buildInteractionBase("effects", triggers, condition, message),
+                    effects: cloneDefinition(effects),
+                };
+            },
 
             validateDefinition({ interaction, label }) {
                 validateEffectsDefinition(interaction.effects, `Effects for ${label}`);
@@ -93,6 +101,25 @@ export const INTERACTION_HANDLERS = new Map([
         {
             allowedKeys: new Set(["handler", "triggers", "condition", "params", "message"]),
 
+            createDefault({
+                triggers = ["action"],
+                condition,
+                mapId = "map-id",
+                entryId = "entry-id",
+                musicTransition,
+                musicTransitionMs,
+                message,
+            } = {}) {
+                const params = { mapId, entryId };
+                if (musicTransition !== undefined) params.musicTransition = musicTransition;
+                if (musicTransitionMs !== undefined) params.musicTransitionMs = musicTransitionMs;
+
+                return {
+                    ...buildInteractionBase("teleport", triggers, condition, message),
+                    params,
+                };
+            },
+
             validateDefinition({ interaction, label }) {
                 if (!Object.hasOwn(interaction, "params")) {
                     throw new Error(`${label} must define a params object.`);
@@ -121,6 +148,18 @@ export const INTERACTION_HANDLERS = new Map([
         },
     ],
 ]);
+
+export function createDefaultInteraction(handlerId, options = {}) {
+    requireString(handlerId, "Interaction handler ID");
+    const handler = INTERACTION_HANDLERS.get(handlerId);
+    if (!handler) {
+        throw new Error(`Unknown interaction handler "${handlerId}".`);
+    }
+    if (typeof handler.createDefault !== "function") {
+        throw new Error(`Interaction handler "${handlerId}" does not expose createDefault().`);
+    }
+    return handler.createDefault(options);
+}
 
 export function validateInteractionDefinition(interaction, label) {
     requireObject(interaction, label);

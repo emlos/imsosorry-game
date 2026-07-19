@@ -496,3 +496,12 @@ p {
     padding: 0.5rem;
     white-space: pre-wrap;
 }
+
+.interaction-template-controls > button {
+    width: 100%;
+}
+
+.interaction-template-controls .hint {
+    min-height: 2.2em;
+    margin-bottom: 0.6rem;
+}

@@ -233,6 +233,34 @@ Allowed structure:
 
 Use direct `teleport` for a simple fixed destination. Use `handler: "effects"` with a `random` effect and nested `teleport` effects for random or conditional destinations.
 
+## Handler defaults and editor templates
+
+Interaction defaults are authoring factories, not runtime fallback behavior. Every saved interaction is still validated exactly as written. Missing keys, empty effect arrays, bad item IDs, and broken map references remain errors.
+
+Each entry in `INTERACTION_HANDLERS` exposes `createDefault(options)`. Use the public factory when code needs a fresh baseline definition:
+
+```js
+import { createDefaultInteraction } from "./interactions.js";
+
+const interaction = createDefaultInteraction("effects");
+const door = createDefaultInteraction("teleport", {
+    mapId: "room-target",
+    entryId: "fromSource",
+});
+```
+
+The map editor exposes semantic templates from `editor/editor-catalog.js`:
+
+- **Dialogue / description:** one `showText` effect.
+- **Teleport:** a direct teleport aimed at the first available entry, preferring another map.
+- **Save point:** save-point dialogue with `saveGame` in `afterClose`.
+- **Item pickup:** `addItem`, pickup text, then deactivation of the selected entity.
+- **Switch / flag change:** toggles an entity-specific flag.
+- **Inspect once:** requires an unset flag, shows text, then sets the flag.
+- **Conditional dialogue:** mutually exclusive text effects for false/true flag states.
+
+Choosing a template replaces the interaction JSON draft in the inspector. It does not modify the entity until **Apply** is pressed. Templates may deliberately contain visible placeholders when the project has no suitable item or entry; Playtest and runtime validation do not waive those reference errors.
+
 ## Presence condition versus interaction condition
 
 Entity or tile condition:

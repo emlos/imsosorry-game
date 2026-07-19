@@ -1,5 +1,219 @@
-import { createSavePointInteraction } from "../interactions.js";
+import { createDefaultInteraction } from "../interactions.js";
 import { TILE_IDS } from "../tiles.js";
+
+function makeTemplateFlag(context, suffix) {
+    const mapId = context.map?.id ?? "map";
+    const entityId = context.entity?.id ?? "entity";
+    return `${mapId}.${entityId}.${suffix}`;
+}
+
+function getTemplateEntry(context) {
+    const currentMap = context.map;
+    const otherMaps = (context.maps ?? []).filter((map) => map !== currentMap);
+    const candidates = [...otherMaps, currentMap].filter(Boolean);
+    const targetMap =
+        candidates.find((map) => Object.keys(map.entries ?? {}).length > 0) ??
+        candidates[0] ??
+        null;
+    const entryIds = Object.keys(targetMap?.entries ?? {});
+    const entryId =
+        (targetMap?.initialEntryId &&
+        Object.hasOwn(targetMap.entries ?? {}, targetMap.initialEntryId)
+            ? targetMap.initialEntryId
+            : entryIds[0]) ?? "entry-id";
+
+    return {
+        mapId: targetMap?.id ?? "map-id",
+        entryId,
+    };
+}
+
+function getTemplateItemId(context) {
+    return context.itemIds?.[0] ?? "item-id";
+}
+
+export function createDialogueInteraction() {
+    return createDefaultInteraction("effects", {
+        effects: [
+            {
+                type: "showText",
+                pages: ["Describe this object."],
+            },
+        ],
+    });
+}
+
+export function createTeleportInteraction(context = {}) {
+    return createDefaultInteraction("teleport", getTemplateEntry(context));
+}
+
+export function createSavePointInteraction({
+    speaker = "Save Point",
+    pages = [
+        "A small light holds perfectly still inside the glass.",
+        "For a moment, the shape of the dream becomes easy to remember.",
+    ],
+} = {}) {
+    return createDefaultInteraction("effects", {
+        effects: [
+            {
+                type: "showText",
+                speaker,
+                pages: [...pages],
+                afterClose: [{ type: "saveGame" }],
+            },
+        ],
+    });
+}
+
+export function createItemPickupInteraction(context = {}) {
+    const itemId = getTemplateItemId(context);
+    const entityId = context.entity?.id ?? "entity-id";
+
+    return createDefaultInteraction("effects", {
+        effects: [
+            {
+                type: "addItem",
+                itemId,
+                quantity: 1,
+            },
+            {
+                type: "showText",
+                pages: [`Picked up ${itemId}.`],
+                afterClose: [
+                    {
+                        type: "setEntityActive",
+                        entityId,
+                        active: false,
+                    },
+                ],
+            },
+        ],
+    });
+}
+
+export function createFlagChangeInteraction(context = {}) {
+    const flag = makeTemplateFlag(context, "switch-on");
+
+    return createDefaultInteraction("effects", {
+        effects: [
+            {
+                type: "toggleFlag",
+                flag,
+            },
+            {
+                type: "showText",
+                pages: [`Toggled flag: ${flag}`],
+            },
+        ],
+    });
+}
+
+export function createInspectOnceInteraction(context = {}) {
+    const flag = makeTemplateFlag(context, "inspected");
+
+    return createDefaultInteraction("effects", {
+        condition: { notFlag: flag },
+        effects: [
+            {
+                type: "showText",
+                pages: ["You inspect it carefully."],
+                afterClose: [
+                    {
+                        type: "setFlag",
+                        flag,
+                        value: true,
+                    },
+                ],
+            },
+        ],
+    });
+}
+
+export function createConditionalDialogueInteraction(context = {}) {
+    const flag = makeTemplateFlag(context, "changed");
+
+    return createDefaultInteraction("effects", {
+        effects: [
+            {
+                type: "showText",
+                condition: { notFlag: flag },
+                pages: ["Nothing has changed yet."],
+            },
+            {
+                type: "showText",
+                condition: { flag },
+                pages: ["Something is different now."],
+            },
+        ],
+    });
+}
+
+export const INTERACTION_TEMPLATES = [
+    {
+        id: "dialogue",
+        label: "Dialogue / description",
+        description: "Action interaction with a single editable text effect.",
+        create: () => createDialogueInteraction(),
+    },
+    {
+        id: "teleport",
+        label: "Teleport",
+        description: "Direct action teleport to the first available entry, preferring another map.",
+        create: (context) => createTeleportInteraction(context),
+        notice(context) {
+            const maps = context.maps ?? [];
+            return maps.some((map) => Object.keys(map.entries ?? {}).length > 0)
+                ? ""
+                : "No map entry exists; replace the placeholder destination before applying.";
+        },
+    },
+    {
+        id: "save-point",
+        label: "Save point",
+        description: "Dialogue followed by saveGame after the textbox closes.",
+        create: () => createSavePointInteraction(),
+    },
+    {
+        id: "item-pickup",
+        label: "Item pickup",
+        description: "Adds one item, shows pickup text, then deactivates this entity.",
+        create: (context) => createItemPickupInteraction(context),
+        notice(context) {
+            return context.itemIds?.length
+                ? ""
+                : 'ITEMS is empty; replace the placeholder "item-id" after defining an item.';
+        },
+    },
+    {
+        id: "flag-change",
+        label: "Switch / flag change",
+        description: "Toggles an entity-specific flag and reports its generated flag ID.",
+        create: (context) => createFlagChangeInteraction(context),
+    },
+    {
+        id: "inspect-once",
+        label: "Inspect once",
+        description: "Shows text once per save and sets an entity-specific flag after closing.",
+        create: (context) => createInspectOnceInteraction(context),
+    },
+    {
+        id: "conditional-dialogue",
+        label: "Conditional dialogue",
+        description: "Two mutually exclusive text effects selected by an entity-specific flag.",
+        create: (context) => createConditionalDialogueInteraction(context),
+    },
+];
+
+export function getInteractionTemplate(templateId) {
+    return INTERACTION_TEMPLATES.find((template) => template.id === templateId) ?? null;
+}
+
+export function createInteractionFromTemplate(templateId, context = {}) {
+    const template = getInteractionTemplate(templateId);
+    if (!template) throw new Error(`Unknown interaction template "${templateId}".`);
+    return template.create(context);
+}
 
 export const TILE_EDITOR_META = {
     [TILE_IDS.FLOOR]: { label: "Floor", category: "Ground" },

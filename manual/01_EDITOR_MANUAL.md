@@ -23,7 +23,7 @@ The editor works on a cloned map document. It does not modify live game state or
 - Grid, layer, collision, footprint, entry, exit, and rectangular-trigger overlays.
 - Canvas zoom from 50% to 400%, including Ctrl/Cmd-wheel zoom.
 - Place entities from presets, drag them, delete them, and choose either a sprite visual or a reusable tile visual.
-- Edit entity interactions as JSON and edit the primary dialogue fields for compatible interactions.
+- Start entity interactions from semantic templates, edit the resulting JSON, and edit the primary dialogue fields for compatible interactions.
 - Place and edit entries, facing directions, and entry IDs.
 - Create rectangular triggers by dragging, then move, resize, reorder, and edit their event/frequency/condition/effect definitions.
 - Create and edit ordinary exits, reciprocal edge connections, and advanced exit JSON.
@@ -40,7 +40,7 @@ The editor does not currently:
 - Create image files or atlas layouts.
 - Edit atlas source rectangles.
 - Edit animation clips visually.
-- Visually construct arbitrary conditions or effect sequences.
+- Visually construct arbitrary conditions or effect sequences beyond the supplied interaction templates.
 - Simulate all runtime flags, random choices, and mutations.
 - Edit live save data.
 - Edit existing foreground layers.
@@ -56,7 +56,7 @@ Use the editor for:
 - Tile placement.
 - Entity placement.
 - Entries, exits, and rectangular trigger regions.
-- Basic entity identity, collision, and visual selection.
+- Basic entity identity, collision, visual selection, and standard interaction templates.
 - Map organization and connection inspection.
 
 Use code or raw JSON for:

@@ -53,3 +53,5 @@ The connection form authors separate source and target ranges. After choosing th
 ## Entity placement palette
 
 Entity placement uses one animated thumbnail card per `ENTITY_PRESETS` entry. Presets may reference either a sprite or a tile visual. Click a card to choose it, or use the arrow keys, Home, and End while the palette has focus. Missing visual definitions appear as disabled placeholder cards; the entity inspector visual controls remain available for changing already-placed entities.
+
+Entity interaction templates are catalog entries in `editor-catalog.js`. Selecting one only replaces the inspector draft; normal entity application and strict document/runtime validation still decide whether the authored interaction is valid.

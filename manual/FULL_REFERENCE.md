@@ -1,4 +1,5 @@
-# Yume Prototype v0.8.5
+# Yume Prototype v0.8.6
+
 ---
 
 # Reference Card
@@ -33,6 +34,10 @@ triggers: [
 - Evaluated only after a completed tile movement.
 - Overlaps execute in `triggers` array order.
 - Stable effect owner: `map:<mapId>:trigger:<triggerId>`.
+
+## Interaction authoring templates
+
+In the entity inspector, choose a template and click **Replace JSON with template**. Available starting points: dialogue, teleport, save point, item pickup, switch/flag change, inspect once, and conditional dialogue. The replacement is only a draft until **Apply**. Runtime validation remains strict.
 
 ## Interaction handlers
 
@@ -212,7 +217,7 @@ The editor works on a cloned map document. It does not modify live game state or
 - Grid, layer, collision, footprint, entry, exit, and rectangular-trigger overlays.
 - Canvas zoom from 50% to 400%, including Ctrl/Cmd-wheel zoom.
 - Place entities from presets, drag them, delete them, and choose either a sprite visual or a reusable tile visual.
-- Edit entity interactions as JSON and edit the primary dialogue fields for compatible interactions.
+- Start entity interactions from semantic templates, edit the resulting JSON, and edit the primary dialogue fields for compatible interactions.
 - Place and edit entries, facing directions, and entry IDs.
 - Create rectangular triggers by dragging, then move, resize, reorder, and edit their event/frequency/condition/effect definitions.
 - Create and edit ordinary exits, reciprocal edge connections, and advanced exit JSON.
@@ -229,7 +234,7 @@ The editor does not currently:
 - Create image files or atlas layouts.
 - Edit atlas source rectangles.
 - Edit animation clips visually.
-- Visually construct arbitrary conditions or effect sequences.
+- Visually construct arbitrary conditions or effect sequences beyond the supplied interaction templates.
 - Simulate all runtime flags, random choices, and mutations.
 - Edit live save data.
 - Edit existing foreground layers.
@@ -245,7 +250,7 @@ Use the editor for:
 - Tile placement.
 - Entity placement.
 - Entries, exits, and rectangular trigger regions.
-- Basic entity identity, collision, and visual selection.
+- Basic entity identity, collision, visual selection, and standard interaction templates.
 - Map organization and connection inspection.
 
 Use code or raw JSON for:
@@ -546,6 +551,34 @@ Allowed structure:
 ```
 
 Use direct `teleport` for a simple fixed destination. Use `handler: "effects"` with a `random` effect and nested `teleport` effects for random or conditional destinations.
+
+## Handler defaults and editor templates
+
+Interaction defaults are authoring factories, not runtime fallback behavior. Every saved interaction is still validated exactly as written. Missing keys, empty effect arrays, bad item IDs, and broken map references remain errors.
+
+Each entry in `INTERACTION_HANDLERS` exposes `createDefault(options)`. Use the public factory when code needs a fresh baseline definition:
+
+```js
+import { createDefaultInteraction } from "./interactions.js";
+
+const interaction = createDefaultInteraction("effects");
+const door = createDefaultInteraction("teleport", {
+    mapId: "room-target",
+    entryId: "fromSource",
+});
+```
+
+The map editor exposes semantic templates from `editor/editor-catalog.js`:
+
+- **Dialogue / description:** one `showText` effect.
+- **Teleport:** a direct teleport aimed at the first available entry, preferring another map.
+- **Save point:** save-point dialogue with `saveGame` in `afterClose`.
+- **Item pickup:** `addItem`, pickup text, then deactivation of the selected entity.
+- **Switch / flag change:** toggles an entity-specific flag.
+- **Inspect once:** requires an unset flag, shows text, then sets the flag.
+- **Conditional dialogue:** mutually exclusive text effects for false/true flag states.
+
+Choosing a template replaces the interaction JSON draft in the inspector. It does not modify the entity until **Apply** is pressed. Templates may deliberately contain visible placeholders when the project has no suitable item or entry; Playtest and runtime validation do not waive those reference errors.
 
 ## Presence condition versus interaction condition
 
@@ -2836,15 +2869,18 @@ A handler needs:
 ```js
 {
     allowedKeys: new Set([...]),
+    createDefault(options) { /* return a fresh authored definition */ },
     validateDefinition(...),
     validateReferences(...),
     execute(...),
 }
 ```
 
+`createDefault()` is an authoring convenience only. Runtime validation must not fill in omitted data or repair malformed interactions. Expose handler defaults through `createDefaultInteraction(handlerId, options)`.
+
 Also update map graph/refactor logic if the handler contains teleports or map references.
 
-Prefer composing existing effects rather than adding a handler when possible. `handler: "effects"` is the general extension point.
+Prefer composing existing effects rather than adding a handler when possible. `handler: "effects"` is the general extension point. Semantic combinations such as save points, pickups, and conditional dialogue belong in `editor/editor-catalog.js` and should be added to `INTERACTION_TEMPLATES`.
 
 ## Add a new random scope
 
