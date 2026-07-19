@@ -15,7 +15,7 @@ Maps may define an optional `editorGroup` string. The editor uses it to organize
 - Atlas-aware static and animated previews.
 - Grid, layer visibility, collision, footprint, entry, exit, and rectangular-trigger overlays.
 - CSS-only canvas zoom from 50% to 400%, with buttons and Ctrl/Cmd-wheel cursor anchoring.
-- Entity presets, placement, dragging, deletion, and basic property editing.
+- Graphical animated entity preset palette, placement, dragging, deletion, and basic property editing.
 - Entry placement, facing, renaming, reference display, and deletion.
 - Rectangular trigger creation, dragging, handle resizing, ordering, event/frequency controls, and condition/effect JSON editing.
 - Exit range display, entry-target and edge-target form editing, reciprocal equal-length doorway connections, and raw JSON editing for advanced forms.
@@ -48,3 +48,8 @@ Random effects, map `onEnter`/`onExit` sequences, and random edge destinations c
 ## Reciprocal doorway connections
 
 The connection form authors separate source and target ranges. After choosing the source range, enter the target start; the editor derives the target end so both openings always have equal length. The generated reciprocal exits swap the two ranges. Editing either linked exit in the inspector updates the reciprocal exit in the same undoable mutation: its source range mirrors the edited target range, and its target range mirrors the edited source range. Resizing a room does not silently clamp exit ranges; structural validation reports any opening that no longer fits.
+
+
+## Entity placement palette
+
+Entity placement uses one animated thumbnail card per `ENTITY_PRESETS` entry. Presets may reference either a sprite or a tile visual. Click a card to choose it, or use the arrow keys, Home, and End while the palette has focus. Missing visual definitions appear as disabled placeholder cards; the entity inspector visual controls remain available for changing already-placed entities.

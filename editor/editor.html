@@ -91,8 +91,10 @@
 
             <section id="entity-tools-section" hidden>
                 <h2>Entity placement</h2>
-                <label>Preset<select id="entity-preset"></select></label>
-                <p class="hint">Click an empty cell to place. Drag an existing entity to move it.</p>
+                <div id="entity-palette" class="palette entity-palette" role="listbox" aria-label="Entity presets">
+                </div>
+                <p class="hint">Choose a preset, then click an empty cell to place it. Drag an existing entity to move
+                    it. Use arrow keys, Home, and End to navigate the palette.</p>
             </section>
 
             <section id="entry-tools-section" hidden>

@@ -40,17 +40,34 @@ export class EditorRenderer {
     loadImage(path) {
         if (this.images.has(path)) return this.images.get(path).promise;
         const image = new Image();
+        const record = { image, promise: null, status: "loading" };
         const promise = new Promise((resolve, reject) => {
-            image.addEventListener("load", () => resolve(image), { once: true });
+            image.addEventListener(
+                "load",
+                () => {
+                    record.status = "ready";
+                    resolve(image);
+                },
+                { once: true },
+            );
             image.addEventListener(
                 "error",
-                () => reject(new Error(`Could not load editor image "${path}".`)),
+                () => {
+                    record.status = "missing";
+                    reject(new Error(`Could not load editor image "${path}".`));
+                },
                 { once: true },
             );
         });
-        this.images.set(path, { image, promise });
+        record.promise = promise;
+        this.images.set(path, record);
         image.src = assetUrl(path);
         return promise;
+    }
+
+    getVisualImageStatus(visual) {
+        if (!visual?.path) return "missing";
+        return this.images.get(visual.path)?.status ?? "missing";
     }
 
     advance(time) {

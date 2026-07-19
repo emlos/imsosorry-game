@@ -296,6 +296,25 @@ p {
     outline: 2px solid #6fa5db;
     background: #293d52;
 }
+.palette-item:focus-visible {
+    outline: 2px solid #9bc8f2;
+    outline-offset: 1px;
+}
+.palette-item[data-incompatible="true"] {
+    opacity: 0.55;
+}
+.palette-item[data-missing="true"] canvas {
+    filter: grayscale(1);
+}
+.entity-palette {
+    max-height: min(46vh, 430px);
+    overflow-y: auto;
+    padding: 0.15rem 0.2rem 0.2rem 0;
+    scrollbar-gutter: stable;
+}
+.entity-palette .palette-items {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .compact-list {
     display: grid;
     gap: 0.3rem;

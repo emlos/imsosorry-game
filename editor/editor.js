@@ -1,5 +1,3 @@
-//TODO: entities should be displayed graphically, like tiles, not a dropdown. reuse system?
-
 import { findPrimaryShowTextEffect } from "../interactions.js";
 import { ITEMS } from "../items.js";
 import { MAPS } from "../maps.js";
@@ -23,6 +21,7 @@ import {
     floodFill,
     getEdgeAxisLength,
     getEntityOccupiedCells,
+    getEntityVisualDefinition,
     getMapSize,
     ensureLayer,
     makeUniqueId,
@@ -90,7 +89,7 @@ function downloadText(filename, text, type) {
     URL.revokeObjectURL(url);
 }
 
-function renderEmptyPreview(ctx) {
+function renderThumbnailPlaceholder(ctx, kind = "empty") {
     const { width, height } = ctx.canvas;
     const cellSize = 8;
 
@@ -103,7 +102,7 @@ function renderEmptyPreview(ctx) {
         }
     }
 
-    ctx.strokeStyle = "#8c929f";
+    ctx.strokeStyle = kind === "missing" ? "#d18a8f" : "#8c929f";
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(8, 8);
@@ -111,6 +110,101 @@ function renderEmptyPreview(ctx) {
     ctx.moveTo(width - 8, 8);
     ctx.lineTo(8, height - 8);
     ctx.stroke();
+
+    if (kind === "missing") {
+        ctx.fillStyle = "#f1c0c3";
+        ctx.font = "bold 18px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("?", width / 2, height / 2);
+    }
+}
+
+export function getPaletteNavigationIndex(currentIndex, key, itemCount, columns = 3) {
+    if (itemCount <= 0) return -1;
+    const clampedIndex = Math.max(0, Math.min(itemCount - 1, currentIndex));
+    if (key === "Home") return 0;
+    if (key === "End") return itemCount - 1;
+    if (key === "ArrowLeft") return Math.max(0, clampedIndex - 1);
+    if (key === "ArrowRight") return Math.min(itemCount - 1, clampedIndex + 1);
+    if (key === "ArrowUp") return Math.max(0, clampedIndex - columns);
+    if (key === "ArrowDown") return Math.min(itemCount - 1, clampedIndex + columns);
+    return clampedIndex;
+}
+
+function createVisualPaletteCard({
+    id,
+    label,
+    title,
+    visual,
+    selected,
+    disabled = false,
+    missing = false,
+    onSelect,
+}) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "palette-item";
+    button.dataset.paletteId = String(id);
+    button.classList.toggle("selected", selected);
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", String(selected));
+    button.title = title ?? label;
+    button.disabled = disabled;
+    if (missing) button.dataset.missing = "true";
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 48;
+    canvas.height = 48;
+    canvas.setAttribute("aria-hidden", "true");
+
+    const labelElement = document.createElement("span");
+    labelElement.textContent = label;
+    button.append(canvas, labelElement);
+    button.addEventListener("click", () => onSelect(id));
+
+    return {
+        button,
+        preview: visual
+            ? { ctx: canvas.getContext("2d"), visual }
+            : { ctx: canvas.getContext("2d"), placeholder: missing ? "missing" : "empty" },
+    };
+}
+
+function bindPaletteKeyboardNavigation(root, onSelect) {
+    const buttons = [...root.querySelectorAll(".palette-item:not(:disabled)")];
+    if (buttons.length === 0) return;
+
+    const selectedIndex = Math.max(
+        0,
+        buttons.findIndex((button) => button.classList.contains("selected")),
+    );
+    buttons.forEach((button, index) => {
+        button.tabIndex = index === selectedIndex ? 0 : -1;
+    });
+
+    root.onkeydown = (event) => {
+        if (
+            !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)
+        ) {
+            return;
+        }
+        const currentIndex = buttons.indexOf(document.activeElement);
+        if (currentIndex < 0) return;
+        const nextIndex = getPaletteNavigationIndex(currentIndex, event.key, buttons.length);
+        if (nextIndex === currentIndex) return;
+        event.preventDefault();
+        const nextButton = buttons[nextIndex];
+        buttons.forEach((button) => (button.tabIndex = button === nextButton ? 0 : -1));
+        buttons.forEach((button) => {
+            const isSelected = button === nextButton;
+            button.classList.toggle("selected", isSelected);
+            button.setAttribute("aria-selected", String(isSelected));
+        });
+        nextButton.focus();
+        nextButton.scrollIntoView({ block: "nearest", inline: "nearest" });
+        onSelect(nextButton.dataset.paletteId);
+    };
 }
 
 export class MapEditor {
@@ -155,19 +249,10 @@ export class MapEditor {
     }
 
     async start() {
-        this.populateStaticSelects();
         this.bindEvents();
         await this.refreshDocumentUI();
         this.updateRecoveryButton();
         requestAnimationFrame((time) => this.animationLoop(time));
-    }
-
-    populateStaticSelects() {
-        const presetSelect = byId("entity-preset");
-        for (const [presetId, preset] of Object.entries(ENTITY_PRESETS)) {
-            presetSelect.add(new Option(preset.label, presetId));
-        }
-        presetSelect.value = this.selectedEntityPreset;
     }
 
     populateEntityVisualOptions(type, selectedId = null) {
@@ -435,10 +520,6 @@ export class MapEditor {
         this.canvasScroll.addEventListener("wheel", (event) => this.onCanvasWheel(event), {
             passive: false,
         });
-        byId("entity-preset").addEventListener(
-            "change",
-            (event) => (this.selectedEntityPreset = event.target.value),
-        );
         byId("entity-visual-type").addEventListener("change", (event) => {
             this.populateEntityVisualOptions(event.target.value);
         });
@@ -607,6 +688,7 @@ export class MapEditor {
             .catch((error) => this.setStatus(error.message, true));
         this.renderMapControls();
         this.renderPalette();
+        this.renderEntityPalette();
         this.renderTriggerList();
         this.renderExitList();
         this.updateModeUI();
@@ -622,6 +704,7 @@ export class MapEditor {
             .catch((error) => this.setStatus(error.message, true));
         this.renderMapControls();
         this.renderPalette();
+        this.renderEntityPalette();
         this.renderTriggerList();
         this.renderExitList();
         this.renderInspectors();
@@ -695,8 +778,12 @@ export class MapEditor {
 
     renderPalette() {
         const root = byId("tile-palette");
+        root.setAttribute("role", "listbox");
+        root.setAttribute("aria-label", "Tile palette");
         root.replaceChildren();
-        this.palettePreviews = [];
+        this.palettePreviews = this.palettePreviews.filter(
+            (preview) => preview.palette !== "tiles",
+        );
         const merged = mergeTileDefinitions(this.currentMap);
         const localIds = new Set(Object.keys(this.currentMap.tiles ?? {}).map(String));
         const categories = new Map([
@@ -729,35 +816,85 @@ export class MapEditor {
             const list = document.createElement("div");
             list.className = "palette-items";
             for (const item of items) {
-                const button = document.createElement("button");
-                button.type = "button";
-                button.className = "palette-item";
-                button.classList.toggle("selected", item.tileId === this.selectedTileId);
-                button.title = `${item.label} (${item.tileId})`;
-                if (!canPlaceTile(this.currentMap, this.activeLayer, item.tileId, 0, 0)) {
-                    button.dataset.incompatible = "true";
-                }
-                const canvas = document.createElement("canvas");
-                canvas.width = 48;
-                canvas.height = 48;
-                const label = document.createElement("span");
-                label.textContent = item.label;
-                button.append(canvas, label);
-                button.addEventListener("click", () => {
-                    this.selectedTileId = item.tileId;
-                    this.renderPalette();
+                const incompatible = !canPlaceTile(
+                    this.currentMap,
+                    this.activeLayer,
+                    item.tileId,
+                    0,
+                    0,
+                );
+                const card = createVisualPaletteCard({
+                    id: item.tileId,
+                    label: item.label,
+                    title: `${item.label} (${item.tileId})`,
+                    visual: item.tile,
+                    selected: item.tileId === this.selectedTileId,
+                    onSelect: (rawTileId) => {
+                        this.selectedTileId = Number(rawTileId);
+                        this.renderPalette();
+                    },
                 });
-                list.append(button);
-                const previewContext = canvas.getContext("2d");
-                if (item.tile === null) {
-                    renderEmptyPreview(previewContext);
-                } else {
-                    this.palettePreviews.push({ ctx: previewContext, visual: item.tile });
-                }
+                if (incompatible) card.button.dataset.incompatible = "true";
+                list.append(card.button);
+                this.palettePreviews.push({ ...card.preview, palette: "tiles" });
             }
             section.append(title, list);
             root.append(section);
         }
+        bindPaletteKeyboardNavigation(root, (rawTileId) => {
+            this.selectedTileId = Number(rawTileId);
+        });
+    }
+
+    renderEntityPalette() {
+        const root = byId("entity-palette");
+        root.replaceChildren();
+        this.palettePreviews = this.palettePreviews.filter(
+            (preview) => preview.palette !== "entities",
+        );
+
+        const section = document.createElement("div");
+        section.className = "palette-category";
+        const title = document.createElement("h3");
+        title.textContent = "Presets";
+        const list = document.createElement("div");
+        list.className = "palette-items";
+
+        for (const [presetId, preset] of Object.entries(ENTITY_PRESETS)) {
+            const visualReference = preset.entity?.visual;
+            const visual = getEntityVisualDefinition(this.currentMap, visualReference);
+            const imageStatus = visual ? this.renderer.getVisualImageStatus(visual) : "missing";
+            const missing = !visual || imageStatus === "missing";
+            const visualLabel = visualReference
+                ? `${visualReference.type}:${String(visualReference.id)}`
+                : "no visual";
+            const missingDescription = visual
+                ? `could not load ${visual.path}`
+                : `missing ${visualLabel}`;
+            const card = createVisualPaletteCard({
+                id: presetId,
+                label: preset.label,
+                title: missing
+                    ? `${preset.label} — ${missingDescription}`
+                    : `${preset.label} — ${visualLabel}`,
+                visual,
+                selected: presetId === this.selectedEntityPreset,
+                disabled: missing,
+                missing,
+                onSelect: (selectedPresetId) => {
+                    this.selectedEntityPreset = selectedPresetId;
+                    this.renderEntityPalette();
+                },
+            });
+            list.append(card.button);
+            this.palettePreviews.push({ ...card.preview, palette: "entities" });
+        }
+
+        section.append(title, list);
+        root.append(section);
+        bindPaletteKeyboardNavigation(root, (presetId) => {
+            this.selectedEntityPreset = presetId;
+        });
     }
 
     renderTriggerList() {
@@ -1035,11 +1172,15 @@ export class MapEditor {
         });
         this.applyZoom();
         for (const preview of this.palettePreviews) {
-            this.renderer.renderVisualPreview(
-                preview.ctx,
-                preview.visual,
-                this.renderer.animationTimeMs,
-            );
+            if (preview.visual) {
+                this.renderer.renderVisualPreview(
+                    preview.ctx,
+                    preview.visual,
+                    this.renderer.animationTimeMs,
+                );
+            } else {
+                renderThumbnailPlaceholder(preview.ctx, preview.placeholder);
+            }
         }
         requestAnimationFrame((nextTime) => this.animationLoop(nextTime));
     }

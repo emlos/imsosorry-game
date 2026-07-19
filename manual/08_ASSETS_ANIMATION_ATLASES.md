@@ -196,6 +196,8 @@ export const SPRITE_EDITOR_META = {
 };
 ```
 
+Each entry appears automatically in the editor's graphical entity placement palette. Its `entity.visual` may reference either a sprite or a tile; the palette uses the referenced definition's atlas, animation, and size metadata for its thumbnail.
+
 Add an entity preset only when a commonly placed sprite should carry default collision/interaction behavior:
 
 ```js
