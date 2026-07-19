@@ -16,48 +16,6 @@ export const MAPS = [
         exits: [],
         triggers: [
             {
-                id: "once-save-threshold",
-                region: {
-                    col: 1,
-                    row: 2,
-                    width: 2,
-                    height: 2,
-                },
-                events: ["enter"],
-                frequency: "once-per-save",
-                effects: [
-                    {
-                        type: "playSound",
-                        soundId: "receiver-chime",
-                    },
-                    {
-                        type: "showText",
-                        pages: ["This 2×2 region only triggers once per save file."],
-                    },
-                ],
-            },
-            {
-                id: "once-visit-strip",
-                region: {
-                    col: 4,
-                    row: 1,
-                    width: 3,
-                    height: 1,
-                },
-                events: ["enter"],
-                frequency: "once-per-visit",
-                effects: [
-                    {
-                        type: "playSound",
-                        soundId: "orb-collect",
-                    },
-                    {
-                        type: "showText",
-                        pages: ["This 3×1 region triggers once during each room visit."],
-                    },
-                ],
-            },
-            {
                 id: "repeat-field",
                 region: {
                     col: 5,
@@ -69,6 +27,11 @@ export const MAPS = [
                 frequency: "always",
                 effects: [
                     {
+                        type: "cameraZoom",
+                        zoom: 6,
+                        durationMs: 500,
+                    },
+                    {
                         type: "playSound",
                         soundId: "item-use",
                     },
@@ -78,18 +41,80 @@ export const MAPS = [
                     },
                 ],
             },
+            {
+                id: "repeat-field-camera-reset",
+                region: {
+                    col: 5,
+                    row: 4,
+                    width: 4,
+                    height: 3,
+                },
+                events: ["exit"],
+                frequency: "always",
+                effects: [
+                    {
+                        type: "cameraReset",
+                        durationMs: 500,
+                    },
+                ],
+            },
         ],
         tiles: {},
         entities: [
             {
                 id: "robed-normal",
                 active: true,
-                col: 0,
-                row: 7,
-                visual: { type: "sprite", id: "robed-figure" },
-                transform: { flipX: false, flipY: false },
-                collision: false,
-                interaction: null,
+                col: 8,
+                row: 2,
+                visual: {
+                    type: "sprite",
+                    id: "robed-figure",
+                },
+                transform: {
+                    flipX: false,
+                    flipY: false,
+                },
+                collision: true,
+                interaction: {
+                    handler: "effects",
+                    triggers: ["action"],
+                    effects: [
+                        {
+                            type: "cameraPan",
+                            offsetX: -64,
+                            offsetY: 0,
+                            durationMs: 500,
+                        },
+                        {
+                            type: "showText",
+                            pages: ["The camera can pan while it continues following the player."],
+                            afterClose: [
+                                {
+                                    type: "cameraReset",
+                                    durationMs: 400,
+                                },
+                                {
+                                    type: "cameraZoom",
+                                    zoom: 6,
+                                    durationMs: 500,
+                                },
+                                {
+                                    type: "showText",
+                                    pages: [
+                                        "Camera transitions finish before the next effect begins.",
+                                    ],
+                                    afterClose: [
+                                        {
+                                            type: "cameraReset",
+                                            durationMs: 500,
+                                        },
+                                    ],
+                                },
+                            ],
+                        },
+                    ],
+                    message: "Camera sequence demonstration.",
+                },
                 condition: null,
             },
             {
@@ -97,8 +122,14 @@ export const MAPS = [
                 active: true,
                 col: 1,
                 row: 7,
-                visual: { type: "sprite", id: "robed-figure" },
-                transform: { flipX: true, flipY: false },
+                visual: {
+                    type: "sprite",
+                    id: "robed-figure",
+                },
+                transform: {
+                    flipX: true,
+                    flipY: false,
+                },
                 collision: false,
                 interaction: null,
                 condition: null,
@@ -108,8 +139,14 @@ export const MAPS = [
                 active: true,
                 col: 3,
                 row: 7,
-                visual: { type: "sprite", id: "forest-sign" },
-                transform: { flipX: false, flipY: false },
+                visual: {
+                    type: "sprite",
+                    id: "forest-sign",
+                },
+                transform: {
+                    flipX: false,
+                    flipY: false,
+                },
                 collision: false,
                 interaction: null,
                 condition: null,
@@ -119,8 +156,14 @@ export const MAPS = [
                 active: true,
                 col: 4,
                 row: 7,
-                visual: { type: "sprite", id: "forest-sign" },
-                transform: { flipX: false, flipY: true },
+                visual: {
+                    type: "sprite",
+                    id: "forest-sign",
+                },
+                transform: {
+                    flipX: false,
+                    flipY: true,
+                },
                 collision: false,
                 interaction: null,
                 condition: null,
@@ -130,8 +173,14 @@ export const MAPS = [
                 active: true,
                 col: 7,
                 row: 7,
-                visual: { type: "sprite", id: "lantern" },
-                transform: { flipX: false, flipY: false },
+                visual: {
+                    type: "sprite",
+                    id: "lantern",
+                },
+                transform: {
+                    flipX: false,
+                    flipY: false,
+                },
                 collision: false,
                 interaction: null,
                 condition: null,
@@ -141,8 +190,14 @@ export const MAPS = [
                 active: true,
                 col: 8,
                 row: 7,
-                visual: { type: "sprite", id: "lantern" },
-                transform: { flipX: true, flipY: true },
+                visual: {
+                    type: "sprite",
+                    id: "lantern",
+                },
+                transform: {
+                    flipX: true,
+                    flipY: true,
+                },
                 collision: false,
                 interaction: null,
                 condition: null,
@@ -171,5 +226,9 @@ export const MAPS = [
             ],
         },
         editorGroup: "demo01",
+        camera: {
+            zoom: 1,
+            follow: "player",
+        },
     },
 ];

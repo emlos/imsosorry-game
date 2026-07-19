@@ -340,7 +340,13 @@ const EFFECT_HANDLERS = new Map([
             validateDefinition({ effect, label }) {
                 requireExactKeys(
                     effect,
-                    effectKeys("mapId", "entryId", "musicTransition", "musicTransitionMs"),
+                    effectKeys(
+                        "mapId",
+                        "entryId",
+                        "musicTransition",
+                        "musicTransitionMs",
+                        "inheritCamera",
+                    ),
                     label,
                 );
                 requireString(effect.mapId, `${label}.mapId`);
@@ -359,6 +365,9 @@ const EFFECT_HANDLERS = new Map([
                         `${label}.musicTransitionMs`,
                     );
                 }
+                if (effect.inheritCamera !== undefined) {
+                    requireBoolean(effect.inheritCamera, `${label}.inheritCamera`);
+                }
             },
             validateReferences({ game, effect, label }) {
                 game.validateEntryReference(effect.mapId, effect.entryId, label);
@@ -369,6 +378,122 @@ const EFFECT_HANDLERS = new Map([
                     entryId: effect.entryId,
                     musicTransition: effect.musicTransition,
                     musicTransitionMs: effect.musicTransitionMs,
+                    inheritCamera: effect.inheritCamera,
+                });
+            },
+        },
+    ],
+    [
+        "cameraPan",
+        {
+            validateDefinition({ effect, label }) {
+                requireExactKeys(
+                    effect,
+                    effectKeys("x", "y", "offsetX", "offsetY", "durationMs"),
+                    label,
+                );
+                const absolute = effect.x !== undefined || effect.y !== undefined;
+                const offset = effect.offsetX !== undefined || effect.offsetY !== undefined;
+                if (absolute === offset) {
+                    throw new Error(
+                        `${label} must define either x/y or offsetX/offsetY, but not both.`,
+                    );
+                }
+                if (absolute) {
+                    requireFiniteNumber(effect.x, `${label}.x`);
+                    requireFiniteNumber(effect.y, `${label}.y`);
+                } else {
+                    if (effect.offsetX !== undefined) {
+                        requireFiniteNumber(effect.offsetX, `${label}.offsetX`);
+                    }
+                    if (effect.offsetY !== undefined) {
+                        requireFiniteNumber(effect.offsetY, `${label}.offsetY`);
+                    }
+                }
+                if (effect.durationMs !== undefined) {
+                    requireNonNegativeNumber(effect.durationMs, `${label}.durationMs`);
+                }
+            },
+            execute({ game, effect }) {
+                return game.cameraPan(effect);
+            },
+        },
+    ],
+    [
+        "cameraZoom",
+        {
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, effectKeys("zoom", "durationMs"), label);
+                requireRange(effect.zoom, 0.25, 8, `${label}.zoom`);
+                if (effect.durationMs !== undefined) {
+                    requireNonNegativeNumber(effect.durationMs, `${label}.durationMs`);
+                }
+            },
+            execute({ game, effect }) {
+                return game.cameraZoom(effect.zoom, effect.durationMs ?? 0);
+            },
+        },
+    ],
+    [
+        "cameraFollow",
+        {
+            validateDefinition({ effect, label }) {
+                requireExactKeys(
+                    effect,
+                    effectKeys("target", "entityId", "offsetX", "offsetY", "durationMs"),
+                    label,
+                );
+                if (!["player", "entity", "none"].includes(effect.target)) {
+                    throw new Error(`${label}.target must be "player", "entity", or "none".`);
+                }
+                if (effect.target === "entity") {
+                    requireString(effect.entityId, `${label}.entityId`);
+                } else if (effect.entityId !== undefined) {
+                    throw new Error(`${label}.entityId is only valid for entity following.`);
+                }
+                for (const key of ["offsetX", "offsetY"]) {
+                    if (effect[key] !== undefined)
+                        requireFiniteNumber(effect[key], `${label}.${key}`);
+                }
+                if (effect.durationMs !== undefined) {
+                    requireNonNegativeNumber(effect.durationMs, `${label}.durationMs`);
+                }
+            },
+            validateReferences({ game, effect, mapId, label }) {
+                if (effect.target === "entity") {
+                    game.validateEntityReference(mapId, effect.entityId, label);
+                }
+            },
+            execute({ game, effect, mapId }) {
+                return game.cameraFollow({ ...effect, mapId });
+            },
+        },
+    ],
+    [
+        "cameraShake",
+        {
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, effectKeys("intensity", "durationMs"), label);
+                requirePositiveNumber(effect.intensity, `${label}.intensity`);
+                requireNonNegativeNumber(effect.durationMs, `${label}.durationMs`);
+            },
+            execute({ game, effect }) {
+                return game.cameraShake(effect);
+            },
+        },
+    ],
+    [
+        "cameraReset",
+        {
+            validateDefinition({ effect, label }) {
+                requireExactKeys(effect, effectKeys("durationMs"), label);
+                if (effect.durationMs !== undefined) {
+                    requireNonNegativeNumber(effect.durationMs, `${label}.durationMs`);
+                }
+            },
+            execute({ game, effect }) {
+                return game.resetCameraToMapDefaults(game.activeMap, {
+                    durationMs: effect.durationMs ?? 0,
                 });
             },
         },
@@ -530,7 +655,7 @@ const EFFECT_HANDLERS = new Map([
                 });
             },
             execute({ game, effect, mapId, ownerId }) {
-                game.runRandomEffect(effect, { mapId, ownerId });
+                return game.runRandomEffect(effect, { mapId, ownerId });
             },
         },
     ],
@@ -676,12 +801,19 @@ export function collectRandomEffectIds(effects, output = []) {
 }
 
 export function runEffects(game, effects, context) {
-    for (const effect of effects) {
-        if (effect.condition && !game.evaluateCondition(effect.condition)) {
-            continue;
-        }
+    const runFrom = (startIndex) => {
+        for (let index = startIndex; index < effects.length; index += 1) {
+            const effect = effects[index];
+            if (effect.condition && !game.evaluateCondition(effect.condition)) continue;
 
-        const handler = EFFECT_HANDLERS.get(effect.type);
-        handler.execute({ game, effect, ...context });
-    }
+            const handler = EFFECT_HANDLERS.get(effect.type);
+            const result = handler.execute({ game, effect, ...context });
+            if (result && typeof result.then === "function") {
+                return result.then(() => runFrom(index + 1));
+            }
+        }
+        return undefined;
+    };
+
+    return runFrom(0);
 }

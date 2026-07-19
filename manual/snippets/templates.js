@@ -1,4 +1,4 @@
-// Yume v0.8.7 authoring templates.
+// Yume v0.9 authoring templates.
 // These are examples to paste into the appropriate definitions; this file is not imported.
 
 // -----------------------------------------------------------------------------
@@ -248,3 +248,16 @@ const itemDefinition = {
         },
     ],
 };
+
+// Camera effect sequence
+const cameraSequence = [
+    { type: "cameraPan", offsetX: -64, offsetY: 0, durationMs: 500 },
+    {
+        type: "showText",
+        pages: ["The pan has finished."],
+        afterClose: [
+            { type: "cameraZoom", zoom: 2, durationMs: 500 },
+            { type: "showText", pages: ["The zoom has finished."], afterClose: [{ type: "cameraReset", durationMs: 500 }] },
+        ],
+    },
+];

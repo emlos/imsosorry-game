@@ -58,6 +58,9 @@ const RENDER_LAYER_NAMES = new Set(["base", "obstacles", "foreground"]);
 const TRIGGER_EVENT_TYPES = new Set(["enter", "exit", "step"]);
 const TRIGGER_FREQUENCIES = new Set(["always", "once-per-visit", "once-per-save"]);
 const COLLISION_EPSILON = 1e-7;
+const CAMERA_ZOOM_MIN = 0.25;
+const CAMERA_ZOOM_MAX = 8;
+const CAMERA_FOLLOW_TYPES = new Set(["player", "entity", "none"]);
 
 function validateEdgeRange(range, label) {
     if (
@@ -160,7 +163,23 @@ export class Game {
         this.dialogueBox = new DialogueBox(document.querySelector("#dialogue"));
         this.mode = "world";
         this.selectedItemId = null;
-        this.camera = { x: 0, y: 0 };
+        this.camera = {
+            x: 0,
+            y: 0,
+            zoom: 1,
+            shakeX: 0,
+            shakeY: 0,
+            transition: null,
+            shake: null,
+        };
+        this.cameraDesired = {
+            x: 0,
+            y: 0,
+            zoom: 1,
+            followTarget: { type: "player" },
+            offsetX: 0,
+            offsetY: 0,
+        };
         this.player = new Player(
             TILE_SIZE,
             this.state.player,
@@ -309,12 +328,28 @@ export class Game {
         }
     }
 
+    validateCameraZoom(zoom, label) {
+        if (!Number.isFinite(zoom) || zoom < CAMERA_ZOOM_MIN || zoom > CAMERA_ZOOM_MAX) {
+            throw new Error(`${label} must be between ${CAMERA_ZOOM_MIN} and ${CAMERA_ZOOM_MAX}.`);
+        }
+    }
+
+    validateMapCamera(camera, label) {
+        requireObject(camera, label);
+        requireExactKeys(camera, new Set(["zoom", "follow"]), label);
+        this.validateCameraZoom(camera.zoom, `${label}.zoom`);
+        if (camera.follow !== "player") {
+            throw new Error(`${label}.follow must be "player".`);
+        }
+    }
+
     validateMap(map, isInitialMap) {
         requireObject(map.entries, `Map "${map.id}" entries`);
         requireObject(map.layers, `Map "${map.id}" layers`);
         requireArray(map.entities, `Map "${map.id}" entities`);
         requireArray(map.triggers, `Map "${map.id}" triggers`);
         requireArray(map.exits, `Map "${map.id}" exits`);
+        this.validateMapCamera(map.camera, `Map "${map.id}" camera`);
         if (map.onEnter !== undefined) {
             requireArray(map.onEnter, `Map "${map.id}" onEnter`);
             if (map.onEnter.length > 0) {
@@ -455,6 +490,9 @@ export class Game {
         ) {
             throw new Error(`${label}.musicTransitionMs must be a non-negative number.`);
         }
+        if (value.inheritCamera !== undefined) {
+            requireBoolean(value.inheritCamera, `${label}.inheritCamera`);
+        }
     }
 
     validateExitDestinationDefinition(destination, sourceEdge, sourceRange, label) {
@@ -471,6 +509,7 @@ export class Game {
                     "entryId",
                     "musicTransition",
                     "musicTransitionMs",
+                    "inheritCamera",
                 ]),
                 label,
             );
@@ -487,6 +526,7 @@ export class Game {
                     "targetPosition",
                     "musicTransition",
                     "musicTransitionMs",
+                    "inheritCamera",
                 ]),
                 label,
             );
@@ -509,6 +549,7 @@ export class Game {
                 "targetRange",
                 "musicTransition",
                 "musicTransitionMs",
+                "inheritCamera",
             ]),
             label,
         );
@@ -2575,6 +2616,10 @@ export class Game {
 
         if (!exitEventsHandled && !this.runActiveMapExitEvents()) return;
 
+        if (transition.inheritCamera !== undefined) {
+            requireBoolean(transition.inheritCamera, "Transition.inheritCamera");
+        }
+
         const mapId = transition.mapId;
         const map = this.mapsById.get(mapId);
         if (!map) throw new Error(`Transition references missing map "${mapId}".`);
@@ -2614,6 +2659,13 @@ export class Game {
         this.syncTouchTargets();
         this.syncTriggerMembership();
 
+        if (transition.inheritCamera !== true) {
+            this.resetCameraToMapDefaults(map, { immediate: true });
+        } else {
+            this.cancelCameraAnimations();
+            this.updateCamera(0);
+        }
+
         this.applyMapMusic(map, transition);
         this.runMapMusicEntryEvents(map, usesEntry ? transition.entryId : null);
         if (map.onEnter !== undefined) {
@@ -2624,7 +2676,7 @@ export class Game {
         }
 
         if (this.state.player.mapId !== mapId) return;
-        this.updateCamera();
+        this.updateCamera(0);
         this.setStatus(`Map: ${mapId} -- ${statusTarget}`);
     }
 
@@ -2838,7 +2890,7 @@ export class Game {
     }
 
     runEffects(effects, { mapId, ownerId }) {
-        runEffects(this, effects, { mapId, ownerId });
+        return runEffects(this, effects, { mapId, ownerId });
     }
 
     getRandomEventKey(ownerId, randomId) {
@@ -2905,7 +2957,7 @@ export class Game {
         const resolved = this.resolveRandomChoice(effect, context);
         if (!resolved) return;
         if (resolved.choice.effects.length === 0) return;
-        this.runEffects(resolved.choice.effects, context);
+        return this.runEffects(resolved.choice.effects, context);
     }
 
     getPlayerFacingName() {
@@ -3329,6 +3381,7 @@ export class Game {
                     entryId: destination.entryId,
                     musicTransition: destination.musicTransition,
                     musicTransitionMs: destination.musicTransitionMs,
+                    inheritCamera: destination.inheritCamera,
                 },
                 { exitEventsHandled: true },
             );
@@ -3342,6 +3395,7 @@ export class Game {
                     position: structuredClone(destination.targetPosition),
                     musicTransition: destination.musicTransition,
                     musicTransitionMs: destination.musicTransitionMs,
+                    inheritCamera: destination.inheritCamera,
                 },
                 { exitEventsHandled: true },
             );
@@ -3354,6 +3408,7 @@ export class Game {
                 mapId: destination.targetMapId,
                 musicTransition: destination.musicTransition,
                 musicTransitionMs: destination.musicTransitionMs,
+                inheritCamera: destination.inheritCamera,
                 position: {
                     ...position,
                     facing: { ...movementDirection },
@@ -3471,23 +3526,234 @@ export class Game {
             this.updatePlayerAnimation(deltaMs);
         }
 
-        this.updateCamera();
+        this.updateCamera(deltaMs);
     }
 
-    //TODO: expand camera system, indroduce hooks for camera movement, and allow for camera to be moved independently of player movement for example: zoom in when interacting with entity, room based zoom levels, etc.
-    updateCamera() {
-        const desiredX = this.player.x + TILE_SIZE / 2 - this.canvas.width / 2;
-        const desiredY = this.player.y + TILE_SIZE / 2 - this.canvas.height / 2;
+    getCameraFocusPoint(target = this.cameraDesired.followTarget) {
+        if (target.type === "player") {
+            return { x: this.player.x + TILE_SIZE / 2, y: this.player.y + TILE_SIZE / 2 };
+        }
+        if (target.type === "entity") {
+            const entityState = this.state.maps[target.mapId]?.entities[target.entityId];
+            if (!entityState?.active) {
+                throw new Error(
+                    `Camera follow target "${target.entityId}" is inactive or missing.`,
+                );
+            }
+            return {
+                x: entityState.col * TILE_SIZE + TILE_SIZE / 2,
+                y: entityState.row * TILE_SIZE + TILE_SIZE / 2,
+            };
+        }
+        return null;
+    }
 
-        const maxX = Math.max(0, this.activeSpatialData.bounds.width - this.canvas.width);
-        const maxY = Math.max(0, this.activeSpatialData.bounds.height - this.canvas.height);
+    clampCameraPosition(x, y, zoom = this.camera.zoom) {
+        const visibleWidth = this.canvas.width / zoom;
+        const visibleHeight = this.canvas.height / zoom;
+        const maxX = Math.max(0, this.activeSpatialData.bounds.width - visibleWidth);
+        const maxY = Math.max(0, this.activeSpatialData.bounds.height - visibleHeight);
+        return {
+            x: Math.max(0, Math.min(x, maxX)),
+            y: Math.max(0, Math.min(y, maxY)),
+        };
+    }
 
-        this.camera.x = Math.max(0, Math.min(desiredX, maxX));
-        this.camera.y = Math.max(0, Math.min(desiredY, maxY));
+    resolveDesiredCameraPosition(zoom = this.cameraDesired.zoom) {
+        const focus = this.getCameraFocusPoint();
+        if (!focus) {
+            return this.clampCameraPosition(this.cameraDesired.x, this.cameraDesired.y, zoom);
+        }
+        return this.clampCameraPosition(
+            focus.x - this.canvas.width / zoom / 2 + this.cameraDesired.offsetX,
+            focus.y - this.canvas.height / zoom / 2 + this.cameraDesired.offsetY,
+            zoom,
+        );
+    }
+
+    cancelCameraAnimations() {
+        if (this.camera.transition?.resolve) this.camera.transition.resolve();
+        if (this.camera.shake?.resolve) this.camera.shake.resolve();
+        this.camera.transition = null;
+        this.camera.shake = null;
+        this.camera.shakeX = 0;
+        this.camera.shakeY = 0;
+        if (this.mode === "camera") this.mode = "world";
+    }
+
+    resetCameraToMapDefaults(map = this.activeMap, { immediate = false, durationMs = 0 } = {}) {
+        const defaults = map.camera;
+        const next = {
+            x: 0,
+            y: 0,
+            zoom: defaults.zoom,
+            followTarget: { type: defaults.follow },
+            offsetX: 0,
+            offsetY: 0,
+        };
+        if (immediate) {
+            this.cancelCameraAnimations();
+            Object.assign(this.cameraDesired, next);
+            const position = this.resolveDesiredCameraPosition(next.zoom);
+            this.camera.x = position.x;
+            this.camera.y = position.y;
+            this.camera.zoom = next.zoom;
+            return undefined;
+        }
+        return this.transitionCamera(next, durationMs);
+    }
+
+    transitionCamera(changes, durationMs = 0) {
+        if (!Number.isFinite(durationMs) || durationMs < 0) {
+            throw new Error("Camera transition duration must be non-negative.");
+        }
+        if (this.camera.transition || this.camera.shake) {
+            throw new Error(
+                "Cannot start a camera transition while another camera animation is active.",
+            );
+        }
+
+        Object.assign(this.cameraDesired, changes);
+        const targetZoom = this.cameraDesired.zoom;
+        const targetPosition = this.resolveDesiredCameraPosition(targetZoom);
+        if (durationMs === 0) {
+            this.camera.x = targetPosition.x;
+            this.camera.y = targetPosition.y;
+            this.camera.zoom = targetZoom;
+            return undefined;
+        }
+
+        if (this.mode !== "world") {
+            throw new Error(`Cannot animate the camera while game mode is "${this.mode}".`);
+        }
+        this.mode = "camera";
+        this.input.clearMovement();
+        return new Promise((resolve) => {
+            this.camera.transition = {
+                startX: this.camera.x,
+                startY: this.camera.y,
+                startZoom: this.camera.zoom,
+                targetX: targetPosition.x,
+                targetY: targetPosition.y,
+                targetZoom,
+                elapsedMs: 0,
+                durationMs,
+                resolve,
+            };
+        });
+    }
+
+    cameraPan({ x, y, offsetX, offsetY, durationMs = 0 }) {
+        if (x !== undefined || y !== undefined) {
+            return this.transitionCamera(
+                {
+                    x,
+                    y,
+                    followTarget: { type: "none" },
+                    offsetX: 0,
+                    offsetY: 0,
+                },
+                durationMs,
+            );
+        }
+        return this.transitionCamera(
+            {
+                offsetX: offsetX ?? this.cameraDesired.offsetX,
+                offsetY: offsetY ?? this.cameraDesired.offsetY,
+            },
+            durationMs,
+        );
+    }
+
+    cameraZoom(zoom, durationMs = 0) {
+        this.validateCameraZoom(zoom, "Camera zoom");
+        return this.transitionCamera({ zoom }, durationMs);
+    }
+
+    cameraFollow({ target, entityId, offsetX = 0, offsetY = 0, mapId, durationMs = 0 }) {
+        const followTarget =
+            target === "entity" ? { type: "entity", mapId, entityId } : { type: target };
+        const position = target === "none" ? { x: this.camera.x, y: this.camera.y } : {};
+        return this.transitionCamera({ ...position, followTarget, offsetX, offsetY }, durationMs);
+    }
+
+    cameraShake({ intensity, durationMs }) {
+        if (this.camera.transition || this.camera.shake) {
+            throw new Error("Cannot start camera shake while another camera animation is active.");
+        }
+        if (durationMs === 0) return undefined;
+        if (this.mode !== "world") {
+            throw new Error(`Cannot shake the camera while game mode is "${this.mode}".`);
+        }
+        this.mode = "camera";
+        this.input.clearMovement();
+        return new Promise((resolve) => {
+            this.camera.shake = { intensity, durationMs, elapsedMs: 0, resolve };
+        });
+    }
+
+    finishCameraAnimation(resolve) {
+        this.camera.transition = null;
+        this.camera.shake = null;
+        this.camera.shakeX = 0;
+        this.camera.shakeY = 0;
+        if (this.mode === "camera") this.mode = "world";
+        resolve();
+    }
+
+    updateCamera(deltaMs) {
+        const transition = this.camera.transition;
+        if (transition) {
+            transition.elapsedMs = Math.min(transition.durationMs, transition.elapsedMs + deltaMs);
+            const linear = transition.elapsedMs / transition.durationMs;
+            const progress = 1 - Math.pow(1 - linear, 3);
+            const interpolatedX =
+                transition.startX + (transition.targetX - transition.startX) * progress;
+            const interpolatedY =
+                transition.startY + (transition.targetY - transition.startY) * progress;
+            this.camera.zoom =
+                transition.startZoom + (transition.targetZoom - transition.startZoom) * progress;
+            const clamped = this.clampCameraPosition(
+                interpolatedX,
+                interpolatedY,
+                this.camera.zoom,
+            );
+            this.camera.x = clamped.x;
+            this.camera.y = clamped.y;
+            if (transition.elapsedMs >= transition.durationMs) {
+                this.camera.x = transition.targetX;
+                this.camera.y = transition.targetY;
+                this.camera.zoom = transition.targetZoom;
+                const resolve = transition.resolve;
+                this.finishCameraAnimation(resolve);
+            }
+        } else {
+            this.camera.zoom = this.cameraDesired.zoom;
+            const position = this.resolveDesiredCameraPosition(this.camera.zoom);
+            this.camera.x = position.x;
+            this.camera.y = position.y;
+        }
+
+        const shake = this.camera.shake;
+        if (shake) {
+            shake.elapsedMs = Math.min(shake.durationMs, shake.elapsedMs + deltaMs);
+            const remaining = 1 - shake.elapsedMs / shake.durationMs;
+            const phase = shake.elapsedMs * 0.09;
+            this.camera.shakeX = Math.sin(phase * 1.7) * shake.intensity * remaining;
+            this.camera.shakeY = Math.cos(phase * 2.3) * shake.intensity * remaining;
+            if (shake.elapsedMs >= shake.durationMs) {
+                const resolve = shake.resolve;
+                this.finishCameraAnimation(resolve);
+            }
+        }
     }
 
     render() {
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.imageSmoothingEnabled = false;
+        this.ctx.save();
+        this.ctx.scale(this.camera.zoom, this.camera.zoom);
 
         this.renderLayer(this.activeMapState.layers.base);
 
@@ -3517,6 +3783,7 @@ export class Game {
         if (this.activeMapState.layers.foreground) {
             this.renderLayer(this.activeMapState.layers.foreground);
         }
+        this.ctx.restore();
     }
 
     renderLayer(layer) {
@@ -3589,7 +3856,13 @@ export class Game {
             this.playerAnimation.animationId,
             this.playerAnimation.elapsedMs,
         );
-        this.player.render(this.ctx, this.camera, playerSprite, playerImage, playerFrame);
+        this.player.render(
+            this.ctx,
+            { x: this.camera.x + this.camera.shakeX, y: this.camera.y + this.camera.shakeY },
+            playerSprite,
+            playerImage,
+            playerFrame,
+        );
     }
 
     renderTile(tile, col, row) {
@@ -3600,8 +3873,8 @@ export class Game {
         const bottomRow = Math.max(...occupiedCells.map((cell) => cell.row));
         const worldBottomY = (bottomRow + 1) * TILE_SIZE;
         const [width, height] = tile.size ?? [TILE_SIZE, TILE_SIZE];
-        const drawX = Math.round(col * TILE_SIZE - this.camera.x);
-        const drawY = Math.round(worldBottomY - height - this.camera.y);
+        const drawX = Math.round(col * TILE_SIZE - this.camera.x - this.camera.shakeX);
+        const drawY = Math.round(worldBottomY - height - this.camera.y - this.camera.shakeY);
 
         const animationId = resolveAnimationId(tile, [tile.defaultAnimation]);
         const frame = resolveVisualFrame(tile, animationId, this.ambientAnimationTimeMs);
@@ -3620,13 +3893,17 @@ export class Game {
 
         if (visualReference.type === "tile") {
             const bottomRow = Math.max(...entity.occupiedCells.map((cell) => cell.row));
-            drawX = Math.round(entity.state.col * TILE_SIZE - this.camera.x);
-            drawY = Math.round((bottomRow + 1) * TILE_SIZE - height - this.camera.y);
+            drawX = Math.round(entity.state.col * TILE_SIZE - this.camera.x - this.camera.shakeX);
+            drawY = Math.round(
+                (bottomRow + 1) * TILE_SIZE - height - this.camera.y - this.camera.shakeY,
+            );
         } else {
             const worldX = entity.state.col * TILE_SIZE;
             const worldY = entity.state.row * TILE_SIZE;
-            drawX = Math.round(worldX + (TILE_SIZE - width) / 2 - this.camera.x);
-            drawY = Math.round(worldY + TILE_SIZE - height - this.camera.y);
+            drawX = Math.round(
+                worldX + (TILE_SIZE - width) / 2 - this.camera.x - this.camera.shakeX,
+            );
+            drawY = Math.round(worldY + TILE_SIZE - height - this.camera.y - this.camera.shakeY);
         }
 
         const animationId = resolveAnimationId(visual, [visual.defaultAnimation]);

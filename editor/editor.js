@@ -433,6 +433,17 @@ export class MapEditor {
             this.clearSelection();
             await this.refreshDocumentUI();
         });
+        byId("map-camera-zoom").addEventListener("change", (event) => {
+            const zoom = Number(event.target.value);
+            if (!Number.isFinite(zoom) || zoom < 0.25 || zoom > 8) {
+                event.target.value = this.currentMap.camera.zoom;
+                return this.setStatus("Camera zoom must be between 0.25 and 8.", true);
+            }
+            this.commitMutation("Change map camera zoom", () => {
+                this.currentMap.camera.zoom = zoom;
+            });
+            this.validateAndDisplay();
+        });
         byId("map-id").addEventListener("change", async (event) => {
             const oldId = this.currentMap.id;
             const newId = event.target.value.trim();
@@ -820,6 +831,7 @@ export class MapEditor {
         const { width, height } = getMapSize(this.currentMap);
         byId("map-width").value = width;
         byId("map-height").value = height;
+        byId("map-camera-zoom").value = this.currentMap.camera.zoom;
 
         const initialSelect = byId("initial-entry");
         initialSelect.replaceChildren(

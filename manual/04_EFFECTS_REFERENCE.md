@@ -16,7 +16,7 @@ Unknown and extra keys fail validation.
 
 - Normal effect arrays must be non-empty.
 - A random choice's `effects` array may be empty to represent “nothing happens.”
-- Effects execute in array order.
+- Effects execute in array order. Camera animations with a nonzero `durationMs` block later effects until the animation finishes.
 - An effect whose `condition` is false is skipped.
 - `showText` must be the final reachable effect in its array.
 - Put work that follows dialogue in `showText.afterClose`.
@@ -214,6 +214,56 @@ Clear a cell:
 
 The target tile must exist in that map's merged tile definitions, fit within the map, and be compatible with the layer.
 
+## Camera
+
+Camera effects control authored camera state rather than dialogue behavior. `durationMs` is optional except for `cameraShake`; a nonzero duration blocks the remaining effect sequence until the animation finishes.
+
+### `cameraPan`
+
+Keep the existing follow target and offset the camera in world pixels:
+
+```js
+{ type: "cameraPan", offsetX: -64, offsetY: 0, durationMs: 500 }
+```
+
+Or stop following and pan to an absolute world-space top-left position:
+
+```js
+{ type: "cameraPan", x: 128, y: 64, durationMs: 500 }
+```
+
+### `cameraZoom`
+
+```js
+{ type: "cameraZoom", zoom: 3, durationMs: 500 }
+```
+
+Zoom must be between `0.25` and `8`. Integer levels are preferred for pixel art.
+
+### `cameraFollow`
+
+```js
+{ type: "cameraFollow", target: "player", offsetX: 0, offsetY: 0, durationMs: 400 }
+{ type: "cameraFollow", target: "entity", entityId: "statue", durationMs: 400 }
+{ type: "cameraFollow", target: "none", durationMs: 0 }
+```
+
+Entity targets are resolved in the effect-context map.
+
+### `cameraShake`
+
+```js
+{ type: "cameraShake", intensity: 6, durationMs: 350 }
+```
+
+### `cameraReset`
+
+```js
+{ type: "cameraReset", durationMs: 500 }
+```
+
+Restores the active map's authored camera defaults.
+
 ## Transition and saving
 
 ### `teleport`
@@ -235,6 +285,7 @@ Optional music transition:
     entryId: "fromHall",
     musicTransition: "crossfade",
     musicTransitionMs: 900,
+    inheritCamera: true, // optional; otherwise the destination map resets camera state
 }
 ```
 

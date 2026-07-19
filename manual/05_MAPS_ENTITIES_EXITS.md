@@ -6,6 +6,7 @@
 {
     id: "room-example",
     initialEntryId: "start",
+    camera: { zoom: 2, follow: "player" },
 
     entries: {
         start: {
@@ -39,6 +40,20 @@
 ```
 
 `maps.generated.js` is editor-owned. The first map must have a valid `initialEntryId`. In practice, giving every map one is useful for editor defaults and debugging.
+
+
+## Map camera defaults
+
+Every map defines:
+
+```js
+camera: {
+    zoom: 2,
+    follow: "player",
+}
+```
+
+Zoom is between `0.25` and `8`; integer levels produce the cleanest pixel-art scaling. Camera state resets to the destination map defaults on every map transition. A teleport or edge destination may set `inheritCamera: true` to preserve the current camera instead. Clamping uses `canvas.width / zoom` and `canvas.height / zoom` as the visible world size.
 
 ## Layers
 

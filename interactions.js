@@ -108,11 +108,13 @@ export const INTERACTION_HANDLERS = new Map([
                 entryId = "entry-id",
                 musicTransition,
                 musicTransitionMs,
+                inheritCamera,
                 message,
             } = {}) {
                 const params = { mapId, entryId };
                 if (musicTransition !== undefined) params.musicTransition = musicTransition;
                 if (musicTransitionMs !== undefined) params.musicTransitionMs = musicTransitionMs;
+                if (inheritCamera !== undefined) params.inheritCamera = inheritCamera;
 
                 return {
                     ...buildInteractionBase("teleport", triggers, condition, message),
@@ -129,12 +131,17 @@ export const INTERACTION_HANDLERS = new Map([
                 const { mapId, entryId } = interaction.params;
                 requireExactKeys(
                     interaction.params,
-                    new Set(["mapId", "entryId", "musicTransition", "musicTransitionMs"]),
+                    new Set(["mapId", "entryId", "musicTransition", "musicTransitionMs", "inheritCamera"]),
                     `${label}.params`,
                 );
                 requireString(mapId, `${label}.params.mapId`);
                 requireString(entryId, `${label}.params.entryId`);
                 validateMusicTransitionOptions(interaction.params, `${label}.params`);
+                if (interaction.params.inheritCamera !== undefined) {
+                    if (typeof interaction.params.inheritCamera !== "boolean") {
+                        throw new Error(`${label}.params.inheritCamera must be a boolean.`);
+                    }
+                }
             },
 
             validateReferences({ game, interaction, sourceMapId, label }) {

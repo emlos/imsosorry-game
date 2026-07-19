@@ -2,10 +2,10 @@ import { OPPOSITE_EDGE, getEdgePosition, getRangeLength } from "../map-edges.js"
 import { SPRITES } from "../sprites.js";
 import { EMPTY_TILE_ID, TILE_IDS, TILES } from "../tiles.js";
 
-export const EDITOR_STORAGE_KEY = "yume-map-editor-recovery-v4";
-export const EDITOR_BACKUP_KEY = "yume-map-editor-pre-import-backup-v4";
-export const PLAYTEST_STORAGE_KEY = "yume-map-editor-playtest-maps-v4";
-export const PLAYTEST_RESULT_KEY = "yume-map-editor-playtest-result-v4";
+export const EDITOR_STORAGE_KEY = "yume-map-editor-recovery-v5";
+export const EDITOR_BACKUP_KEY = "yume-map-editor-pre-import-backup-v5";
+export const PLAYTEST_STORAGE_KEY = "yume-map-editor-playtest-maps-v5";
+export const PLAYTEST_RESULT_KEY = "yume-map-editor-playtest-result-v5";
 
 export function cloneData(value) {
     return structuredClone(value);
@@ -214,6 +214,7 @@ export function createMap(id, width = 10, height = 8) {
     return {
         id,
         initialEntryId: "start",
+        camera: { zoom: 1, follow: "player" },
         entries: {
             start: {
                 col: Math.min(1, width - 1),
@@ -414,6 +415,7 @@ const ENTITY_REFERENCE_EFFECT_TYPES = new Set([
     "setEntityPosition",
     "setEntityVisual",
     "setEntityCollision",
+    "cameraFollow",
 ]);
 
 export function findMapIdReferences(value, mapId, path = "value", output = []) {
@@ -1033,6 +1035,21 @@ export function validateEditorDocument(maps) {
                     }
                 });
             });
+        }
+
+        if (
+            !map.camera ||
+            typeof map.camera !== "object" ||
+            Array.isArray(map.camera) ||
+            Object.keys(map.camera).length !== 2 ||
+            !Object.hasOwn(map.camera, "zoom") ||
+            !Object.hasOwn(map.camera, "follow") ||
+            !Number.isFinite(map.camera.zoom) ||
+            map.camera.zoom < 0.25 ||
+            map.camera.zoom > 8 ||
+            map.camera.follow !== "player"
+        ) {
+            errors.push(`Map "${map.id}" needs camera { zoom: 0.25..8, follow: "player" }.`);
         }
 
         const entries = map.entries ?? {};

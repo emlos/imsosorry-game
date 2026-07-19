@@ -31,6 +31,14 @@ triggers: [
 - Overlaps execute in `triggers` array order.
 - Stable effect owner: `map:<mapId>:trigger:<triggerId>`.
 
+## Camera
+
+```js
+camera: { zoom: 2, follow: "player" }
+```
+
+Camera effects animate before the next effect runs when `durationMs` is nonzero. Dialogue and other UI remain outside the scaled canvas world.
+
 ## Interaction authoring templates
 
 In the entity inspector, choose a template and click **Replace JSON with template**. Available starting points: dialogue, teleport, save point, item pickup, switch/flag change, inspect once, and conditional dialogue. The replacement is only a draft until **Apply**. Runtime validation remains strict.
@@ -82,7 +90,10 @@ setPlayerSprite     setPlayerMoveSpeed
 setEntityActive     setEntityPosition
 setEntityVisual     setEntityCollision
 setTile             teleport
-saveGame            playSound
+cameraPan           cameraZoom
+cameraFollow        cameraShake
+cameraReset         saveGame
+playSound
 playMusic           stopMusic
 pushMusic           popMusic
 playMusicEffect     random

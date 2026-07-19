@@ -1,6 +1,6 @@
-# Yume Prototype v0.8.7 — Authoring Manual
+# Yume Prototype v0.9 — Authoring Manual
 
-This manual documents the systems present in the attached `0.8.7` project. It is intended as the central reference for map authoring, editor use, interactions, hooks, conditions, effects, deterministic randomness, music, assets, and common recipes.
+This manual documents the systems present in the attached `0.9` project. It is intended as the central reference for map authoring, editor use, interactions, hooks, conditions, effects, deterministic randomness, music, assets, and common recipes.
 
 The code is strict by design. Most authored objects accept only the documented keys; a misspelled or unsupported key should fail during game initialization or Playtest rather than being silently ignored.
 

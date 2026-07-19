@@ -1,4 +1,5 @@
-# Yume Prototype v0.8.7
+# Yume Prototype v0.9
+Generated from the project source on 2026-07-19.
 
 ---
 
@@ -34,6 +35,14 @@ triggers: [
 - Evaluated only after a completed tile movement.
 - Overlaps execute in `triggers` array order.
 - Stable effect owner: `map:<mapId>:trigger:<triggerId>`.
+
+## Camera
+
+```js
+camera: { zoom: 2, follow: "player" }
+```
+
+Camera effects animate before the next effect runs when `durationMs` is nonzero. Dialogue and other UI remain outside the scaled canvas world.
 
 ## Interaction authoring templates
 
@@ -86,7 +95,10 @@ setPlayerSprite     setPlayerMoveSpeed
 setEntityActive     setEntityPosition
 setEntityVisual     setEntityCollision
 setTile             teleport
-saveGame            playSound
+cameraPan           cameraZoom
+cameraFollow        cameraShake
+cameraReset         saveGame
+playSound
 playMusic           stopMusic
 pushMusic           popMusic
 playMusicEffect     random
@@ -209,7 +221,7 @@ The editor works on a cloned map document. It does not modify live game state or
 ## What the editor currently supports
 
 - Create, duplicate, copy, rename, group, resize, and delete maps.
-- Choose the initial entry.
+- Choose the initial entry and map camera zoom default.
 - Edit base and obstacle layers.
 - Preserve and preview existing foreground layers without editing them.
 - Pencil, eraser, rectangle, fill, eyedropper, Empty tile, and clear-layer tools.
@@ -780,7 +792,7 @@ Unknown and extra keys fail validation.
 
 - Normal effect arrays must be non-empty.
 - A random choice's `effects` array may be empty to represent “nothing happens.”
-- Effects execute in array order.
+- Effects execute in array order. Camera animations with a nonzero `durationMs` block later effects until the animation finishes.
 - An effect whose `condition` is false is skipped.
 - `showText` must be the final reachable effect in its array.
 - Put work that follows dialogue in `showText.afterClose`.
@@ -978,6 +990,56 @@ Clear a cell:
 
 The target tile must exist in that map's merged tile definitions, fit within the map, and be compatible with the layer.
 
+## Camera
+
+Camera effects control authored camera state rather than dialogue behavior. `durationMs` is optional except for `cameraShake`; a nonzero duration blocks the remaining effect sequence until the animation finishes.
+
+### `cameraPan`
+
+Keep the existing follow target and offset the camera in world pixels:
+
+```js
+{ type: "cameraPan", offsetX: -64, offsetY: 0, durationMs: 500 }
+```
+
+Or stop following and pan to an absolute world-space top-left position:
+
+```js
+{ type: "cameraPan", x: 128, y: 64, durationMs: 500 }
+```
+
+### `cameraZoom`
+
+```js
+{ type: "cameraZoom", zoom: 3, durationMs: 500 }
+```
+
+Zoom must be between `0.25` and `8`. Integer levels are preferred for pixel art.
+
+### `cameraFollow`
+
+```js
+{ type: "cameraFollow", target: "player", offsetX: 0, offsetY: 0, durationMs: 400 }
+{ type: "cameraFollow", target: "entity", entityId: "statue", durationMs: 400 }
+{ type: "cameraFollow", target: "none", durationMs: 0 }
+```
+
+Entity targets are resolved in the effect-context map.
+
+### `cameraShake`
+
+```js
+{ type: "cameraShake", intensity: 6, durationMs: 350 }
+```
+
+### `cameraReset`
+
+```js
+{ type: "cameraReset", durationMs: 500 }
+```
+
+Restores the active map's authored camera defaults.
+
 ## Transition and saving
 
 ### `teleport`
@@ -999,6 +1061,7 @@ Optional music transition:
     entryId: "fromHall",
     musicTransition: "crossfade",
     musicTransitionMs: 900,
+    inheritCamera: true, // optional; otherwise the destination map resets camera state
 }
 ```
 
@@ -1178,6 +1241,7 @@ See `06_RANDOMNESS.md` for scope semantics and stable IDs.
 {
     id: "room-example",
     initialEntryId: "start",
+    camera: { zoom: 2, follow: "player" },
 
     entries: {
         start: {
@@ -1211,6 +1275,20 @@ See `06_RANDOMNESS.md` for scope semantics and stable IDs.
 ```
 
 `maps.generated.js` is editor-owned. The first map must have a valid `initialEntryId`. In practice, giving every map one is useful for editor defaults and debugging.
+
+
+## Map camera defaults
+
+Every map defines:
+
+```js
+camera: {
+    zoom: 2,
+    follow: "player",
+}
+```
+
+Zoom is between `0.25` and `8`; integer levels produce the cleanest pixel-art scaling. Camera state resets to the destination map defaults on every map transition. A teleport or edge destination may set `inheritCamera: true` to preserve the current camera instead. Clamping uses `canvas.width / zoom` and `canvas.height / zoom` as the visible world size.
 
 ## Layers
 

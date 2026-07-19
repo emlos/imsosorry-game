@@ -53,3 +53,7 @@ Entity placement uses one animated thumbnail card per `ENTITY_PRESETS` entry. Pr
 Entity interaction templates are catalog entries in `editor-catalog.js`. Selecting one only replaces the inspector draft; normal entity application and strict document/runtime validation still decide whether the authored interaction is valid.
 
 The entity inspector has horizontal and vertical flip controls. Mirroring is stored per entity as `transform: { flipX, flipY }`; it changes drawing only. Placement cells, tile-backed footprints, collision, interactions, and depth sorting do not change. Ordinary tile-layer placements are not mirrored.
+
+## Camera authoring
+
+Every map has `camera: { zoom, follow: "player" }`. The map panel edits the default zoom. Camera movement, follow changes, shake, reset, and animated zoom are authored as ordinary effects in trigger/entity JSON. Nonzero camera durations block the rest of that effect sequence until the animation completes.

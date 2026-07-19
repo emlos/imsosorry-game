@@ -15,7 +15,7 @@ The editor works on a cloned map document. It does not modify live game state or
 ## What the editor currently supports
 
 - Create, duplicate, copy, rename, group, resize, and delete maps.
-- Choose the initial entry.
+- Choose the initial entry and map camera zoom default.
 - Edit base and obstacle layers.
 - Preserve and preview existing foreground layers without editing them.
 - Pencil, eraser, rectangle, fill, eyedropper, Empty tile, and clear-layer tools.
