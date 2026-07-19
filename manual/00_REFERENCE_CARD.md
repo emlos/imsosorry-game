@@ -34,10 +34,27 @@ triggers: [
 ## Camera
 
 ```js
-camera: { zoom: 2, follow: "player" }
+camera: { zoom: 4, follow: "player" }
 ```
 
-Camera effects animate before the next effect runs when `durationMs` is nonzero. Dialogue and other UI remain outside the scaled canvas world.
+Camera effects modify the persistent base state. Nonzero durations delay later effects in the same effect sequence, but never pause world updates or clear movement input. New targets supersede unfinished camera transitions from the current rendered state.
+
+Continuous region-owned overrides belong in `cameraZones`:
+
+```js
+cameraZones: [
+    {
+        id: "close-up",
+        region: { col: 5, row: 2, width: 9, height: 5 },
+        priority: 10,
+        camera: { zoom: 6 },
+        transitionInMs: 500,
+        transitionOutMs: 400,
+    },
+]
+```
+
+Zones are reconstructed from current position and conditions, combine by priority and array order, and remove only their own partial camera patch. Shake intensity is measured in screen pixels. World rendering rounds shared rectangle edges after applying zoom; UI remains outside the canvas world.
 
 ## Interaction authoring templates
 

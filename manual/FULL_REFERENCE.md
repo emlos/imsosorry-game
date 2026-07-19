@@ -1,4 +1,4 @@
-# Yume Prototype v0.9.1
+# Yume Prototype v0.9.2
 Generated from the project source on 2026-07-19.
 
 ---
@@ -39,10 +39,27 @@ triggers: [
 ## Camera
 
 ```js
-camera: { zoom: 2, follow: "player" }
+camera: { zoom: 4, follow: "player" }
 ```
 
-Camera effects animate before the next effect runs when `durationMs` is nonzero. Dialogue and other UI remain outside the scaled canvas world.
+Camera effects modify the persistent base state. Nonzero durations delay later effects in the same effect sequence, but never pause world updates or clear movement input. New targets supersede unfinished camera transitions from the current rendered state.
+
+Continuous region-owned overrides belong in `cameraZones`:
+
+```js
+cameraZones: [
+    {
+        id: "close-up",
+        region: { col: 5, row: 2, width: 9, height: 5 },
+        priority: 10,
+        camera: { zoom: 6 },
+        transitionInMs: 500,
+        transitionOutMs: 400,
+    },
+]
+```
+
+Zones are reconstructed from current position and conditions, combine by priority and array order, and remove only their own partial camera patch. Shake intensity is measured in screen pixels. World rendering rounds shared rectangle edges after applying zoom; UI remains outside the canvas world.
 
 ## Interaction authoring templates
 
@@ -327,6 +344,10 @@ Treat the editor export as a generated replacement file.
 
 The full game validator is authoritative; the editor performs a lighter structural pass for responsiveness.
 
+## Camera Zones mode
+
+Camera Zones mode uses the same rectangular authoring workflow as trigger regions: drag empty space to create, drag a zone to move it, and drag eight selection handles to resize it. The list controls array order; the inspector edits priority, transition-in/out durations, an optional condition, and a partial camera patch as JSON. Overlays label each zone with its order, ID, and priority. Playtest validation checks bounds, duplicate IDs, camera patch properties, timing values, and entity follow references.
+
 ---
 
 # Hooks, Triggers, and Interactions
@@ -460,7 +481,7 @@ triggers: [
 ]
 ```
 
-Map triggers are invisible rectangular regions independent of tiles and entities. They are evaluated after the player completes a movement into a new tile, never once per rendered frame. The runtime tracks the trigger IDs containing the player's previous tile.
+Camera lifetime should use `cameraZones`, not paired camera enter/exit effects. Map triggers are invisible rectangular regions independent of tiles and entities. They are evaluated after the player completes a movement into a new tile, never once per rendered frame. The runtime tracks the trigger IDs containing the player's previous tile.
 
 Event types:
 
@@ -994,11 +1015,13 @@ The target tile must exist in that map's merged tile definitions, fit within the
 
 ## Camera
 
-Camera effects control authored camera state rather than dialogue behavior. `durationMs` is optional except for `cameraShake`; a nonzero duration blocks the remaining effect sequence until the animation finishes.
+Camera effects modify the persistent base camera state. Active `cameraZones` are resolved over that base. A nonzero `durationMs` delays later effects in the same effect array, but it does not pause player updates, clear held movement keys, or change the game mode. A newer camera target supersedes an unfinished transition from its current rendered state; the superseded effect promise resolves and its sequence continues.
+
+Follow targets are resolved every update. Zooming or changing offsets while following the player therefore continues to track a moving player without an end-of-transition correction snap.
 
 ### `cameraPan`
 
-Keep the existing follow target and offset the camera in world pixels:
+Keep the base follow target and animate an offset in world pixels:
 
 ```js
 { type: "cameraPan", offsetX: -64, offsetY: 0, durationMs: 500 }
@@ -1016,7 +1039,7 @@ Or stop following and pan to an absolute world-space top-left position:
 { type: "cameraZoom", zoom: 3, durationMs: 500 }
 ```
 
-Zoom must be between `0.25` and `8`. Integer levels are preferred for pixel art.
+Zoom must be between `0.25` and `8`. Continuous transitions are supported. Fractional intermediate zoom frames use nearest-neighbor scaling and may contain uneven source-pixel widths; integer endpoints are crisp.
 
 ### `cameraFollow`
 
@@ -1026,7 +1049,7 @@ Zoom must be between `0.25` and `8`. Integer levels are preferred for pixel art.
 { type: "cameraFollow", target: "none", durationMs: 0 }
 ```
 
-Entity targets are resolved in the effect-context map.
+Entity targets are resolved in the effect-context map. Switching follow modes begins from the current rendered position.
 
 ### `cameraShake`
 
@@ -1034,13 +1057,15 @@ Entity targets are resolved in the effect-context map.
 { type: "cameraShake", intensity: 6, durationMs: 350 }
 ```
 
+`intensity` is measured in screen pixels. Shake is additive after the stable camera transform and can run at the same time as a pan or zoom. A newer shake supersedes the previous shake.
+
 ### `cameraReset`
 
 ```js
 { type: "cameraReset", durationMs: 500 }
 ```
 
-Restores the active map's authored camera defaults.
+Restores the base camera to the active map defaults. It does not erase active camera-zone overrides; those remain authoritative until their region or condition becomes inactive.
 
 ## Transition and saving
 
@@ -1255,6 +1280,7 @@ See `06_RANDOMNESS.md` for scope semantics and stable IDs.
 
     exits: [],
     triggers: [],
+    cameraZones: [],
     tiles: {},
     entities: [],
 
@@ -1281,16 +1307,85 @@ See `06_RANDOMNESS.md` for scope semantics and stable IDs.
 
 ## Map camera defaults
 
-Every map defines:
+Every map defines the base camera:
 
 ```js
 camera: {
-    zoom: 2,
+    zoom: 4,
     follow: "player",
 }
 ```
 
-Zoom is between `0.25` and `8`; integer levels produce the cleanest pixel-art scaling. Camera state resets to the destination map defaults on every map transition. A teleport or edge destination may set `inheritCamera: true` to preserve the current camera instead. Clamping uses `canvas.width / zoom` and `canvas.height / zoom` as the visible world size.
+Zoom is between `0.25` and `8`. Clamping uses the logical visible world size: `canvas.width / zoom` and `canvas.height / zoom`. Normal map transitions discard source-map camera-zone owners and initialize the destination base and any zones containing the destination position.
+
+`inheritCamera: true` preserves the visible source camera as the starting rendered state for a short destination transition. Source-map zone owners are still removed, and an entity follow target from the previous map is never retained.
+
+## Declarative camera zones
+
+Camera zones are continuous region-owned state, not one-time trigger effects:
+
+```js
+cameraZones: [
+    {
+        id: "close-up",
+        region: { col: 5, row: 2, width: 9, height: 5 },
+        priority: 10,
+        camera: {
+            zoom: 6,
+        },
+        transitionInMs: 500,
+        transitionOutMs: 500,
+    },
+    {
+        id: "look-ahead",
+        region: { col: 10, row: 2, width: 9, height: 5 },
+        condition: { flag: "camera.lookAhead" }, // optional
+        priority: 20,
+        camera: {
+            offsetX: 96,
+        },
+        transitionInMs: 500,
+        transitionOutMs: 500,
+    },
+]
+```
+
+A zone is active while the player is inside its rectangle, its optional condition is true, and its map is current. This is reconstructed on spawn and save load, reevaluated while stationary when conditions change, and cleared on map transitions even when no ordinary exit movement occurs.
+
+The owner ID is:
+
+```text
+map:<mapId>:camera-zone:<zoneId>
+```
+
+Zones contain partial camera patches. Resolution order is:
+
+1. map/scripted base camera;
+2. active zones sorted by ascending `priority`;
+3. map array order as the tie-breaker.
+
+Later-applied properties win, while omitted properties remain inherited. Leaving one overlapping zone removes only that owner and reveals the remaining base and overrides. Zone state ignores trigger frequency; `once-per-visit` and `once-per-save` apply only to separate trigger effects.
+
+Supported patch properties are `zoom`, `offsetX`, `offsetY`, `x`, `y`, and `followTarget`. A local entity target uses:
+
+```js
+followTarget: { type: "entity", entityId: "statue" }
+```
+
+Enter and exit changes replace unfinished camera transitions from the current rendered state. Rapid boundary crossings do not throw or snap through an obsolete target.
+
+## Pixel-stable world rendering
+
+Logical camera coordinates remain floating point. Rendering converts complete world-space rectangle edges to screen coordinates and rounds those screen edges:
+
+```js
+screenLeft = Math.round((worldLeft - cameraX) * zoom)
+screenRight = Math.round((worldRight - cameraX) * zoom)
+```
+
+Base tiles, obstacle tiles, foreground tiles, entities, and the player all use the same conversion. Shared edges therefore remain identical, fixed-integer-zoom pans advance in screen-pixel increments, and camera snapping never changes collision or trigger logic. The game canvas is displayed at its native `960×640` CSS size; narrow layouts scroll rather than applying a fractional responsive scale.
+
+The selected zoom policy is continuous nearest-neighbor zoom with screen-space translation snapping. Fractional intermediate zoom values may display uneven source-pixel widths, but integer endpoints are crisp and adjacent world rectangles remain joined.
 
 ## Layers
 
@@ -3256,3 +3351,13 @@ Clear or migrate development saves after:
 - Source and target ranges must have equal inclusive lengths.
 - Room resizing leaves ranges unchanged so invalid connections remain visible to editor validation.
 - Startup validation checks every integer target doorway cell; runtime footbox validation remains authoritative for fractional placement.
+
+## Camera validation and presentation
+
+- Every map explicitly contains `cameraZones`, even when empty.
+- Zone IDs are unique within the map and regions remain inside map bounds.
+- Zone priorities are finite; transition durations are non-negative.
+- Camera patches are nonempty and contain only supported properties.
+- Camera effects never imply a control lock. Add a future explicit cutscene/control-lock system when that behavior is required.
+- Continuous fractional zoom cannot preserve uniform source-pixel widths on every intermediate frame. Integer endpoints are the pixel-crisp guarantee.
+- Shake intensity is in screen pixels.

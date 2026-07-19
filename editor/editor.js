@@ -251,9 +251,11 @@ export class MapEditor {
     this.selectedEntityId = null;
     this.selectedEntryId = null;
     this.selectedTriggerId = null;
+    this.selectedCameraZoneId = null;
     this.selectedExitIndex = null;
     this.rectanglePreview = null;
     this.triggerPreview = null;
+    this.cameraZonePreview = null;
     this.pointerAction = null;
     this.undoStack = [];
     this.redoStack = [];
@@ -683,6 +685,9 @@ export class MapEditor {
       this.updateTriggerItemFieldVisibility(),
     );
     byId("add-trigger").addEventListener("click", () => this.addTrigger());
+    byId("add-camera-zone").addEventListener("click", () =>
+      this.addCameraZone(),
+    );
     byId("add-exit").addEventListener("click", () => this.addExit());
     byId("connection-source-edge").addEventListener("change", () =>
       this.renderConnectionControls(),
@@ -762,6 +767,18 @@ export class MapEditor {
     byId("move-trigger-down").addEventListener("click", () =>
       this.moveSelectedTrigger(1),
     );
+    byId("apply-camera-zone").addEventListener("click", () =>
+      this.applyCameraZoneInspector(),
+    );
+    byId("delete-camera-zone").addEventListener("click", () =>
+      this.deleteSelectedCameraZone(),
+    );
+    byId("move-camera-zone-up").addEventListener("click", () =>
+      this.moveSelectedCameraZone(-1),
+    );
+    byId("move-camera-zone-down").addEventListener("click", () =>
+      this.moveSelectedCameraZone(1),
+    );
     byId("apply-exit").addEventListener("click", () =>
       this.applyExitInspector(),
     );
@@ -805,6 +822,7 @@ export class MapEditor {
         if (this.selectedEntityId) this.deleteSelectedEntity();
         else if (this.selectedEntryId) this.deleteSelectedEntry();
         else if (this.selectedTriggerId) this.deleteSelectedTrigger();
+        else if (this.selectedCameraZoneId) this.deleteSelectedCameraZone();
         else if (this.selectedExitIndex !== null) this.deleteSelectedExit();
       }
     });
@@ -895,6 +913,7 @@ export class MapEditor {
     this.renderPalette();
     this.renderEntityPalette();
     this.renderTriggerList();
+    this.renderCameraZoneList();
     this.renderExitList();
     this.updateModeUI();
     this.renderInspectors();
@@ -911,6 +930,7 @@ export class MapEditor {
     this.renderPalette();
     this.renderEntityPalette();
     this.renderTriggerList();
+    this.renderCameraZoneList();
     this.renderExitList();
     this.renderInspectors();
     this.validateAndDisplay();
@@ -976,6 +996,7 @@ export class MapEditor {
     byId("entity-tools-section").hidden = this.mode !== "entities";
     byId("entry-tools-section").hidden = this.mode !== "entries";
     byId("trigger-tools-section").hidden = this.mode !== "triggers";
+    byId("camera-zone-tools-section").hidden = this.mode !== "camera-zones";
     byId("exit-tools-section").hidden = this.mode !== "exits";
   }
 
@@ -1134,12 +1155,42 @@ export class MapEditor {
       );
       button.addEventListener("click", () => {
         this.selectedTriggerId = trigger.id;
+        this.selectedCameraZoneId = null;
         this.selectedEntityId = null;
         this.selectedEntryId = null;
         this.selectedExitIndex = null;
         this.mode = "triggers";
         this.updateModeUI();
         this.renderTriggerList();
+        this.renderInspectors();
+      });
+      root.append(button);
+    }
+  }
+
+  renderCameraZoneList() {
+    const root = byId("camera-zone-list");
+    root.replaceChildren();
+    for (const [index, zone] of (this.currentMap.cameraZones ?? []).entries()) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent =
+        `${index + 1}. ${zone.id} [${zone.priority}] — ` +
+        `${zone.region.col},${zone.region.row} ` +
+        `${zone.region.width}×${zone.region.height}`;
+      button.classList.toggle(
+        "selected",
+        zone.id === this.selectedCameraZoneId,
+      );
+      button.addEventListener("click", () => {
+        this.selectedCameraZoneId = zone.id;
+        this.selectedEntityId = null;
+        this.selectedEntryId = null;
+        this.selectedTriggerId = null;
+        this.selectedExitIndex = null;
+        this.mode = "camera-zones";
+        this.updateModeUI();
+        this.renderCameraZoneList();
         this.renderInspectors();
       });
       root.append(button);
@@ -1165,6 +1216,7 @@ export class MapEditor {
         this.selectedEntityId = null;
         this.selectedEntryId = null;
         this.selectedTriggerId = null;
+        this.selectedCameraZoneId = null;
         this.mode = "exits";
         this.updateModeUI();
         this.renderExitList();
@@ -1304,6 +1356,7 @@ export class MapEditor {
       this.selectedEntityId = null;
       this.selectedEntryId = null;
       this.selectedTriggerId = null;
+      this.selectedCameraZoneId = null;
       this.mode = "exits";
       await this.refreshAfterMutation();
       this.updateModeUI();
@@ -1413,9 +1466,12 @@ export class MapEditor {
       selectedEntryId: this.selectedEntryId,
       showTriggers: this.mode === "triggers",
       selectedTriggerId: this.selectedTriggerId,
+      showCameraZones: this.mode === "camera-zones",
+      selectedCameraZoneId: this.selectedCameraZoneId,
       selectedExitIndex: this.selectedExitIndex,
       rectanglePreview: this.rectanglePreview,
       triggerPreview: this.triggerPreview,
+      cameraZonePreview: this.cameraZonePreview,
     });
     this.applyZoom();
     for (const preview of this.palettePreviews) {
@@ -1451,6 +1507,7 @@ export class MapEditor {
     else if (this.mode === "entities") this.startEntityAction(cell);
     else if (this.mode === "entries") this.startEntryAction(cell);
     else if (this.mode === "triggers") this.startTriggerAction(cell);
+    else if (this.mode === "camera-zones") this.startCameraZoneAction(cell);
     else this.selectExitAt(cell);
   }
 
@@ -1517,6 +1574,32 @@ export class MapEditor {
       }
     } else if (this.pointerAction.kind === "trigger-resize") {
       this.resizeSelectedTriggerFromPointer(cell);
+    } else if (this.pointerAction.kind === "camera-zone-create") {
+      this.cameraZonePreview.end = { col: cell.col, row: cell.row };
+    } else if (this.pointerAction.kind === "camera-zone-move") {
+      const zone = this.currentMap.cameraZones.find(
+        (candidate) => candidate.id === this.pointerAction.cameraZoneId,
+      );
+      if (zone) {
+        const { width, height } = getMapSize(this.currentMap);
+        zone.region.col = Math.max(
+          0,
+          Math.min(
+            width - zone.region.width,
+            cell.col - this.pointerAction.offsetCol,
+          ),
+        );
+        zone.region.row = Math.max(
+          0,
+          Math.min(
+            height - zone.region.height,
+            cell.row - this.pointerAction.offsetRow,
+          ),
+        );
+        this.renderInspectors();
+      }
+    } else if (this.pointerAction.kind === "camera-zone-resize") {
+      this.resizeSelectedCameraZoneFromPointer(cell);
     }
   }
 
@@ -1559,6 +1642,24 @@ export class MapEditor {
       this.endTransaction("Move trigger");
     } else if (action.kind === "trigger-resize") {
       this.endTransaction("Resize trigger");
+    } else if (action.kind === "camera-zone-create") {
+      const start = this.cameraZonePreview.start;
+      const end = this.cameraZonePreview.end;
+      const region = {
+        col: Math.min(start.col, end.col),
+        row: Math.min(start.row, end.row),
+        width: Math.abs(end.col - start.col) + 1,
+        height: Math.abs(end.row - start.row) + 1,
+      };
+      const zone = this.createDefaultCameraZone(region);
+      this.currentMap.cameraZones.push(zone);
+      this.selectedCameraZoneId = zone.id;
+      this.cameraZonePreview = null;
+      this.endTransaction("Create camera zone");
+    } else if (action.kind === "camera-zone-move") {
+      this.endTransaction("Move camera zone");
+    } else if (action.kind === "camera-zone-resize") {
+      this.endTransaction("Resize camera zone");
     }
     this.refreshAfterMutation();
     if (this.canvas.hasPointerCapture(event.pointerId))
@@ -1651,6 +1752,7 @@ export class MapEditor {
       this.selectedEntityId = existing.id;
       this.selectedEntryId = null;
       this.selectedTriggerId = null;
+      this.selectedCameraZoneId = null;
       this.selectedExitIndex = null;
       this.beginTransaction();
       this.pointerAction = { kind: "entity-drag", entityId: existing.id };
@@ -1679,6 +1781,7 @@ export class MapEditor {
     );
     this.selectedEntityId = entity.id;
     this.selectedTriggerId = null;
+    this.selectedCameraZoneId = null;
     this.renderInspectors();
     this.refreshAfterMutation();
   }
@@ -1691,6 +1794,7 @@ export class MapEditor {
       this.selectedEntryId = existing[0];
       this.selectedEntityId = null;
       this.selectedTriggerId = null;
+      this.selectedCameraZoneId = null;
       this.selectedExitIndex = null;
       this.beginTransaction();
       this.pointerAction = { kind: "entry-drag", entryId: existing[0] };
@@ -1712,6 +1816,7 @@ export class MapEditor {
     });
     this.selectedEntryId = entryId;
     this.selectedTriggerId = null;
+    this.selectedCameraZoneId = null;
     this.renderMapControls();
     this.renderInspectors();
   }
@@ -1745,6 +1850,7 @@ export class MapEditor {
       this.currentMap.triggers.push(trigger),
     );
     this.selectedTriggerId = trigger.id;
+    this.selectedCameraZoneId = null;
     this.selectedEntityId = null;
     this.selectedEntryId = null;
     this.selectedExitIndex = null;
@@ -1814,6 +1920,7 @@ export class MapEditor {
     const existing = this.getTriggerAtCell(cell);
     if (existing) {
       this.selectedTriggerId = existing.id;
+      this.selectedCameraZoneId = null;
       this.selectedEntityId = null;
       this.selectedEntryId = null;
       this.selectedExitIndex = null;
@@ -1864,6 +1971,128 @@ export class MapEditor {
     this.renderInspectors();
   }
 
+  createDefaultCameraZone(region) {
+    return {
+      id: makeUniqueId(
+        "camera-zone",
+        new Set(
+          (this.currentMap.cameraZones ?? []).map((zone) => zone.id),
+        ),
+      ),
+      region: { ...region },
+      priority: 10,
+      camera: { zoom: 2 },
+      transitionInMs: 500,
+      transitionOutMs: 500,
+    };
+  }
+
+  addCameraZone() {
+    const zone = this.createDefaultCameraZone({
+      col: 0,
+      row: 0,
+      width: 1,
+      height: 1,
+    });
+    this.commitMutation("Add camera zone", () =>
+      this.currentMap.cameraZones.push(zone),
+    );
+    this.selectedCameraZoneId = zone.id;
+    this.selectedEntityId = null;
+    this.selectedEntryId = null;
+    this.selectedTriggerId = null;
+    this.selectedExitIndex = null;
+    this.mode = "camera-zones";
+    this.updateModeUI();
+    this.refreshAfterMutation();
+  }
+
+  getSelectedCameraZone() {
+    return (this.currentMap.cameraZones ?? []).find(
+      (zone) => zone.id === this.selectedCameraZoneId,
+    );
+  }
+
+  getCameraZoneAtCell(cell) {
+    return [...(this.currentMap.cameraZones ?? [])].reverse().find((zone) => {
+      const { col, row, width, height } = zone.region;
+      return (
+        cell.col >= col &&
+        cell.col < col + width &&
+        cell.row >= row &&
+        cell.row < row + height
+      );
+    });
+  }
+
+  startCameraZoneAction(cell) {
+    const selected = this.getSelectedCameraZone();
+    const resizeHandle = this.getTriggerResizeHandle(cell, selected);
+    if (selected && resizeHandle) {
+      this.beginTransaction();
+      this.pointerAction = {
+        kind: "camera-zone-resize",
+        cameraZoneId: selected.id,
+        handle: resizeHandle,
+        originalRegion: { ...selected.region },
+      };
+      return;
+    }
+
+    const existing = this.getCameraZoneAtCell(cell);
+    if (existing) {
+      this.selectedCameraZoneId = existing.id;
+      this.selectedEntityId = null;
+      this.selectedEntryId = null;
+      this.selectedTriggerId = null;
+      this.selectedExitIndex = null;
+      this.beginTransaction();
+      this.pointerAction = {
+        kind: "camera-zone-move",
+        cameraZoneId: existing.id,
+        offsetCol: cell.col - existing.region.col,
+        offsetRow: cell.row - existing.region.row,
+      };
+      this.renderCameraZoneList();
+      this.renderInspectors();
+      return;
+    }
+
+    this.clearSelection();
+    this.beginTransaction();
+    this.pointerAction = { kind: "camera-zone-create" };
+    this.cameraZonePreview = {
+      start: { col: cell.col, row: cell.row },
+      end: { col: cell.col, row: cell.row },
+    };
+    this.renderInspectors();
+  }
+
+  resizeSelectedCameraZoneFromPointer(cell) {
+    const action = this.pointerAction;
+    const zone = this.currentMap.cameraZones.find(
+      (candidate) => candidate.id === action.cameraZoneId,
+    );
+    if (!zone) return;
+
+    const original = action.originalRegion;
+    let left = original.col;
+    let right = original.col + original.width - 1;
+    let top = original.row;
+    let bottom = original.row + original.height - 1;
+
+    if (action.handle.includes("w")) left = Math.min(cell.col, right);
+    if (action.handle.includes("e")) right = Math.max(cell.col, left);
+    if (action.handle.includes("n")) top = Math.min(cell.row, bottom);
+    if (action.handle.includes("s")) bottom = Math.max(cell.row, top);
+
+    zone.region.col = left;
+    zone.region.row = top;
+    zone.region.width = right - left + 1;
+    zone.region.height = bottom - top + 1;
+    this.renderInspectors();
+  }
+
   selectExitAt(cell) {
     const { width, height } = getMapSize(this.currentMap);
     const candidates = [];
@@ -1882,6 +2111,7 @@ export class MapEditor {
       this.selectedEntityId = null;
       this.selectedEntryId = null;
       this.selectedTriggerId = null;
+      this.selectedCameraZoneId = null;
       this.renderExitList();
       this.renderInspectors();
     }
@@ -1891,6 +2121,7 @@ export class MapEditor {
     this.selectedEntityId = null;
     this.selectedEntryId = null;
     this.selectedTriggerId = null;
+    this.selectedCameraZoneId = null;
     this.selectedExitIndex = null;
   }
 
@@ -1899,16 +2130,19 @@ export class MapEditor {
       this.selectedEntityId ||
       this.selectedEntryId ||
       this.selectedTriggerId ||
+      this.selectedCameraZoneId ||
       this.selectedExitIndex !== null,
     );
     byId("entity-inspector").hidden = !this.selectedEntityId;
     byId("entry-inspector").hidden = !this.selectedEntryId;
     byId("trigger-inspector").hidden = !this.selectedTriggerId;
+    byId("camera-zone-inspector").hidden = !this.selectedCameraZoneId;
     byId("exit-inspector").hidden = this.selectedExitIndex === null;
 
     if (this.selectedEntityId) this.renderEntityInspector();
     if (this.selectedEntryId) this.renderEntryInspector();
     if (this.selectedTriggerId) this.renderTriggerInspector();
+    if (this.selectedCameraZoneId) this.renderCameraZoneInspector();
     if (this.selectedExitIndex !== null) this.renderExitInspector();
     const selection = this.selectedEntityId
       ? `Entity: ${this.selectedEntityId}`
@@ -1916,7 +2150,9 @@ export class MapEditor {
         ? `Entry: ${this.selectedEntryId}`
         : this.selectedTriggerId
           ? `Trigger: ${this.selectedTriggerId}`
-          : this.selectedExitIndex !== null
+          : this.selectedCameraZoneId
+            ? `Camera zone: ${this.selectedCameraZoneId}`
+            : this.selectedExitIndex !== null
             ? `Exit: ${this.selectedExitIndex}`
             : "No selection";
     byId("selection-status").textContent = selection;
@@ -2219,6 +2455,151 @@ export class MapEditor {
     this.refreshAfterMutation();
   }
 
+  renderCameraZoneInspector() {
+    const zone = this.getSelectedCameraZone();
+    if (!zone) return this.clearSelection();
+
+    byId("camera-zone-id").value = zone.id;
+    byId("camera-zone-col").value = zone.region.col;
+    byId("camera-zone-row").value = zone.region.row;
+    byId("camera-zone-width").value = zone.region.width;
+    byId("camera-zone-height").value = zone.region.height;
+    byId("camera-zone-priority").value = zone.priority;
+    byId("camera-zone-transition-in").value = zone.transitionInMs;
+    byId("camera-zone-transition-out").value = zone.transitionOutMs;
+    byId("camera-zone-camera").value = JSON.stringify(zone.camera, null, 4);
+    byId("camera-zone-condition").value = zone.condition
+      ? JSON.stringify(zone.condition, null, 4)
+      : "";
+
+    const index = this.currentMap.cameraZones.indexOf(zone);
+    byId("move-camera-zone-up").disabled = index <= 0;
+    byId("move-camera-zone-down").disabled =
+      index < 0 || index >= this.currentMap.cameraZones.length - 1;
+  }
+
+  applyCameraZoneInspector() {
+    const zone = this.getSelectedCameraZone();
+    if (!zone) return;
+
+    try {
+      const id = byId("camera-zone-id").value.trim();
+      const region = {
+        col: Number(byId("camera-zone-col").value),
+        row: Number(byId("camera-zone-row").value),
+        width: Number(byId("camera-zone-width").value),
+        height: Number(byId("camera-zone-height").value),
+      };
+      const priority = Number(byId("camera-zone-priority").value);
+      const transitionInMs = Number(
+        byId("camera-zone-transition-in").value,
+      );
+      const transitionOutMs = Number(
+        byId("camera-zone-transition-out").value,
+      );
+      const camera = JSON.parse(byId("camera-zone-camera").value.trim());
+      const conditionText = byId("camera-zone-condition").value.trim();
+      const condition = conditionText ? JSON.parse(conditionText) : null;
+      const { width, height } = getMapSize(this.currentMap);
+
+      if (
+        !id ||
+        (id !== zone.id &&
+          this.currentMap.cameraZones.some((candidate) => candidate.id === id))
+      ) {
+        throw new Error(
+          "Camera zone IDs must be nonempty and unique within the map.",
+        );
+      }
+      if (
+        !Number.isInteger(region.col) ||
+        !Number.isInteger(region.row) ||
+        !Number.isInteger(region.width) ||
+        !Number.isInteger(region.height) ||
+        region.col < 0 ||
+        region.row < 0 ||
+        region.width < 1 ||
+        region.height < 1 ||
+        region.col + region.width > width ||
+        region.row + region.height > height
+      ) {
+        throw new Error(
+          "Camera zone region must be an integer rectangle inside the map.",
+        );
+      }
+      if (!Number.isFinite(priority)) {
+        throw new Error("Camera zone priority must be a finite number.");
+      }
+      if (
+        !Number.isFinite(transitionInMs) ||
+        transitionInMs < 0 ||
+        !Number.isFinite(transitionOutMs) ||
+        transitionOutMs < 0
+      ) {
+        throw new Error("Camera zone transition times must be non-negative.");
+      }
+      if (
+        !camera ||
+        typeof camera !== "object" ||
+        Array.isArray(camera) ||
+        Object.keys(camera).length === 0
+      ) {
+        throw new Error("Camera patch JSON must be a nonempty object.");
+      }
+      if (
+        condition !== null &&
+        (!condition || typeof condition !== "object" || Array.isArray(condition))
+      ) {
+        throw new Error("Camera zone condition JSON must be an object or blank.");
+      }
+
+      const previousId = zone.id;
+      this.commitMutation("Edit camera zone", () => {
+        zone.id = id;
+        zone.region = region;
+        zone.priority = priority;
+        zone.camera = camera;
+        zone.transitionInMs = transitionInMs;
+        zone.transitionOutMs = transitionOutMs;
+        if (condition === null) delete zone.condition;
+        else zone.condition = condition;
+      });
+      this.selectedCameraZoneId = id;
+      this.refreshAfterMutation();
+      if (previousId !== id) {
+        this.setStatus(`Renamed camera zone "${previousId}" to "${id}".`);
+      }
+    } catch (error) {
+      this.setStatus(error.message, true);
+    }
+  }
+
+  moveSelectedCameraZone(direction) {
+    const zone = this.getSelectedCameraZone();
+    if (!zone) return;
+    const index = this.currentMap.cameraZones.indexOf(zone);
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= this.currentMap.cameraZones.length)
+      return;
+    this.commitMutation("Reorder camera zone", () => {
+      this.currentMap.cameraZones.splice(index, 1);
+      this.currentMap.cameraZones.splice(targetIndex, 0, zone);
+    });
+    this.refreshAfterMutation();
+  }
+
+  deleteSelectedCameraZone() {
+    const index = this.currentMap.cameraZones.findIndex(
+      (zone) => zone.id === this.selectedCameraZoneId,
+    );
+    if (index < 0) return;
+    this.commitMutation("Delete camera zone", () =>
+      this.currentMap.cameraZones.splice(index, 1),
+    );
+    this.selectedCameraZoneId = null;
+    this.refreshAfterMutation();
+  }
+
   renderEntryInspector() {
     const entry = this.currentMap.entries[this.selectedEntryId];
     if (!entry) return this.clearSelection();
@@ -2343,6 +2724,7 @@ export class MapEditor {
     this.selectedEntityId = null;
     this.selectedEntryId = null;
     this.selectedTriggerId = null;
+    this.selectedCameraZoneId = null;
     this.mode = "exits";
     this.refreshAfterMutation();
   }

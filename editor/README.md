@@ -13,11 +13,12 @@ Maps may define an optional `editorGroup` string. The editor uses it to organize
 - Existing foreground layers are preserved and previewed, but are not currently editable.
 - Pencil, eraser, rectangle, flood-fill, eyedropper, Empty palette selection, and active-layer clearing tools.
 - Atlas-aware static and animated previews.
-- Grid, layer visibility, collision, footprint, entry, exit, and rectangular-trigger overlays.
+- Grid, layer visibility, collision, footprint, entry, exit, rectangular-trigger, and camera-zone overlays.
 - CSS-only canvas zoom from 50% to 400%, with buttons and Ctrl/Cmd-wheel cursor anchoring.
 - Graphical animated entity preset palette, placement, dragging, deletion, and basic property editing.
 - Entry placement, facing, renaming, reference display, and deletion.
 - Rectangular trigger creation, dragging, handle resizing, ordering, event/frequency controls, and condition/effect JSON editing.
+- Declarative camera-zone creation, dragging, handle resizing, ordering, priority/timing controls, and camera-patch/condition JSON editing.
 - Exit range display, entry-target and edge-target form editing, reciprocal equal-length doorway connections, and raw JSON editing for advanced forms.
 - Full-document undo/redo snapshots grouped by completed action.
 - Generated JavaScript and JSON export, import, local recovery, and pre-import backup.
@@ -56,6 +57,10 @@ The entity inspector has horizontal and vertical flip controls. Mirroring is sto
 
 ## Camera authoring
 
-Every map has `camera: { zoom, follow: "player" }`. The map panel edits the default zoom. Camera movement, follow changes, shake, reset, and animated zoom are authored as ordinary effects in trigger/entity JSON. Nonzero camera durations block the rest of that effect sequence until the animation completes.
+Every map has `camera: { zoom, follow: "player" }`. The map panel edits the base zoom. Persistent scripted changes use `cameraPan`, `cameraZoom`, `cameraFollow`, `cameraShake`, and `cameraReset` effects. A nonzero duration delays only later effects in that sequence; player updates and held movement remain active. A newer target replaces an unfinished camera transition from its current rendered state.
+
+Use **Camera Zones** mode for continuous region-owned camera state. A zone supplies a partial camera patch, priority, optional condition, and transition-in/out durations. Active zones combine over the map/scripted base by ascending priority and array order. Spawning or loading inside a zone applies it immediately, condition changes are reconciled while stationary, and map changes discard source-map owners. Zone lifetime is independent of trigger frequency.
+
+The runtime uses one shared world-to-screen rectangle conversion for tiles, entities, and the player. Fixed integer zoom pans are snapped in screen space, shared edges stay joined, and integer zoom endpoints remain crisp. Continuous fractional zoom frames intentionally accept nearest-neighbor pixel-width variation.
 
 Trigger mode supports `itemUse` events. Select the item in the trigger inspector; the trigger fires when that item is used while the player stands inside its rectangle.

@@ -7,10 +7,10 @@ import { ITEMS } from "../items.js";
 import { SPRITES } from "../sprites.js";
 import { EMPTY_TILE_ID, TILE_IDS, TILES } from "../tiles.js";
 
-export const EDITOR_STORAGE_KEY = "yume-map-editor-recovery-v6";
-export const EDITOR_BACKUP_KEY = "yume-map-editor-pre-import-backup-v6";
-export const PLAYTEST_STORAGE_KEY = "yume-map-editor-playtest-maps-v6";
-export const PLAYTEST_RESULT_KEY = "yume-map-editor-playtest-result-v6";
+export const EDITOR_STORAGE_KEY = "yume-map-editor-recovery-v7";
+export const EDITOR_BACKUP_KEY = "yume-map-editor-pre-import-backup-v7";
+export const PLAYTEST_STORAGE_KEY = "yume-map-editor-playtest-maps-v7";
+export const PLAYTEST_RESULT_KEY = "yume-map-editor-playtest-result-v7";
 
 export function cloneData(value) {
   return structuredClone(value);
@@ -243,6 +243,7 @@ export function createMap(id, width = 10, height = 8) {
     },
     exits: [],
     triggers: [],
+    cameraZones: [],
     tiles: {},
     entities: [],
     layers: {
@@ -288,16 +289,25 @@ export function resizeMap(map, width, height) {
 
   Object.values(map.entries).forEach(clampPosition);
   map.entities.forEach(clampPosition);
-  for (const trigger of map.triggers ?? []) {
-    trigger.region.col = Math.max(0, Math.min(width - 1, trigger.region.col));
-    trigger.region.row = Math.max(0, Math.min(height - 1, trigger.region.row));
-    trigger.region.width = Math.max(
-      1,
-      Math.min(trigger.region.width, width - trigger.region.col),
+  for (const regionOwner of [
+    ...(map.triggers ?? []),
+    ...(map.cameraZones ?? []),
+  ]) {
+    regionOwner.region.col = Math.max(
+      0,
+      Math.min(width - 1, regionOwner.region.col),
     );
-    trigger.region.height = Math.max(
+    regionOwner.region.row = Math.max(
+      0,
+      Math.min(height - 1, regionOwner.region.row),
+    );
+    regionOwner.region.width = Math.max(
       1,
-      Math.min(trigger.region.height, height - trigger.region.row),
+      Math.min(regionOwner.region.width, width - regionOwner.region.col),
+    );
+    regionOwner.region.height = Math.max(
+      1,
+      Math.min(regionOwner.region.height, height - regionOwner.region.row),
     );
   }
 }
@@ -1088,6 +1098,9 @@ export function validateEditorDocument(maps) {
     if (!Array.isArray(map.triggers)) {
       errors.push(`Map "${map.id ?? "?"}" triggers must be an array.`);
     }
+    if (!Array.isArray(map.cameraZones)) {
+      errors.push(`Map "${map.id ?? "?"}" cameraZones must be an array.`);
+    }
     if (!Array.isArray(map.exits)) {
       errors.push(`Map "${map.id ?? "?"}" exits must be an array.`);
     }
@@ -1365,6 +1378,98 @@ export function validateEditorDocument(maps) {
       }
       if (!Array.isArray(trigger.effects) || trigger.effects.length === 0) {
         errors.push(`${label}.effects must be a nonempty array.`);
+      }
+    }
+
+    const cameraZoneIds = new Set();
+    for (const [index, zone] of (map.cameraZones ?? []).entries()) {
+      const label = `Camera zone ${index} in "${map.id}"`;
+      if (!zone || typeof zone !== "object" || Array.isArray(zone)) {
+        errors.push(`${label} must be an object.`);
+        continue;
+      }
+      if (typeof zone.id !== "string" || zone.id.length === 0) {
+        errors.push(`${label} needs a nonempty ID.`);
+      } else if (cameraZoneIds.has(zone.id)) {
+        errors.push(`${label} duplicates ID "${zone.id}".`);
+      } else {
+        cameraZoneIds.add(zone.id);
+      }
+      const region = zone.region;
+      if (
+        !region ||
+        typeof region !== "object" ||
+        Array.isArray(region) ||
+        !Number.isInteger(region.col) ||
+        !Number.isInteger(region.row) ||
+        !Number.isInteger(region.width) ||
+        !Number.isInteger(region.height) ||
+        region.col < 0 ||
+        region.row < 0 ||
+        region.width < 1 ||
+        region.height < 1 ||
+        region.col + region.width > width ||
+        region.row + region.height > height
+      ) {
+        errors.push(`${label} has an invalid or out-of-bounds region.`);
+      }
+      if (!Number.isFinite(zone.priority)) {
+        errors.push(`${label}.priority must be a finite number.`);
+      }
+      for (const key of ["transitionInMs", "transitionOutMs"]) {
+        if (!Number.isFinite(zone[key]) || zone[key] < 0) {
+          errors.push(`${label}.${key} must be a non-negative number.`);
+        }
+      }
+      const camera = zone.camera;
+      const allowedCameraKeys = new Set([
+        "x",
+        "y",
+        "zoom",
+        "followTarget",
+        "offsetX",
+        "offsetY",
+      ]);
+      if (
+        !camera ||
+        typeof camera !== "object" ||
+        Array.isArray(camera) ||
+        Object.keys(camera).length === 0 ||
+        Object.keys(camera).some((key) => !allowedCameraKeys.has(key))
+      ) {
+        errors.push(`${label}.camera must be a nonempty camera patch object.`);
+      } else {
+        if (
+          camera.zoom !== undefined &&
+          (!Number.isFinite(camera.zoom) || camera.zoom < 0.25 || camera.zoom > 8)
+        ) {
+          errors.push(`${label}.camera.zoom must be between 0.25 and 8.`);
+        }
+        for (const key of ["x", "y", "offsetX", "offsetY"]) {
+          if (camera[key] !== undefined && !Number.isFinite(camera[key])) {
+            errors.push(`${label}.camera.${key} must be a finite number.`);
+          }
+        }
+        if (camera.followTarget !== undefined) {
+          const target = camera.followTarget;
+          if (
+            !target ||
+            typeof target !== "object" ||
+            Array.isArray(target) ||
+            !["player", "entity", "none"].includes(target.type)
+          ) {
+            errors.push(`${label}.camera.followTarget is invalid.`);
+          } else if (target.type === "entity") {
+            if (
+              typeof target.entityId !== "string" ||
+              !(map.entities ?? []).some((entity) => entity.id === target.entityId)
+            ) {
+              errors.push(`${label}.camera.followTarget references a missing entity.`);
+            }
+          } else if (Object.hasOwn(target, "entityId")) {
+            errors.push(`${label}.camera.followTarget.entityId is only valid for entity targets.`);
+          }
+        }
       }
     }
 

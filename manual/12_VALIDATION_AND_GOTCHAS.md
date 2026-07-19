@@ -159,3 +159,13 @@ Clear or migrate development saves after:
 - Source and target ranges must have equal inclusive lengths.
 - Room resizing leaves ranges unchanged so invalid connections remain visible to editor validation.
 - Startup validation checks every integer target doorway cell; runtime footbox validation remains authoritative for fractional placement.
+
+## Camera validation and presentation
+
+- Every map explicitly contains `cameraZones`, even when empty.
+- Zone IDs are unique within the map and regions remain inside map bounds.
+- Zone priorities are finite; transition durations are non-negative.
+- Camera patches are nonempty and contain only supported properties.
+- Camera effects never imply a control lock. Add a future explicit cutscene/control-lock system when that behavior is required.
+- Continuous fractional zoom cannot preserve uniform source-pixel widths on every intermediate frame. Integer endpoints are the pixel-crisp guarantee.
+- Shake intensity is in screen pixels.

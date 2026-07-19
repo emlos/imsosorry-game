@@ -1,5 +1,3 @@
-//TODO: move camera code to its own file, and make it a class, camera.js
-
 import {
   drawImageVisual,
   resolveAnimationId,
@@ -76,6 +74,7 @@ const COLLISION_EPSILON = 1e-7;
 const CAMERA_ZOOM_MIN = 0.25;
 const CAMERA_ZOOM_MAX = 8;
 const CAMERA_FOLLOW_TYPES = new Set(["player", "entity", "none"]);
+const CAMERA_INHERIT_TRANSITION_MS = 250;
 
 function validateEdgeRange(range, label) {
   if (
@@ -187,7 +186,7 @@ export class Game {
       transition: null,
       shake: null,
     };
-    this.cameraDesired = {
+    this.cameraBase = {
       x: 0,
       y: 0,
       zoom: 1,
@@ -195,6 +194,10 @@ export class Game {
       offsetX: 0,
       offsetY: 0,
     };
+    this.cameraEffective = structuredClone(this.cameraBase);
+    this.cameraMotion = structuredClone(this.cameraBase);
+    this.cameraOverrides = new Map();
+    this.activeCameraZoneIds = new Set();
     this.player = new Player(
       TILE_SIZE,
       this.state.player,
@@ -400,6 +403,7 @@ export class Game {
     requireObject(map.layers, `Map "${map.id}" layers`);
     requireArray(map.entities, `Map "${map.id}" entities`);
     requireArray(map.triggers, `Map "${map.id}" triggers`);
+    requireArray(map.cameraZones, `Map "${map.id}" cameraZones`);
     requireArray(map.exits, `Map "${map.id}" exits`);
     this.validateMapCamera(map.camera, `Map "${map.id}" camera`);
     if (map.onEnter !== undefined) {
@@ -459,6 +463,17 @@ export class Game {
         );
       }
       triggerIds.add(trigger.id);
+    });
+
+    const cameraZoneIds = new Set();
+    map.cameraZones.forEach((zone, index) => {
+      this.validateCameraZoneDefinition(zone, map, index);
+      if (cameraZoneIds.has(zone.id)) {
+        throw new Error(
+          `Map "${map.id}" contains duplicate camera zone ID "${zone.id}".`,
+        );
+      }
+      cameraZoneIds.add(zone.id);
     });
 
     let walkableBaseCells = 0;
@@ -1098,6 +1113,23 @@ export class Game {
       );
     }
 
+    for (const zone of map.cameraZones) {
+      if (zone.condition) {
+        validateConditionReferences(
+          this,
+          zone.condition,
+          `Condition for camera zone "${zone.id}" in "${map.id}"`,
+        );
+      }
+      if (zone.camera.followTarget?.type === "entity") {
+        this.validateEntityReference(
+          map.id,
+          zone.camera.followTarget.entityId,
+          `Camera zone "${zone.id}" in "${map.id}"`,
+        );
+      }
+    }
+
     for (const entity of map.entities) {
       if (entity.condition) {
         validateConditionReferences(
@@ -1189,6 +1221,87 @@ export class Game {
       validateCondition(trigger.condition, `Condition for ${label}`);
     }
     validateEffectsDefinition(trigger.effects, `Effects for ${label}`);
+  }
+
+  validateCameraFollowTarget(target, mapId, label) {
+    requireObject(target, label);
+    requireExactKeys(target, new Set(["type", "entityId"]), label);
+    if (!CAMERA_FOLLOW_TYPES.has(target.type)) {
+      throw new Error(`${label}.type must be "player", "entity", or "none".`);
+    }
+    if (target.type === "entity") {
+      requireString(target.entityId, `${label}.entityId`);
+    } else if (Object.hasOwn(target, "entityId")) {
+      throw new Error(`${label}.entityId is only valid for entity following.`);
+    }
+  }
+
+  validateCameraPatch(camera, mapId, label) {
+    requireObject(camera, label);
+    requireExactKeys(
+      camera,
+      new Set(["x", "y", "zoom", "followTarget", "offsetX", "offsetY"]),
+      label,
+    );
+    if (Object.keys(camera).length === 0) {
+      throw new Error(`${label} must define at least one camera property.`);
+    }
+    if (camera.zoom !== undefined) this.validateCameraZoom(camera.zoom, `${label}.zoom`);
+    for (const key of ["x", "y", "offsetX", "offsetY"]) {
+      if (camera[key] !== undefined && !Number.isFinite(camera[key])) {
+        throw new Error(`${label}.${key} must be a finite number.`);
+      }
+    }
+    if (camera.followTarget !== undefined) {
+      this.validateCameraFollowTarget(camera.followTarget, mapId, `${label}.followTarget`);
+    }
+  }
+
+  validateCameraZoneDefinition(zone, map, index) {
+    const label = `Camera zone ${index} in "${map.id}"`;
+    requireObject(zone, label);
+    requireExactKeys(
+      zone,
+      new Set([
+        "id",
+        "region",
+        "condition",
+        "priority",
+        "camera",
+        "transitionInMs",
+        "transitionOutMs",
+      ]),
+      label,
+    );
+    requireString(zone.id, `${label}.id`);
+    requireObject(zone.region, `${label}.region`);
+    requireExactKeys(
+      zone.region,
+      new Set(["col", "row", "width", "height"]),
+      `${label}.region`,
+    );
+    requireNonNegativeInteger(zone.region.col, `${label}.region.col`);
+    requireNonNegativeInteger(zone.region.row, `${label}.region.row`);
+    requirePositiveInteger(zone.region.width, `${label}.region.width`);
+    requirePositiveInteger(zone.region.height, `${label}.region.height`);
+    if (
+      zone.region.col + zone.region.width > map.gridSize.width ||
+      zone.region.row + zone.region.height > map.gridSize.height
+    ) {
+      throw new Error(`${label}.region extends outside map "${map.id}".`);
+    }
+    if (!Number.isFinite(zone.priority)) {
+      throw new Error(`${label}.priority must be a finite number.`);
+    }
+    this.validateCameraPatch(zone.camera, map.id, `${label}.camera`);
+    for (const key of ["transitionInMs", "transitionOutMs"]) {
+      if (!Number.isFinite(zone[key]) || zone[key] < 0) {
+        throw new Error(`${label}.${key} must be a non-negative number.`);
+      }
+    }
+    if (zone.condition !== undefined && zone.condition !== null) {
+      validateCondition(zone.condition, `Condition for ${label}`);
+    }
   }
 
   validateSize(size, label) {
@@ -2835,12 +2948,13 @@ export class Game {
     this.syncTriggerMembership();
     this.selectedItemId = Object.keys(this.state.inventory)[0] ?? null;
     this.mode = "world";
+    this.initializeCameraForActiveMap();
     this.eventLogElement.textContent = "";
     this.saveMusicEventIds = new Set(prepared.music.playedEventIds);
     await this.audio.restoreSaveState(prepared.music.playback);
 
     this.refreshInventoryPanel();
-    this.updateCamera();
+    this.updateCamera(0);
     this.setStatus(`Map: ${this.state.player.mapId} -- Save loaded`);
   }
 
@@ -3132,12 +3246,9 @@ export class Game {
     this.syncTouchTargets();
     this.syncTriggerMembership();
 
-    if (transition.inheritCamera !== true) {
-      this.resetCameraToMapDefaults(map, { immediate: true });
-    } else {
-      this.cancelCameraAnimations();
-      this.updateCamera(0);
-    }
+    this.initializeCameraForActiveMap({
+      inheritRendered: transition.inheritCamera === true,
+    });
 
     this.applyMapMusic(map, transition);
     this.runMapMusicEntryEvents(map, usesEntry ? transition.entryId : null);
@@ -4117,10 +4228,43 @@ export class Game {
       this.updatePlayerAnimation(deltaMs);
     }
 
+    this.reconcileCameraZones();
     this.updateCamera(deltaMs);
   }
 
-  getCameraFocusPoint(target = this.cameraDesired.followTarget) {
+  cloneCameraState(state) {
+    return {
+      x: state.x,
+      y: state.y,
+      zoom: state.zoom,
+      followTarget: structuredClone(state.followTarget),
+      offsetX: state.offsetX,
+      offsetY: state.offsetY,
+    };
+  }
+
+  getMapCameraDefaultState(map = this.activeMap) {
+    return {
+      x: 0,
+      y: 0,
+      zoom: map.camera.zoom,
+      followTarget: { type: map.camera.follow },
+      offsetX: 0,
+      offsetY: 0,
+    };
+  }
+
+  applyCameraPatch(state, patch) {
+    for (const key of ["x", "y", "zoom", "offsetX", "offsetY"]) {
+      if (patch[key] !== undefined) state[key] = patch[key];
+    }
+    if (patch.followTarget !== undefined) {
+      state.followTarget = structuredClone(patch.followTarget);
+    }
+    return state;
+  }
+
+  getCameraFocusPoint(target) {
     if (target.type === "player") {
       return {
         x: this.player.x + TILE_SIZE / 2,
@@ -4160,93 +4304,82 @@ export class Game {
     };
   }
 
-  resolveDesiredCameraPosition(zoom = this.cameraDesired.zoom) {
-    const focus = this.getCameraFocusPoint();
+  resolveCameraPosition(state, zoom = state.zoom) {
+    const focus = this.getCameraFocusPoint(state.followTarget);
     if (!focus) {
-      return this.clampCameraPosition(
-        this.cameraDesired.x,
-        this.cameraDesired.y,
-        zoom,
-      );
+      return this.clampCameraPosition(state.x, state.y, zoom);
     }
     return this.clampCameraPosition(
-      focus.x - this.canvas.width / zoom / 2 + this.cameraDesired.offsetX,
-      focus.y - this.canvas.height / zoom / 2 + this.cameraDesired.offsetY,
+      focus.x - this.canvas.width / zoom / 2 + state.offsetX,
+      focus.y - this.canvas.height / zoom / 2 + state.offsetY,
       zoom,
     );
   }
 
-  cancelCameraAnimations() {
-    if (this.camera.transition?.resolve) this.camera.transition.resolve();
-    if (this.camera.shake?.resolve) this.camera.shake.resolve();
-    this.camera.transition = null;
-    this.camera.shake = null;
-    this.camera.shakeX = 0;
-    this.camera.shakeY = 0;
-    if (this.mode === "camera") this.mode = "world";
-  }
-
-  resetCameraToMapDefaults(
-    map = this.activeMap,
-    { immediate = false, durationMs = 0 } = {},
-  ) {
-    const defaults = map.camera;
-    const next = {
-      x: 0,
-      y: 0,
-      zoom: defaults.zoom,
-      followTarget: { type: defaults.follow },
-      offsetX: 0,
-      offsetY: 0,
-    };
-    if (immediate) {
-      this.cancelCameraAnimations();
-      Object.assign(this.cameraDesired, next);
-      const position = this.resolveDesiredCameraPosition(next.zoom);
-      this.camera.x = position.x;
-      this.camera.y = position.y;
-      this.camera.zoom = next.zoom;
-      return undefined;
+  resolveEffectiveCameraState() {
+    const result = this.cloneCameraState(this.cameraBase);
+    const overrides = [...this.cameraOverrides.values()].sort(
+      (first, second) =>
+        first.priority - second.priority || first.order - second.order,
+    );
+    for (const override of overrides) {
+      this.applyCameraPatch(result, override.patch);
     }
-    return this.transitionCamera(next, durationMs);
+    return result;
   }
 
-  //TODO: camera: pixellation when zooming and panning, not quite smooth movement - investigate
-  transitionCamera(changes, durationMs = 0) {
+  cameraStatesEqual(first, second) {
+    return (
+      first.x === second.x &&
+      first.y === second.y &&
+      first.zoom === second.zoom &&
+      first.offsetX === second.offsetX &&
+      first.offsetY === second.offsetY &&
+      first.followTarget.type === second.followTarget.type &&
+      first.followTarget.mapId === second.followTarget.mapId &&
+      first.followTarget.entityId === second.followTarget.entityId
+    );
+  }
+
+  supersedeCameraTransition(status = "superseded") {
+    const transition = this.camera.transition;
+    if (!transition) return;
+    this.camera.transition = null;
+    transition.resolve({ status });
+  }
+
+  replaceCameraTransition(targetState, durationMs = 0) {
     if (!Number.isFinite(durationMs) || durationMs < 0) {
       throw new Error("Camera transition duration must be non-negative.");
     }
-    if (this.camera.transition || this.camera.shake) {
-      throw new Error(
-        "Cannot start a camera transition while another camera animation is active.",
-      );
-    }
 
-    Object.assign(this.cameraDesired, changes);
-    const targetZoom = this.cameraDesired.zoom;
-    const targetPosition = this.resolveDesiredCameraPosition(targetZoom);
+    this.supersedeCameraTransition();
+    const target = this.cloneCameraState(targetState);
+
     if (durationMs === 0) {
-      this.camera.x = targetPosition.x;
-      this.camera.y = targetPosition.y;
-      this.camera.zoom = targetZoom;
+      this.cameraMotion = this.cloneCameraState(target);
+      this.camera.zoom = target.zoom;
+      const position = this.resolveCameraPosition(target, target.zoom);
+      this.camera.x = position.x;
+      this.camera.y = position.y;
       return undefined;
     }
 
-    if (this.mode !== "world") {
-      throw new Error(
-        `Cannot animate the camera while game mode is "${this.mode}".`,
-      );
-    }
-    this.mode = "camera";
-    this.input.clearMovement();
+    const startState = this.cloneCameraState(this.cameraMotion);
+    startState.zoom = this.camera.zoom;
+    const resolveStartState = this.cloneCameraState(startState);
+    resolveStartState.followTarget = structuredClone(target.followTarget);
+    const resolvedStart = this.resolveCameraPosition(
+      resolveStartState,
+      this.camera.zoom,
+    );
+
     return new Promise((resolve) => {
       this.camera.transition = {
-        startX: this.camera.x,
-        startY: this.camera.y,
-        startZoom: this.camera.zoom,
-        targetX: targetPosition.x,
-        targetY: targetPosition.y,
-        targetZoom,
+        startState,
+        targetState: target,
+        correctionX: this.camera.x - resolvedStart.x,
+        correctionY: this.camera.y - resolvedStart.y,
         elapsedMs: 0,
         durationMs,
         resolve,
@@ -4254,9 +4387,30 @@ export class Game {
     });
   }
 
+  refreshEffectiveCamera(durationMs = 0) {
+    const next = this.resolveEffectiveCameraState();
+    const unchanged = this.cameraStatesEqual(next, this.cameraEffective);
+    this.cameraEffective = this.cloneCameraState(next);
+    if (unchanged && !this.camera.transition) return undefined;
+    return this.replaceCameraTransition(next, durationMs);
+  }
+
+  setCameraBase(changes, durationMs = 0) {
+    this.applyCameraPatch(this.cameraBase, changes);
+    return this.refreshEffectiveCamera(durationMs);
+  }
+
+  resetCameraToMapDefaults(
+    map = this.activeMap,
+    { immediate = false, durationMs = 0 } = {},
+  ) {
+    this.cameraBase = this.getMapCameraDefaultState(map);
+    return this.refreshEffectiveCamera(immediate ? 0 : durationMs);
+  }
+
   cameraPan({ x, y, offsetX, offsetY, durationMs = 0 }) {
     if (x !== undefined || y !== undefined) {
-      return this.transitionCamera(
+      return this.setCameraBase(
         {
           x,
           y,
@@ -4267,10 +4421,10 @@ export class Game {
         durationMs,
       );
     }
-    return this.transitionCamera(
+    return this.setCameraBase(
       {
-        offsetX: offsetX ?? this.cameraDesired.offsetX,
-        offsetY: offsetY ?? this.cameraDesired.offsetY,
+        offsetX: offsetX ?? this.cameraBase.offsetX,
+        offsetY: offsetY ?? this.cameraBase.offsetY,
       },
       durationMs,
     );
@@ -4278,7 +4432,7 @@ export class Game {
 
   cameraZoom(zoom, durationMs = 0) {
     this.validateCameraZoom(zoom, "Camera zoom");
-    return this.transitionCamera({ zoom }, durationMs);
+    return this.setCameraBase({ zoom }, durationMs);
   }
 
   cameraFollow({
@@ -4295,41 +4449,133 @@ export class Game {
         : { type: target };
     const position =
       target === "none" ? { x: this.camera.x, y: this.camera.y } : {};
-    return this.transitionCamera(
+    return this.setCameraBase(
       { ...position, followTarget, offsetX, offsetY },
       durationMs,
     );
   }
 
   cameraShake({ intensity, durationMs }) {
-    if (this.camera.transition || this.camera.shake) {
-      throw new Error(
-        "Cannot start camera shake while another camera animation is active.",
-      );
+    if (this.camera.shake?.resolve) {
+      this.camera.shake.resolve({ status: "superseded" });
+      this.camera.shake = null;
     }
+    this.camera.shakeX = 0;
+    this.camera.shakeY = 0;
     if (durationMs === 0) return undefined;
-    if (this.mode !== "world") {
-      throw new Error(
-        `Cannot shake the camera while game mode is "${this.mode}".`,
-      );
-    }
-    this.mode = "camera";
-    this.input.clearMovement();
     return new Promise((resolve) => {
       this.camera.shake = { intensity, durationMs, elapsedMs: 0, resolve };
     });
   }
 
-  finishCameraAnimation(resolve) {
-    this.camera.transition = null;
+  cancelCameraAnimations(status = "superseded") {
+    this.supersedeCameraTransition(status);
+    if (this.camera.shake?.resolve) {
+      this.camera.shake.resolve({ status });
+    }
     this.camera.shake = null;
     this.camera.shakeX = 0;
     this.camera.shakeY = 0;
-    if (this.mode === "camera") this.mode = "world";
-    resolve();
   }
 
-  updateCamera(deltaMs) {
+  getActiveCameraZones() {
+    const tile = this.player.getCurrentTile();
+    return (this.activeMap.cameraZones ?? []).filter(
+      (zone) =>
+        this.isTileInsideTrigger(tile, zone) &&
+        (!zone.condition || this.evaluateCondition(zone.condition)),
+    );
+  }
+
+  reconcileCameraZones({ immediate = false, retarget = true } = {}) {
+    if (!this.activeMap) return undefined;
+    const zones = this.getActiveCameraZones();
+    const nextIds = new Set(zones.map((zone) => zone.id));
+    const added = zones.filter((zone) => !this.activeCameraZoneIds.has(zone.id));
+    const removed = (this.activeMap.cameraZones ?? []).filter(
+      (zone) => this.activeCameraZoneIds.has(zone.id) && !nextIds.has(zone.id),
+    );
+    if (added.length === 0 && removed.length === 0) return undefined;
+
+    this.activeCameraZoneIds = nextIds;
+    this.cameraOverrides = new Map(
+      zones.map((zone, order) => [
+        `map:${this.activeMap.id}:camera-zone:${zone.id}`,
+        {
+          ownerId: `map:${this.activeMap.id}:camera-zone:${zone.id}`,
+          mapId: this.activeMap.id,
+          priority: zone.priority,
+          order: (this.activeMap.cameraZones ?? []).indexOf(zone),
+          patch: {
+            ...structuredClone(zone.camera),
+            ...(zone.camera.followTarget?.type === "entity"
+              ? {
+                  followTarget: {
+                    ...structuredClone(zone.camera.followTarget),
+                    mapId: this.activeMap.id,
+                  },
+                }
+              : {}),
+          },
+        },
+      ]),
+    );
+    this.cameraEffective = this.resolveEffectiveCameraState();
+    if (!retarget) return undefined;
+
+    const durationMs = immediate
+      ? 0
+      : Math.max(
+          0,
+          ...added.map((zone) => zone.transitionInMs),
+          ...removed.map((zone) => zone.transitionOutMs),
+        );
+    return this.replaceCameraTransition(this.cameraEffective, durationMs);
+  }
+
+  initializeCameraForActiveMap({ inheritRendered = false } = {}) {
+    const rendered = {
+      x: this.camera.x,
+      y: this.camera.y,
+      zoom: this.camera.zoom,
+    };
+    this.cancelCameraAnimations();
+    this.cameraOverrides.clear();
+    this.activeCameraZoneIds.clear();
+    this.cameraBase = this.getMapCameraDefaultState(this.activeMap);
+    this.cameraEffective = this.cloneCameraState(this.cameraBase);
+    this.reconcileCameraZones({ immediate: true, retarget: false });
+    this.cameraEffective = this.resolveEffectiveCameraState();
+
+    if (!inheritRendered) {
+      this.cameraMotion = this.cloneCameraState(this.cameraEffective);
+      this.camera.zoom = this.cameraEffective.zoom;
+      const position = this.resolveCameraPosition(
+        this.cameraEffective,
+        this.cameraEffective.zoom,
+      );
+      this.camera.x = position.x;
+      this.camera.y = position.y;
+      return;
+    }
+
+    this.camera.x = rendered.x;
+    this.camera.y = rendered.y;
+    this.camera.zoom = rendered.zoom;
+    this.cameraMotion = {
+      ...this.cloneCameraState(this.cameraEffective),
+      x: rendered.x,
+      y: rendered.y,
+      zoom: rendered.zoom,
+      followTarget: { type: "none" },
+    };
+    this.replaceCameraTransition(
+      this.cameraEffective,
+      CAMERA_INHERIT_TRANSITION_MS,
+    );
+  }
+
+  updateCamera(deltaMs = 0) {
     const transition = this.camera.transition;
     if (transition) {
       transition.elapsedMs = Math.min(
@@ -4338,30 +4584,46 @@ export class Game {
       );
       const linear = transition.elapsedMs / transition.durationMs;
       const progress = 1 - Math.pow(1 - linear, 3);
-      const interpolatedX =
-        transition.startX + (transition.targetX - transition.startX) * progress;
-      const interpolatedY =
-        transition.startY + (transition.targetY - transition.startY) * progress;
-      this.camera.zoom =
-        transition.startZoom +
-        (transition.targetZoom - transition.startZoom) * progress;
-      const clamped = this.clampCameraPosition(
-        interpolatedX,
-        interpolatedY,
-        this.camera.zoom,
+      const start = transition.startState;
+      const target = transition.targetState;
+      const motion = {
+        x: start.x + (target.x - start.x) * progress,
+        y: start.y + (target.y - start.y) * progress,
+        zoom: start.zoom + (target.zoom - start.zoom) * progress,
+        followTarget: structuredClone(target.followTarget),
+        offsetX:
+          start.offsetX + (target.offsetX - start.offsetX) * progress,
+        offsetY:
+          start.offsetY + (target.offsetY - start.offsetY) * progress,
+      };
+      this.cameraMotion = motion;
+      this.camera.zoom = motion.zoom;
+      const resolved = this.resolveCameraPosition(motion, motion.zoom);
+      const correctionScale = 1 - progress;
+      const corrected = this.clampCameraPosition(
+        resolved.x + transition.correctionX * correctionScale,
+        resolved.y + transition.correctionY * correctionScale,
+        motion.zoom,
       );
-      this.camera.x = clamped.x;
-      this.camera.y = clamped.y;
+      this.camera.x = corrected.x;
+      this.camera.y = corrected.y;
+
       if (transition.elapsedMs >= transition.durationMs) {
-        this.camera.x = transition.targetX;
-        this.camera.y = transition.targetY;
-        this.camera.zoom = transition.targetZoom;
-        const resolve = transition.resolve;
-        this.finishCameraAnimation(resolve);
+        this.camera.transition = null;
+        this.cameraMotion = this.cloneCameraState(target);
+        this.camera.zoom = target.zoom;
+        const finalPosition = this.resolveCameraPosition(target, target.zoom);
+        this.camera.x = finalPosition.x;
+        this.camera.y = finalPosition.y;
+        transition.resolve({ status: "completed" });
       }
     } else {
-      this.camera.zoom = this.cameraDesired.zoom;
-      const position = this.resolveDesiredCameraPosition(this.camera.zoom);
+      this.cameraMotion = this.cloneCameraState(this.cameraEffective);
+      this.camera.zoom = this.cameraEffective.zoom;
+      const position = this.resolveCameraPosition(
+        this.cameraEffective,
+        this.camera.zoom,
+      );
       this.camera.x = position.x;
       this.camera.y = position.y;
     }
@@ -4371,21 +4633,48 @@ export class Game {
       shake.elapsedMs = Math.min(shake.durationMs, shake.elapsedMs + deltaMs);
       const remaining = 1 - shake.elapsedMs / shake.durationMs;
       const phase = shake.elapsedMs * 0.09;
-      this.camera.shakeX = Math.sin(phase * 1.7) * shake.intensity * remaining;
-      this.camera.shakeY = Math.cos(phase * 2.3) * shake.intensity * remaining;
+      this.camera.shakeX =
+        Math.sin(phase * 1.7) * shake.intensity * remaining;
+      this.camera.shakeY =
+        Math.cos(phase * 2.3) * shake.intensity * remaining;
       if (shake.elapsedMs >= shake.durationMs) {
-        const resolve = shake.resolve;
-        this.finishCameraAnimation(resolve);
+        this.camera.shake = null;
+        this.camera.shakeX = 0;
+        this.camera.shakeY = 0;
+        shake.resolve({ status: "completed" });
       }
     }
+  }
+
+  worldToScreenX(worldX) {
+    return Math.round(
+      (worldX - this.camera.x) * this.camera.zoom + this.camera.shakeX,
+    );
+  }
+
+  worldToScreenY(worldY) {
+    return Math.round(
+      (worldY - this.camera.y) * this.camera.zoom + this.camera.shakeY,
+    );
+  }
+
+  worldRectToScreen(x, y, width, height) {
+    const left = this.worldToScreenX(x);
+    const top = this.worldToScreenY(y);
+    const right = this.worldToScreenX(x + width);
+    const bottom = this.worldToScreenY(y + height);
+    return {
+      x: left,
+      y: top,
+      width: right - left,
+      height: bottom - top,
+    };
   }
 
   render() {
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.ctx.imageSmoothingEnabled = false;
-    this.ctx.save();
-    this.ctx.scale(this.camera.zoom, this.camera.zoom);
 
     this.renderLayer(this.activeMapState.layers.base);
 
@@ -4416,7 +4705,6 @@ export class Game {
     if (this.activeMapState.layers.foreground) {
       this.renderLayer(this.activeMapState.layers.foreground);
     }
-    this.ctx.restore();
   }
 
   renderLayer(layer) {
@@ -4497,12 +4785,22 @@ export class Game {
       this.playerAnimation.animationId,
       this.playerAnimation.elapsedMs,
     );
+    const playerSize =
+      playerSprite.kind === "image"
+        ? playerSprite.size
+        : [TILE_SIZE, TILE_SIZE];
+    const playerWorldX =
+      this.player.x + (TILE_SIZE - playerSize[0]) / 2;
+    const playerWorldY = this.player.y + TILE_SIZE - playerSize[1];
+    const playerScreenRect = this.worldRectToScreen(
+      playerWorldX,
+      playerWorldY,
+      playerSize[0],
+      playerSize[1],
+    );
     this.player.render(
       this.ctx,
-      {
-        x: this.camera.x + this.camera.shakeX,
-        y: this.camera.y + this.camera.shakeY,
-      },
+      playerScreenRect,
       playerSprite,
       playerImage,
       playerFrame,
@@ -4517,11 +4815,11 @@ export class Game {
     const bottomRow = Math.max(...occupiedCells.map((cell) => cell.row));
     const worldBottomY = (bottomRow + 1) * TILE_SIZE;
     const [width, height] = tile.size ?? [TILE_SIZE, TILE_SIZE];
-    const drawX = Math.round(
-      col * TILE_SIZE - this.camera.x - this.camera.shakeX,
-    );
-    const drawY = Math.round(
-      worldBottomY - height - this.camera.y - this.camera.shakeY,
+    const screenRect = this.worldRectToScreen(
+      col * TILE_SIZE,
+      worldBottomY - height,
+      width,
+      height,
     );
 
     const animationId = resolveAnimationId(tile, [tile.defaultAnimation]);
@@ -4535,8 +4833,10 @@ export class Game {
       image,
       { ...tile, size: [width, height] },
       frame,
-      drawX,
-      drawY,
+      screenRect.x,
+      screenRect.y,
+      screenRect.width,
+      screenRect.height,
     );
   }
 
@@ -4550,32 +4850,25 @@ export class Game {
     if (!image) return;
 
     const [width, height] = visual.size ?? [TILE_SIZE, TILE_SIZE];
-    let drawX;
-    let drawY;
+    let worldX;
+    let worldY;
 
     if (visualReference.type === "tile") {
       const bottomRow = Math.max(
         ...entity.occupiedCells.map((cell) => cell.row),
       );
-      drawX = Math.round(
-        entity.state.col * TILE_SIZE - this.camera.x - this.camera.shakeX,
-      );
-      drawY = Math.round(
-        (bottomRow + 1) * TILE_SIZE -
-          height -
-          this.camera.y -
-          this.camera.shakeY,
-      );
+      worldX = entity.state.col * TILE_SIZE;
+      worldY = (bottomRow + 1) * TILE_SIZE - height;
     } else {
-      const worldX = entity.state.col * TILE_SIZE;
-      const worldY = entity.state.row * TILE_SIZE;
-      drawX = Math.round(
-        worldX + (TILE_SIZE - width) / 2 - this.camera.x - this.camera.shakeX,
-      );
-      drawY = Math.round(
-        worldY + TILE_SIZE - height - this.camera.y - this.camera.shakeY,
-      );
+      worldX = entity.state.col * TILE_SIZE + (TILE_SIZE - width) / 2;
+      worldY = entity.state.row * TILE_SIZE + TILE_SIZE - height;
     }
+    const screenRect = this.worldRectToScreen(
+      worldX,
+      worldY,
+      width,
+      height,
+    );
 
     const animationId = resolveAnimationId(visual, [visual.defaultAnimation]);
     const frame = resolveVisualFrame(
@@ -4588,8 +4881,10 @@ export class Game {
       image,
       { ...visual, size: [width, height], transform: entity.state.transform },
       frame,
-      drawX,
-      drawY,
+      screenRect.x,
+      screenRect.y,
+      screenRect.width,
+      screenRect.height,
     );
   }
 

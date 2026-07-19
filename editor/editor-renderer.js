@@ -144,6 +144,8 @@ export class EditorRenderer {
       this.renderFootprintOverlay(map, tiles, options.activeLayer);
     if (options.showTriggers)
       this.renderTriggers(map, options.selectedTriggerId);
+    if (options.showCameraZones)
+      this.renderCameraZones(map, options.selectedCameraZoneId);
     if (options.showEntries !== false)
       this.renderEntries(map, options.selectedEntryId);
     if (options.showExits !== false)
@@ -154,6 +156,8 @@ export class EditorRenderer {
       this.renderRectanglePreview(options.rectanglePreview);
     if (options.triggerPreview)
       this.renderTriggerPreview(options.triggerPreview);
+    if (options.cameraZonePreview)
+      this.renderCameraZonePreview(options.cameraZonePreview);
     if (options.showGrid !== false) this.renderGrid(map);
   }
 
@@ -470,6 +474,63 @@ export class EditorRenderer {
     }
   }
 
+  renderCameraZones(map, selectedCameraZoneId) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+
+    for (const [index, zone] of (map.cameraZones ?? []).entries()) {
+      const selected = zone.id === selectedCameraZoneId;
+      const x = zone.region.col * TILE_SIZE;
+      const y = zone.region.row * TILE_SIZE;
+      const width = zone.region.width * TILE_SIZE;
+      const height = zone.region.height * TILE_SIZE;
+
+      ctx.fillStyle = selected
+        ? "rgba(65, 205, 255, 0.30)"
+        : "rgba(30, 150, 210, 0.20)";
+      ctx.strokeStyle = selected
+        ? "rgba(190, 245, 255, 0.98)"
+        : "rgba(80, 205, 245, 0.84)";
+      ctx.lineWidth = selected ? 3 : 2;
+      ctx.fillRect(x, y, width, height);
+      ctx.strokeRect(x + 1, y + 1, width - 2, height - 2);
+
+      const label = `${index + 1}. ${zone.id} [${zone.priority}]`;
+      const labelWidth = Math.min(width - 4, ctx.measureText(label).width + 8);
+      if (labelWidth > 4 && height >= 16) {
+        ctx.fillStyle = "rgba(5, 35, 48, 0.84)";
+        ctx.fillRect(x + 2, y + 2, labelWidth, 15);
+        ctx.fillStyle = "#e8fbff";
+        ctx.fillText(label, x + 5, y + 4, Math.max(0, width - 10));
+      }
+
+      if (selected) this.renderCameraZoneHandles(zone);
+    }
+    ctx.restore();
+  }
+
+  renderCameraZoneHandles(zone) {
+    const x = zone.region.col * TILE_SIZE;
+    const y = zone.region.row * TILE_SIZE;
+    const width = zone.region.width * TILE_SIZE;
+    const height = zone.region.height * TILE_SIZE;
+    const points = [
+      [x, y], [x + width / 2, y], [x + width, y],
+      [x, y + height / 2], [x + width, y + height / 2],
+      [x, y + height], [x + width / 2, y + height], [x + width, y + height],
+    ];
+    this.ctx.fillStyle = "#e8fbff";
+    this.ctx.strokeStyle = "#12677f";
+    this.ctx.lineWidth = 1;
+    for (const [centerX, centerY] of points) {
+      this.ctx.fillRect(centerX - 4, centerY - 4, 8, 8);
+      this.ctx.strokeRect(centerX - 4.5, centerY - 4.5, 9, 9);
+    }
+  }
+
   renderEntitySelection(map, entityId) {
     const entity = map.entities.find((candidate) => candidate.id === entityId);
     if (!entity) return;
@@ -518,6 +579,24 @@ export class EditorRenderer {
     this.ctx.save();
     this.ctx.fillStyle = "rgba(180, 100, 255, 0.28)";
     this.ctx.strokeStyle = "rgba(225, 185, 255, 0.98)";
+    this.ctx.lineWidth = 2;
+    this.ctx.fillRect(x, y, width, height);
+    this.ctx.strokeRect(x + 1, y + 1, width - 2, height - 2);
+    this.ctx.restore();
+  }
+
+  renderCameraZonePreview(preview) {
+    const minCol = Math.min(preview.start.col, preview.end.col);
+    const maxCol = Math.max(preview.start.col, preview.end.col);
+    const minRow = Math.min(preview.start.row, preview.end.row);
+    const maxRow = Math.max(preview.start.row, preview.end.row);
+    const x = minCol * TILE_SIZE;
+    const y = minRow * TILE_SIZE;
+    const width = (maxCol - minCol + 1) * TILE_SIZE;
+    const height = (maxRow - minRow + 1) * TILE_SIZE;
+    this.ctx.save();
+    this.ctx.fillStyle = "rgba(65, 205, 255, 0.28)";
+    this.ctx.strokeStyle = "rgba(190, 245, 255, 0.98)";
     this.ctx.lineWidth = 2;
     this.ctx.fillRect(x, y, width, height);
     this.ctx.strokeRect(x + 1, y + 1, width - 2, height - 2);

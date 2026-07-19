@@ -1,6 +1,6 @@
-# Yume Prototype v0.9.1 — Authoring Manual
+# Yume Prototype v0.9.2 — Authoring Manual
 
-This manual documents the systems present in the attached `0.9.1` project. It is intended as the central reference for map authoring, editor use, interactions, hooks, conditions, effects, deterministic randomness, music, assets, and common recipes.
+This manual documents the systems present in the attached `0.9.2` project. It is intended as the central reference for map authoring, editor use, interactions, hooks, conditions, effects, camera zones and rendering, deterministic randomness, music, assets, and common recipes.
 
 The code is strict by design. Most authored objects accept only the documented keys; a misspelled or unsupported key should fail during game initialization or Playtest rather than being silently ignored.
 
@@ -20,6 +20,7 @@ The code is strict by design. Most authored objects accept only the documented k
 - `11_EXTENDING_THE_ENGINE.md` — files and checklists for adding new engine capabilities.
 - `12_VALIDATION_AND_GOTCHAS.md` — strict rules and common failure modes.
 - `FULL_REFERENCE.md` — all main reference chapters concatenated into one file.
+- `CAMERA_TEST_MAPS.md` — procedures and expected results for the three camera regression maps.
 - `snippets/templates.js` — compact JavaScript templates.
 
 ## Project files by responsibility
@@ -46,7 +47,7 @@ The code is strict by design. Most authored objects accept only the documented k
 ## Terminology
 
 - **Hook:** a place where an effect sequence may run, such as `onEnter`, an interaction, an item use, or `showText.afterClose`.
-- **Trigger:** the event that activates an interaction: for interactions, `action` or `touch`; rectangular map triggers separately use `enter`, `exit`, or `step`.
+- **Trigger:** the event that activates an interaction: for interactions, `action` or `touch`; rectangular map triggers separately use `enter`, `exit`, `step`, or contextual `itemUse`.
 - **Interaction handler:** the top-level interaction behavior: currently `effects` or direct `teleport`.
 - **Effect:** one operation inside an effect array, such as `setFlag`, `showText`, or `random`.
 - **Condition:** a test controlling presence, availability, music, or one effect.

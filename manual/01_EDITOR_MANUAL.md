@@ -120,3 +120,7 @@ Treat the editor export as a generated replacement file.
 6. Re-run after changing references, random IDs, exits, or conditions.
 
 The full game validator is authoritative; the editor performs a lighter structural pass for responsiveness.
+
+## Camera Zones mode
+
+Camera Zones mode uses the same rectangular authoring workflow as trigger regions: drag empty space to create, drag a zone to move it, and drag eight selection handles to resize it. The list controls array order; the inspector edits priority, transition-in/out durations, an optional condition, and a partial camera patch as JSON. Overlays label each zone with its order, ID, and priority. Playtest validation checks bounds, duplicate IDs, camera patch properties, timing values, and entity follow references.

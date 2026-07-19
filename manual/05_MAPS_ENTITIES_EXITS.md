@@ -18,6 +18,7 @@
 
     exits: [],
     triggers: [],
+    cameraZones: [],
     tiles: {},
     entities: [],
 
@@ -44,16 +45,85 @@
 
 ## Map camera defaults
 
-Every map defines:
+Every map defines the base camera:
 
 ```js
 camera: {
-    zoom: 2,
+    zoom: 4,
     follow: "player",
 }
 ```
 
-Zoom is between `0.25` and `8`; integer levels produce the cleanest pixel-art scaling. Camera state resets to the destination map defaults on every map transition. A teleport or edge destination may set `inheritCamera: true` to preserve the current camera instead. Clamping uses `canvas.width / zoom` and `canvas.height / zoom` as the visible world size.
+Zoom is between `0.25` and `8`. Clamping uses the logical visible world size: `canvas.width / zoom` and `canvas.height / zoom`. Normal map transitions discard source-map camera-zone owners and initialize the destination base and any zones containing the destination position.
+
+`inheritCamera: true` preserves the visible source camera as the starting rendered state for a short destination transition. Source-map zone owners are still removed, and an entity follow target from the previous map is never retained.
+
+## Declarative camera zones
+
+Camera zones are continuous region-owned state, not one-time trigger effects:
+
+```js
+cameraZones: [
+    {
+        id: "close-up",
+        region: { col: 5, row: 2, width: 9, height: 5 },
+        priority: 10,
+        camera: {
+            zoom: 6,
+        },
+        transitionInMs: 500,
+        transitionOutMs: 500,
+    },
+    {
+        id: "look-ahead",
+        region: { col: 10, row: 2, width: 9, height: 5 },
+        condition: { flag: "camera.lookAhead" }, // optional
+        priority: 20,
+        camera: {
+            offsetX: 96,
+        },
+        transitionInMs: 500,
+        transitionOutMs: 500,
+    },
+]
+```
+
+A zone is active while the player is inside its rectangle, its optional condition is true, and its map is current. This is reconstructed on spawn and save load, reevaluated while stationary when conditions change, and cleared on map transitions even when no ordinary exit movement occurs.
+
+The owner ID is:
+
+```text
+map:<mapId>:camera-zone:<zoneId>
+```
+
+Zones contain partial camera patches. Resolution order is:
+
+1. map/scripted base camera;
+2. active zones sorted by ascending `priority`;
+3. map array order as the tie-breaker.
+
+Later-applied properties win, while omitted properties remain inherited. Leaving one overlapping zone removes only that owner and reveals the remaining base and overrides. Zone state ignores trigger frequency; `once-per-visit` and `once-per-save` apply only to separate trigger effects.
+
+Supported patch properties are `zoom`, `offsetX`, `offsetY`, `x`, `y`, and `followTarget`. A local entity target uses:
+
+```js
+followTarget: { type: "entity", entityId: "statue" }
+```
+
+Enter and exit changes replace unfinished camera transitions from the current rendered state. Rapid boundary crossings do not throw or snap through an obsolete target.
+
+## Pixel-stable world rendering
+
+Logical camera coordinates remain floating point. Rendering converts complete world-space rectangle edges to screen coordinates and rounds those screen edges:
+
+```js
+screenLeft = Math.round((worldLeft - cameraX) * zoom)
+screenRight = Math.round((worldRight - cameraX) * zoom)
+```
+
+Base tiles, obstacle tiles, foreground tiles, entities, and the player all use the same conversion. Shared edges therefore remain identical, fixed-integer-zoom pans advance in screen-pixel increments, and camera snapping never changes collision or trigger logic. The game canvas is displayed at its native `960×640` CSS size; narrow layouts scroll rather than applying a fractional responsive scale.
+
+The selected zoom policy is continuous nearest-neighbor zoom with screen-space translation snapping. Fractional intermediate zoom values may display uneven source-pixel widths, but integer endpoints are crisp and adjacent world rectangles remain joined.
 
 ## Layers
 

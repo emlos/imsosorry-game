@@ -434,8 +434,6 @@ const EFFECT_HANDLERS = new Map([
       },
     },
   ],
-  //TODO: on trigger area exit, the camera should reset back to map default as soon as player exits the trigger area - current behavior unpredictable
-  // TODO BUG: whene xiting trigger area that controls camera zoom/movement, player movement stops on exit from the area, even when holding the movement key -> camera movement should not interfere with player movement
 
   [
     "cameraPan",

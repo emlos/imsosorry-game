@@ -1,4 +1,4 @@
-// Yume v0.9.1 authoring templates.
+// Yume v0.9.2 authoring templates.
 // These are examples to paste into the appropriate definitions; this file is not imported.
 
 // -----------------------------------------------------------------------------
@@ -70,6 +70,24 @@ const teleportInteraction = {
     // musicTransitionMs: 700,
   },
   message: "The door opens.",
+};
+
+// -----------------------------------------------------------------------------
+// DECLARATIVE CAMERA ZONE
+// -----------------------------------------------------------------------------
+
+const cameraZone = {
+  id: "close-up",
+  region: { col: 5, row: 2, width: 9, height: 5 },
+  priority: 10,
+  camera: {
+    zoom: 6,
+    // offsetX: 96,
+    // followTarget: { type: "player" },
+  },
+  transitionInMs: 500,
+  transitionOutMs: 400,
+  // condition: { flag: "camera.enabled" },
 };
 
 // -----------------------------------------------------------------------------

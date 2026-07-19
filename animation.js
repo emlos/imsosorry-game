@@ -38,8 +38,18 @@ export function resolveVisualFrame(visual, animationId, elapsedMs) {
   };
 }
 
-export function drawImageVisual(ctx, image, visual, frame, drawX, drawY) {
-  const [width, height] = visual.size;
+export function drawImageVisual(
+  ctx,
+  image,
+  visual,
+  frame,
+  drawX,
+  drawY,
+  destinationWidth = visual.size[0],
+  destinationHeight = visual.size[1],
+) {
+  const width = destinationWidth;
+  const height = destinationHeight;
   const flipX = visual.transform?.flipX === true;
   const flipY = visual.transform?.flipY === true;
 

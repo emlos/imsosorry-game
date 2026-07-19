@@ -59,14 +59,19 @@ body {
 
 .game-viewport {
   position: relative;
+  width: 960px;
+  max-width: 100%;
+  overflow: auto;
 }
 
 canvas {
   display: block;
-  width: 100%;
-  height: auto;
+  width: 960px;
+  height: 640px;
+  max-width: none;
   background: #000;
-  border: 1px solid #3a4050;
+  border: 0;
+  box-shadow: 0 0 0 1px #3a4050;
   image-rendering: pixelated;
 }
 

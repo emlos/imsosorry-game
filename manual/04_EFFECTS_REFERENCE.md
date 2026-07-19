@@ -216,11 +216,13 @@ The target tile must exist in that map's merged tile definitions, fit within the
 
 ## Camera
 
-Camera effects control authored camera state rather than dialogue behavior. `durationMs` is optional except for `cameraShake`; a nonzero duration blocks the remaining effect sequence until the animation finishes.
+Camera effects modify the persistent base camera state. Active `cameraZones` are resolved over that base. A nonzero `durationMs` delays later effects in the same effect array, but it does not pause player updates, clear held movement keys, or change the game mode. A newer camera target supersedes an unfinished transition from its current rendered state; the superseded effect promise resolves and its sequence continues.
+
+Follow targets are resolved every update. Zooming or changing offsets while following the player therefore continues to track a moving player without an end-of-transition correction snap.
 
 ### `cameraPan`
 
-Keep the existing follow target and offset the camera in world pixels:
+Keep the base follow target and animate an offset in world pixels:
 
 ```js
 { type: "cameraPan", offsetX: -64, offsetY: 0, durationMs: 500 }
@@ -238,7 +240,7 @@ Or stop following and pan to an absolute world-space top-left position:
 { type: "cameraZoom", zoom: 3, durationMs: 500 }
 ```
 
-Zoom must be between `0.25` and `8`. Integer levels are preferred for pixel art.
+Zoom must be between `0.25` and `8`. Continuous transitions are supported. Fractional intermediate zoom frames use nearest-neighbor scaling and may contain uneven source-pixel widths; integer endpoints are crisp.
 
 ### `cameraFollow`
 
@@ -248,7 +250,7 @@ Zoom must be between `0.25` and `8`. Integer levels are preferred for pixel art.
 { type: "cameraFollow", target: "none", durationMs: 0 }
 ```
 
-Entity targets are resolved in the effect-context map.
+Entity targets are resolved in the effect-context map. Switching follow modes begins from the current rendered position.
 
 ### `cameraShake`
 
@@ -256,13 +258,15 @@ Entity targets are resolved in the effect-context map.
 { type: "cameraShake", intensity: 6, durationMs: 350 }
 ```
 
+`intensity` is measured in screen pixels. Shake is additive after the stable camera transform and can run at the same time as a pan or zoom. A newer shake supersedes the previous shake.
+
 ### `cameraReset`
 
 ```js
 { type: "cameraReset", durationMs: 500 }
 ```
 
-Restores the active map's authored camera defaults.
+Restores the base camera to the active map defaults. It does not erase active camera-zone overrides; those remain authoritative until their region or condition becomes inactive.
 
 ## Transition and saving
 

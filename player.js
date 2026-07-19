@@ -212,38 +212,47 @@ export class Player {
     return [{ col: currentTile.col + dc, row: currentTile.row + dr }];
   }
 
-  render(ctx, camera, sprite, image, frame) {
+  render(ctx, screenRect, sprite, image, frame) {
     if (sprite.kind === "image") {
-      const [width, height] = sprite.size;
-      const drawX = Math.round(this.x + (this.tileSize - width) / 2 - camera.x);
-      const drawY = Math.round(this.y + this.tileSize - height - camera.y);
-      drawImageVisual(ctx, image, sprite, frame, drawX, drawY);
+      drawImageVisual(
+        ctx,
+        image,
+        sprite,
+        frame,
+        screenRect.x,
+        screenRect.y,
+        screenRect.width,
+        screenRect.height,
+      );
       return;
     }
 
-    const drawX = Math.round(this.x - camera.x);
-    const drawY = Math.round(this.y - camera.y);
-    const inset = Math.round(this.tileSize * 0.18);
-    const size = this.tileSize - inset * 2;
-    const shapeX = drawX + inset;
-    const shapeY = drawY + inset;
+    const scaleX = screenRect.width / this.tileSize;
+    const scaleY = screenRect.height / this.tileSize;
+    const insetX = Math.round(this.tileSize * 0.18 * scaleX);
+    const insetY = Math.round(this.tileSize * 0.18 * scaleY);
+    const shapeX = screenRect.x + insetX;
+    const shapeY = screenRect.y + insetY;
+    const sizeX = screenRect.width - insetX * 2;
+    const sizeY = screenRect.height - insetY * 2;
 
     ctx.fillStyle = sprite.fillStyle;
-    ctx.fillRect(shapeX, shapeY, size, size);
+    ctx.fillRect(shapeX, shapeY, sizeX, sizeY);
 
     ctx.strokeStyle = sprite.strokeStyle;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(shapeX, shapeY, size, size);
+    ctx.lineWidth = Math.max(1, Math.round(3 * Math.min(scaleX, scaleY)));
+    ctx.strokeRect(shapeX, shapeY, sizeX, sizeY);
 
-    const centerX = shapeX + size / 2;
-    const centerY = shapeY + size / 2;
-    const length = size * 0.35;
+    const centerX = shapeX + sizeX / 2;
+    const centerY = shapeY + sizeY / 2;
+    const lengthX = sizeX * 0.35;
+    const lengthY = sizeY * 0.35;
 
     ctx.beginPath();
     ctx.moveTo(centerX, centerY);
     ctx.lineTo(
-      centerX + this.facing.dc * length,
-      centerY + this.facing.dr * length,
+      centerX + this.facing.dc * lengthX,
+      centerY + this.facing.dr * lengthY,
     );
     ctx.stroke();
   }
