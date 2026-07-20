@@ -35,6 +35,8 @@ Valid:
 ];
 ```
 
+`showText()` returns a promise without using the `async` keyword. Closing dialogue resumes `afterClose` with the complete original effect context. A synchronous throw or rejected promise from that continuation rejects the dialogue promise and propagates to the waiting effect sequence.
+
 ## Missing flag versus false
 
 ```js

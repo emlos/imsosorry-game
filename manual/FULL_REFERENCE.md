@@ -1,4 +1,4 @@
-# Yume Prototype v0.11.1
+# Yume Prototype v0.11.2
 
 Generated from the project source on 2026-07-20.
 
@@ -619,6 +619,8 @@ Effects execute with a structured context containing the current map, stable own
 ```
 
 This subject is preserved through `random` choices and `showText.afterClose`. The four entity mutation effects may use `target: "self"`; validation rejects that syntax from tile interactions, triggers, items, map hooks, and music events. Explicit `entityId` targeting remains available for cross-entity and cross-map mutations.
+
+`showText()` remains a normal promise-returning method rather than an `async` method. When dialogue closes, synchronous throws and rejected promises from `afterClose` reject that dialogue promise, so the parent effect sequence cannot remain pending indefinitely.
 
 ## Handler defaults and editor templates
 
@@ -3322,6 +3324,8 @@ Valid:
   },
 ];
 ```
+
+`showText()` returns a promise without using the `async` keyword. Closing dialogue resumes `afterClose` with the complete original effect context. A synchronous throw or rejected promise from that continuation rejects the dialogue promise and propagates to the waiting effect sequence.
 
 ## Missing flag versus false
 

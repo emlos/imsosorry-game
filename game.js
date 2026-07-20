@@ -3071,7 +3071,6 @@ export class Game {
     void this.audio.playMusicEffect(musicEffectId, options);
   }
 
-  //TODO: should this be async?
   showText({ pages, speaker, afterClose, effectContext }) {
     if (this.mode !== "world") {
       throw new Error(
@@ -3082,21 +3081,20 @@ export class Game {
     this.mode = "dialogue";
     this.input.clearMovement();
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       this.dialogueBox.open({
         pages: [...pages],
         speaker,
         onClose: () => {
           this.mode = "world";
-          const result =
-            afterClose === null
-              ? undefined
-              : this.runEffects(afterClose, effectContext);
-          if (result && typeof result.then === "function") {
-            void result.then(resolve);
-          } else {
-            resolve();
-          }
+
+          Promise.resolve()
+            .then(() =>
+              afterClose === null
+                ? undefined
+                : this.runEffects(afterClose, effectContext),
+            )
+            .then(resolve, reject);
         },
       });
     });
