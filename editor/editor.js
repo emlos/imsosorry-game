@@ -1,8 +1,8 @@
 import { findPrimaryShowTextEffect } from "../interactions.js";
-import { ITEMS } from "../items.js";
-import { MAPS } from "../maps.js";
-import { SPRITES } from "../sprites.js";
-import { EMPTY_TILE_ID, TILE_IDS, TILE_SIZE, TILES } from "../tiles.js";
+import { ITEMS } from "../data/items.js";
+import { MAPS } from "../data/maps.js";
+import { SPRITES } from "../data/sprites.js";
+import { EMPTY_TILE_ID, TILE_IDS, TILE_SIZE, TILES } from "../data/tiles.js";
 import {
   ENTITY_PRESETS,
   INTERACTION_TEMPLATES,

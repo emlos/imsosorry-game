@@ -2,7 +2,7 @@
 
 ## Atlas paths
 
-The current project stores atlas constants in `tiles.js`:
+The current project stores atlas constants in `data/tiles.js`:
 
 ```js
 export const ATLAS_PATHS = {

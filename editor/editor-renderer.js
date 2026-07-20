@@ -3,8 +3,8 @@ import {
   resolveAnimationId,
   resolveVisualFrame,
 } from "../animation.js";
-import { SPRITES } from "../sprites.js";
-import { EMPTY_TILE_ID, TILE_SIZE } from "../tiles.js";
+import { SPRITES } from "../data/sprites.js";
+import { EMPTY_TILE_ID, TILE_SIZE } from "../data/tiles.js";
 import {
   getEntityOccupiedCells,
   getEntityVisualDefinition,

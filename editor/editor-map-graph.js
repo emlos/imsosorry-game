@@ -1,5 +1,5 @@
 import cytoscape from "../vendor/cytoscape.esm.min.mjs";
-import { EMPTY_TILE_ID } from "../tiles.js";
+import { EMPTY_TILE_ID } from "../data/tiles.js";
 import { getMapSize, mergeTileDefinitions } from "./editor-model.js";
 
 const GRAPH_ID_PREFIX = {

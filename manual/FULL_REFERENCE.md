@@ -1,4 +1,8 @@
-# Yume Prototype v0.10.1
+# Yume Prototype v0.11
+
+Generated from the project source on 2026-07-20.
+
+---
 
 # Reference Card
 
@@ -232,7 +236,7 @@ editor/editor.html
 
 Do not open it directly with a `file://` URL. The project uses ES modules and asset fetching.
 
-The editor works on a cloned map document. It does not modify live game state or save data. Its authoritative map output is `maps.generated.js`; `maps.js` only re-exports it.
+The editor works on a cloned map document. It does not modify live game state or save data. Its authoritative map output is `data/maps.generated.js`; `data/maps.js` only re-exports it.
 
 ## What the editor currently supports
 
@@ -330,7 +334,7 @@ Old development saves are not migrated when map IDs change.
 
 The editor accepts JSON-compatible map data and generated JavaScript produced by the editor. It is not a general JavaScript parser. Handwritten source using imports, spreads, comments, or computed constants cannot be faithfully reconstructed after evaluation.
 
-Treat the editor export as a generated replacement file.
+Treat the editor export as a generated replacement file. The browser downloads `maps.generated.js`; replace `data/maps.generated.js` with that file.
 
 ## Playtest workflow
 
@@ -1321,7 +1325,7 @@ See `06_RANDOMNESS.md` for scope semantics and stable IDs.
 }
 ```
 
-`maps.generated.js` is editor-owned. The first map must have a valid `initialEntryId`. In practice, giving every map one is useful for editor defaults and debugging.
+`data/maps.generated.js` is editor-owned. The first map must have a valid `initialEntryId`. In practice, giving every map one is useful for editor defaults and debugging.
 
 ## Map camera defaults
 
@@ -1942,7 +1946,7 @@ Keep randomness above `AudioSystem`; audio receives already-resolved commands.
 
 # Music and Audio
 
-The project has three registries in `sounds.js`:
+The project has three registries in `data/audio-definitions.js`:
 
 - `SOUNDS`: short decoded sound effects.
 - `MUSIC`: looping/background tracks.
@@ -2200,7 +2204,7 @@ Browsers require a user gesture before audio starts. The game listens for keydow
 
 ## Atlas paths
 
-The current project stores atlas constants in `tiles.js`:
+The current project stores atlas constants in `data/tiles.js`:
 
 ```js
 export const ATLAS_PATHS = {
@@ -2481,7 +2485,7 @@ The generated snippets intentionally omit collision, footprint, conditions, and 
 
 # Items and Inventory
 
-Items are defined globally in `items.js`. Their definitions contain only universal information: display text, an inventory visual, whether the item can be used, and optional effects that make sense in every map.
+Items are defined globally in `data/items.js`. Their definitions contain only universal information: display text, an inventory visual, whether the item can be used, and optional effects that make sense in every map.
 
 ## Passive item
 
@@ -3050,7 +3054,7 @@ No game logic changes are required when using existing tile fields.
 
 ## Add an item
 
-1. Add `ITEMS[itemId]` in `items.js`.
+1. Add `ITEMS[itemId]` in `data/items.js`.
 2. Add icon art.
 3. Choose passive or usable.
 4. Assign `visual: { type: "sprite", id }`.

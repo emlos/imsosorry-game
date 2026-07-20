@@ -1,6 +1,6 @@
-# Yume Prototype v0.10.1 — Authoring Manual
+# Yume Prototype v0.11 — Authoring Manual
 
-This manual documents the systems present in the attached `0.10.1` project. It is intended as the central reference for map authoring, editor use, interactions, hooks, conditions, effects, camera zones and rendering, deterministic randomness, music, assets, and common recipes.
+This manual documents the systems present in the attached `0.11` project. It is intended as the central reference for map authoring, editor use, interactions, hooks, conditions, effects, camera zones and rendering, deterministic randomness, music, assets, and common recipes.
 
 The code is strict by design. Most authored objects accept only the documented keys; a misspelled or unsupported key should fail during game initialization or Playtest rather than being silently ignored.
 
@@ -25,24 +25,26 @@ The code is strict by design. Most authored objects accept only the documented k
 
 ## Project files by responsibility
 
-| File                       | Purpose                                                                   |
-| -------------------------- | ------------------------------------------------------------------------- |
-| `maps.generated.js`        | Editor-owned map data.                                                    |
-| `maps.js`                  | Re-exports generated maps.                                                |
-| `tiles.js`                 | Tile IDs, atlas paths, and global tile definitions.                       |
-| `sprites.js`               | Entity and player visual definitions.                                     |
-| `editor/editor-catalog.js` | Editor labels, entity presets, and semantic interaction templates.        |
-| `items.js`                 | Inventory item definitions.                                               |
-| `sounds.js`                | Sound, music, and music-effect registries.                                |
-| `conditions.js`            | Condition operators and evaluation.                                       |
-| `interactions.js`          | Interaction triggers and handlers.                                        |
-| `effects.js`               | Effect types, validation, and execution.                                  |
-| `random.js`                | Seed generation and deterministic weighted choice.                        |
-| `music.js`                 | Map-level music definitions and music-entry events.                       |
-| `audio.js`                 | Audio playback implementation.                                            |
-| `game.js`                  | Runtime state, validation, transitions, mutations, saving, and rendering. |
-| `editor/README.md`         | Short editor-specific project notes.                                      |
-| `tools/pack_atlas.py`      | Atlas builder and snippet generator.                                      |
+Authored registries live under `data/`; runtime behavior remains in the root engine modules. Asset strings inside data definitions stay in document-relative form, such as `"./assets/atlases/world.png"`. Moving the JavaScript module does not require changing those URL values.
+
+| File                        | Purpose                                                                   |
+| --------------------------- | ------------------------------------------------------------------------- |
+| `data/maps.generated.js`    | Editor-owned map data.                                                    |
+| `data/maps.js`              | Stable map import point; re-exports generated maps.                       |
+| `data/tiles.js`             | Tile IDs, atlas paths, and global tile definitions.                       |
+| `data/sprites.js`           | Entity and player visual definitions.                                     |
+| `data/items.js`             | Inventory item definitions.                                               |
+| `data/audio-definitions.js` | Sound, music, and music-effect registries.                                |
+| `editor/editor-catalog.js`  | Editor labels, entity presets, and semantic interaction templates.        |
+| `conditions.js`             | Condition operators and evaluation.                                       |
+| `interactions.js`           | Interaction triggers and handlers.                                        |
+| `effects.js`                | Effect types, validation, and execution.                                  |
+| `random.js`                 | Seed generation and deterministic weighted choice.                        |
+| `music.js`                  | Map-level music behavior.                                                 |
+| `audio.js`                  | Runtime audio loading and playback.                                       |
+| `game.js`                   | Runtime state, validation, transitions, mutations, saving, and rendering. |
+| `editor/README.md`          | Short editor-specific project notes.                                      |
+| `tools/pack_atlas.py`       | Atlas builder and snippet generator.                                      |
 
 ## Terminology
 

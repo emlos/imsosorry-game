@@ -40,7 +40,7 @@
 }
 ```
 
-`maps.generated.js` is editor-owned. The first map must have a valid `initialEntryId`. In practice, giving every map one is useful for editor defaults and debugging.
+`data/maps.generated.js` is editor-owned. The first map must have a valid `initialEntryId`. In practice, giving every map one is useful for editor defaults and debugging.
 
 ## Map camera defaults
 

@@ -2,7 +2,7 @@
 
 Serve the project through a local web server and open `editor/editor.html`.
 
-The editor works on a `structuredClone()` of `MAPS`. It never edits `Game.maps` or runtime save state. The authoritative project map file is `maps.generated.js`; `maps.js` only re-exports it.
+The editor works on a `structuredClone()` of `MAPS`. It never edits `Game.maps` or runtime save state. The authoritative project map file is `data/maps.generated.js`; `data/maps.js` is the stable import point and only re-exports it. The browser download is named `maps.generated.js` and should replace the file inside `data/`.
 
 Maps may define an optional `editorGroup` string. The editor uses it to organize the current-map selector; the game ignores it as editor-only authored metadata. Maps without the field appear under **Ungrouped**.
 

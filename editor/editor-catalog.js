@@ -1,5 +1,5 @@
 import { createDefaultInteraction } from "../interactions.js";
-import { TILE_IDS } from "../tiles.js";
+import { TILE_IDS } from "../data/tiles.js";
 
 function makeTemplateFlag(context, suffix) {
   const mapId = context.map?.id ?? "map";

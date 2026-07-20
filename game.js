@@ -32,9 +32,9 @@ import {
   validateMapMusicDefinition,
   validateMapMusicReferences,
 } from "./music.js";
-import { MUSIC, MUSIC_EFFECTS, SOUNDS } from "./sounds.js";
-import { PLAYER_SPRITES, SPRITES } from "./sprites.js";
-import { TILE_SIZE, EMPTY_TILE_ID, TILES } from "./tiles.js";
+import { MUSIC, MUSIC_EFFECTS, SOUNDS } from "./data/audio-definitions.js";
+import { PLAYER_SPRITES, SPRITES } from "./data/sprites.js";
+import { TILE_SIZE, EMPTY_TILE_ID, TILES } from "./data/tiles.js";
 import { SAVE_VERSION } from "./saves.js";
 import {
   OPPOSITE_EDGE,

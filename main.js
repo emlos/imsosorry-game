@@ -1,6 +1,6 @@
 import { Game } from "./game.js";
-import { ITEMS } from "./items.js";
-import { MAPS } from "./maps.js";
+import { ITEMS } from "./data/items.js";
+import { MAPS } from "./data/maps.js";
 import { SaveControls } from "./save-ui.js";
 import { SaveStore } from "./saves.js";
 

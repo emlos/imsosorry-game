@@ -1,6 +1,6 @@
 # Music and Audio
 
-The project has three registries in `sounds.js`:
+The project has three registries in `data/audio-definitions.js`:
 
 - `SOUNDS`: short decoded sound effects.
 - `MUSIC`: looping/background tracks.

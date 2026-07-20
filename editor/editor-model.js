@@ -3,9 +3,9 @@ import {
   getEdgePosition,
   getRangeLength,
 } from "../map-edges.js";
-import { ITEMS } from "../items.js";
-import { SPRITES } from "../sprites.js";
-import { EMPTY_TILE_ID, TILE_IDS, TILES } from "../tiles.js";
+import { ITEMS } from "../data/items.js";
+import { SPRITES } from "../data/sprites.js";
+import { EMPTY_TILE_ID, TILE_IDS, TILES } from "../data/tiles.js";
 
 export const EDITOR_STORAGE_KEY = "yume-map-editor-recovery-v7";
 export const EDITOR_BACKUP_KEY = "yume-map-editor-pre-import-backup-v7";
@@ -719,7 +719,7 @@ export function parseImportedMaps(text) {
 }
 
 export function serializeGeneratedMaps(maps) {
-  return `// Generated map data. Edit through editor/editor.html.\nexport const MAPS = ${JSON.stringify(maps, null, 4)};\n`;
+  return `// Generated map data. Save as data/maps.generated.js; edit through editor/editor.html.\nexport const MAPS = ${JSON.stringify(maps, null, 4)};\n`;
 }
 
 function isRectangularLayer(layer, width, height) {

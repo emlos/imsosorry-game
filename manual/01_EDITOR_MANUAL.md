@@ -10,7 +10,7 @@ editor/editor.html
 
 Do not open it directly with a `file://` URL. The project uses ES modules and asset fetching.
 
-The editor works on a cloned map document. It does not modify live game state or save data. Its authoritative map output is `maps.generated.js`; `maps.js` only re-exports it.
+The editor works on a cloned map document. It does not modify live game state or save data. Its authoritative map output is `data/maps.generated.js`; `data/maps.js` only re-exports it.
 
 ## What the editor currently supports
 
@@ -108,7 +108,7 @@ Old development saves are not migrated when map IDs change.
 
 The editor accepts JSON-compatible map data and generated JavaScript produced by the editor. It is not a general JavaScript parser. Handwritten source using imports, spreads, comments, or computed constants cannot be faithfully reconstructed after evaluation.
 
-Treat the editor export as a generated replacement file.
+Treat the editor export as a generated replacement file. The browser downloads `maps.generated.js`; replace `data/maps.generated.js` with that file.
 
 ## Playtest workflow
 

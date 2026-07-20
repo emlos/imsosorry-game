@@ -1,4 +1,4 @@
-// Yume v0.10.1 authoring templates.
+// Yume v0.11 authoring templates.
 // These are examples to paste into the appropriate definitions; this file is not imported.
 
 // -----------------------------------------------------------------------------

@@ -31,7 +31,7 @@ No game logic changes are required when using existing tile fields.
 
 ## Add an item
 
-1. Add `ITEMS[itemId]` in `items.js`.
+1. Add `ITEMS[itemId]` in `data/items.js`.
 2. Add icon art.
 3. Choose passive or usable.
 4. Assign `visual: { type: "sprite", id }`.

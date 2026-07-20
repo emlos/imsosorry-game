@@ -1,6 +1,6 @@
 # Items and Inventory
 
-Items are defined globally in `items.js`. Their definitions contain only universal information: display text, an inventory visual, whether the item can be used, and optional effects that make sense in every map.
+Items are defined globally in `data/items.js`. Their definitions contain only universal information: display text, an inventory visual, whether the item can be used, and optional effects that make sense in every map.
 
 ## Passive item
 

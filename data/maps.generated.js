@@ -1,4 +1,4 @@
-// Generated map data. Edit through editor/editor.html.
+// Generated map data. Save as data/maps.generated.js; edit through editor/editor.html.
 export const MAPS = [
   {
     id: "camera-input-test",
