@@ -155,47 +155,47 @@ interaction: {
 
 ```js
 onEnter: [
-    {
-        type: "random",
-        id: "rare-visitor",
-        scope: "roomVisit",
-        choices: [
-            {
-                weight: 5,
-                effects: [
-                    {
-                        type: "setEntityActive",
-                        entityId: "visitor",
-                        active: true,
-                        persistence: "roomVisit",
-                    },
-                ],
-            },
-            { weight: 95, effects: [] },
+  {
+    type: "random",
+    id: "rare-visitor",
+    scope: "roomVisit",
+    choices: [
+      {
+        weight: 5,
+        effects: [
+          {
+            type: "setEntityActive",
+            entityId: "visitor",
+            active: true,
+            persistence: "roomVisit",
+          },
         ],
-    },
-]
+      },
+      { weight: 95, effects: [] },
+    ],
+  },
+];
 ```
 
 ## 9. Once-per-save chance
 
 ```js
 onEnter: [
-    {
-        type: "random",
-        id: "one-chance",
-        scope: "once",
-        choices: [
-            {
-                weight: 10,
-                effects: [
-                    { type: "setFlag", flag: "rare-event.happened", value: true },
-                ],
-            },
-            { weight: 90, effects: [] },
+  {
+    type: "random",
+    id: "one-chance",
+    scope: "once",
+    choices: [
+      {
+        weight: 10,
+        effects: [
+          { type: "setFlag", flag: "rare-event.happened", value: true },
         ],
-    },
-]
+      },
+      { weight: 90, effects: [] },
+    ],
+  },
+];
 ```
 
 The chance is consumed whether it succeeds or fails.
@@ -204,26 +204,26 @@ The chance is consumed whether it succeeds or fails.
 
 ```js
 onEnter: [
-    {
-        type: "random",
-        id: "room-colour",
-        scope: "save",
-        choices: [
-            {
-                weight: 1,
-                effects: [
-                    { type: "setTile", layer: "base", col: 2, row: 2, tileId: 7 },
-                ],
-            },
-            {
-                weight: 1,
-                effects: [
-                    { type: "setTile", layer: "base", col: 2, row: 2, tileId: 8 },
-                ],
-            },
+  {
+    type: "random",
+    id: "room-colour",
+    scope: "save",
+    choices: [
+      {
+        weight: 1,
+        effects: [
+          { type: "setTile", layer: "base", col: 2, row: 2, tileId: 7 },
         ],
-    },
-]
+      },
+      {
+        weight: 1,
+        effects: [
+          { type: "setTile", layer: "base", col: 2, row: 2, tileId: 8 },
+        ],
+      },
+    ],
+  },
+];
 ```
 
 The same branch is selected every visit. Because `setTile` is persistent, the first visit also writes the result into map state.
@@ -273,36 +273,36 @@ Restore:
 
 ```js
 music: [
-    {
-        condition: { flag: "forest.corrupted" },
-        trackId: "strange-room",
-        playbackRate: 0.8,
-    },
-    {
-        trackId: "forest",
-        continuityId: "forest-region",
-        restart: "if-different",
-    },
-]
+  {
+    condition: { flag: "forest.corrupted" },
+    trackId: "strange-room",
+    playbackRate: 0.8,
+  },
+  {
+    trackId: "forest",
+    continuityId: "forest-region",
+    restart: "if-different",
+  },
+];
 ```
 
 ## 14. One-time stinger on a specific entry
 
 ```js
 musicEvents: [
-    {
-        id: "first-discovery",
-        frequency: "once-per-save",
-        entryId: "fromGrove",
-        effects: [
-            {
-                type: "playMusicEffect",
-                musicEffectId: "discovery",
-                duckMusicTo: 0.18,
-            },
-        ],
-    },
-]
+  {
+    id: "first-discovery",
+    frequency: "once-per-save",
+    entryId: "fromGrove",
+    effects: [
+      {
+        type: "playMusicEffect",
+        musicEffectId: "discovery",
+        duckMusicTo: 0.18,
+      },
+    ],
+  },
+];
 ```
 
 ## 15. Random edge exit

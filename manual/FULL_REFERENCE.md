@@ -1,16 +1,13 @@
-# Yume Prototype v0.9.2
-Generated from the project source on 2026-07-19.
-
----
+# Yume Prototype v0.10.1
 
 # Reference Card
 
 ## Interaction triggers
 
 ```js
-triggers: ["action"]
-triggers: ["touch"]
-triggers: ["action", "touch"]
+triggers: ["action"];
+triggers: ["touch"];
+triggers: ["action", "touch"];
 ```
 
 - `action`: player uses the interaction button while facing the target.
@@ -21,15 +18,15 @@ triggers: ["action", "touch"]
 
 ```js
 triggers: [
-    {
-        id: "hallway-distortion",
-        region: { col: 3, row: 4, width: 5, height: 2 },
-        events: ["enter"], // enter, exit, step
-        frequency: "always", // always, once-per-visit, once-per-save
-        condition: { flag: "world.changed" }, // optional
-        effects: [/* effects */],
-    },
-]
+  {
+    id: "hallway-distortion",
+    region: { col: 3, row: 4, width: 5, height: 2 },
+    events: ["enter"], // enter, exit, step
+    frequency: "always", // always, once-per-visit, once-per-save
+    condition: { flag: "world.changed" }, // optional
+    effects: [/* effects */],
+  },
+];
 ```
 
 - Evaluated only after a completed tile movement.
@@ -48,15 +45,15 @@ Continuous region-owned overrides belong in `cameraZones`:
 
 ```js
 cameraZones: [
-    {
-        id: "close-up",
-        region: { col: 5, row: 2, width: 9, height: 5 },
-        priority: 10,
-        camera: { zoom: 6 },
-        transitionInMs: 500,
-        transitionOutMs: 400,
-    },
-]
+  {
+    id: "close-up",
+    region: { col: 5, row: 2, width: 9, height: 5 },
+    priority: 10,
+    camera: { zoom: 6 },
+    transitionInMs: 500,
+    transitionOutMs: 400,
+  },
+];
 ```
 
 Zones are reconstructed from current position and conditions, combine by priority and array order, and remove only their own partial camera patch. Shake intensity is measured in screen pixels. World rendering rounds shared rectangle edges after applying zoom; UI remains outside the canvas world.
@@ -125,7 +122,9 @@ showText
 Every effect may add:
 
 ```js
-condition: { /* condition */ }
+condition: {
+  /* condition */
+}
 ```
 
 Important dialogue rule: `showText` must be the final reachable effect in its array. Put later operations in `afterClose`.
@@ -146,13 +145,13 @@ Map `triggers[].effects` (`enter`, `exit`, `step`, or contextual `itemUse`)
 
 ## Random scopes
 
-| Scope | Behavior |
-|---|---|
-| `save` | One choice is fixed for the whole save; it executes every time invoked. |
-| `once` | Chooses and executes once for the save; later calls do nothing. |
-| `roomVisit` | Same choice throughout one room visit; rerolls on a later visit. |
-| `interaction` | Advances its own counter on each invocation. |
-| `use` | Same mechanics as interaction, but a separate counter namespace. |
+| Scope         | Behavior                                                                |
+| ------------- | ----------------------------------------------------------------------- |
+| `save`        | One choice is fixed for the whole save; it executes every time invoked. |
+| `once`        | Chooses and executes once for the save; later calls do nothing.         |
+| `roomVisit`   | Same choice throughout one room visit; rerolls on a later visit.        |
+| `interaction` | Advances its own counter on each invocation.                            |
+| `use`         | Same mechanics as interaction, but a separate counter namespace.        |
 
 ## Layers
 
@@ -320,7 +319,7 @@ Map IDs and entity IDs are technical references. Keep them stable once content b
 `editorGroup` is editor-only organization and can be changed freely:
 
 ```js
-editorGroup: "Forest"
+editorGroup: "Forest";
 ```
 
 Changing a map ID is a reference refactor. The editor updates map-owned references on a clone and commits only if valid. References in external registries such as global `TILES`, `SPRITES`, or presets block the rename and must be changed in source code first. Global item definitions are not allowed to contain map destinations.
@@ -410,7 +409,7 @@ Global item effects may play sounds, change flags, heal, or perform other univer
 ### 4. Map entry
 
 ```js
-onEnter: [/* effects */]
+onEnter: [/* effects */];
 ```
 
 Runs after:
@@ -429,7 +428,7 @@ map:<mapId>:onEnter
 ### 5. Map exit
 
 ```js
-onExit: [/* effects */]
+onExit: [/* effects */];
 ```
 
 Runs before an edge exit or teleport transition. If it opens dialogue, changes maps, or leaves world mode, the original transition does not continue automatically. Use this intentionally; for an exit conversation followed by travel, put the teleport in `showText.afterClose`.
@@ -444,12 +443,12 @@ map:<mapId>:onExit
 
 ```js
 musicEvents: [
-    {
-        id: "first-cue",
-        frequency: "once-per-save",
-        effects: [/* ... */],
-    },
-]
+  {
+    id: "first-cue",
+    frequency: "once-per-save",
+    effects: [/* ... */],
+  },
+];
 ```
 
 Runs on room entry after the map music is applied and before `onEnter`.
@@ -464,21 +463,21 @@ map:<mapId>:music-event:<eventId>
 
 ```js
 triggers: [
-    {
-        id: "hallway-distortion",
-        region: {
-            col: 3,
-            row: 4,
-            width: 5,
-            height: 2,
-        },
-        events: ["enter"],
-        // itemId: "pink-orb", // required when events includes itemUse
-        frequency: "always",
-        condition: { flag: "world.changed" }, // optional
-        effects: [/* non-empty effect array */],
+  {
+    id: "hallway-distortion",
+    region: {
+      col: 3,
+      row: 4,
+      width: 5,
+      height: 2,
     },
-]
+    events: ["enter"],
+    // itemId: "pink-orb", // required when events includes itemUse
+    frequency: "always",
+    condition: { flag: "world.changed" }, // optional
+    effects: [/* non-empty effect array */],
+  },
+];
 ```
 
 Camera lifetime should use `cameraZones`, not paired camera enter/exit effects. Map triggers are invisible rectangular regions independent of tiles and entities. They are evaluated after the player completes a movement into a new tile, never once per rendered frame. The runtime tracks the trigger IDs containing the player's previous tile.
@@ -598,8 +597,8 @@ import { createDefaultInteraction } from "./interactions.js";
 
 const interaction = createDefaultInteraction("effects");
 const door = createDefaultInteraction("teleport", {
-    mapId: "room-target",
-    entryId: "fromSource",
+  mapId: "room-target",
+  entryId: "fromSource",
 });
 ```
 
@@ -620,7 +619,9 @@ Choosing a template replaces the interaction JSON draft in the inspector. It doe
 Entity or tile condition:
 
 ```js
-condition: { notFlag: "object.removed" }
+condition: {
+  notFlag: "object.removed";
+}
 ```
 
 Controls whether the object exists in rendering, collision, and interactions.
@@ -670,7 +671,9 @@ Conditions are plain objects with exactly one operator. They can control:
 ### Flag is true
 
 ```js
-{ flag: "bridge.lowered" }
+{
+  flag: "bridge.lowered";
+}
 ```
 
 Equivalent to:
@@ -690,7 +693,9 @@ This is true only when the stored value is explicitly `false`. A missing flag is
 ### Flag is not true
 
 ```js
-{ notFlag: "bridge.lowered" }
+{
+  notFlag: "bridge.lowered";
+}
 ```
 
 This is true when the flag is false or missing. This is usually the correct condition for content visible before an event has occurred.
@@ -698,13 +703,17 @@ This is true when the flag is false or missing. This is usually the correct cond
 ## Item conditions
 
 ```js
-{ hasItem: "pink-orb" }
+{
+  hasItem: "pink-orb";
+}
 ```
 
 True when the inventory quantity is greater than zero.
 
 ```js
-{ notItem: "pink-orb" }
+{
+  notItem: "pink-orb";
+}
 ```
 
 True when the item is absent or has no positive quantity.
@@ -743,7 +752,9 @@ Item IDs are reference-validated.
 ### One-time entity disappears after pickup
 
 ```js
-condition: { notItem: "blue-orb" }
+condition: {
+  notItem: "blue-orb";
+}
 ```
 
 ### Alternate object after a flag
@@ -751,13 +762,17 @@ condition: { notItem: "blue-orb" }
 Original:
 
 ```js
-condition: { notFlag: "statue.changed" }
+condition: {
+  notFlag: "statue.changed";
+}
 ```
 
 Replacement:
 
 ```js
-condition: { flag: "statue.changed" }
+condition: {
+  flag: "statue.changed";
+}
 ```
 
 ### Exact false versus unset
@@ -771,7 +786,9 @@ condition: { flag: "choice.accepted", equals: false }
 For normal “not yet done” content, use:
 
 ```js
-condition: { notFlag: "choice.accepted" }
+condition: {
+  notFlag: "choice.accepted";
+}
 ```
 
 ## Mutually exclusive effect branches
@@ -780,17 +797,17 @@ Effects may each have conditions:
 
 ```js
 [
-    {
-        type: "showText",
-        condition: { flag: "machine.on" },
-        pages: ["It is running."],
-    },
-    {
-        type: "showText",
-        condition: { notFlag: "machine.on" },
-        pages: ["It is silent."],
-    },
-]
+  {
+    type: "showText",
+    condition: { flag: "machine.on" },
+    pages: ["It is running."],
+  },
+  {
+    type: "showText",
+    condition: { notFlag: "machine.on" },
+    pages: ["It is silent."],
+  },
+];
 ```
 
 The validator understands basic overlap between flag/item/all/any conditions. Mutually exclusive dialogue branches may coexist in one effect array. If two reachable branches can both open dialogue, validation fails.
@@ -1099,7 +1116,9 @@ A transition cannot begin while dialogue is still open; put it in `afterClose`.
 ### `saveGame`
 
 ```js
-{ type: "saveGame" }
+{
+  type: "saveGame";
+}
 ```
 
 Usually placed in save-point dialogue `afterClose`.
@@ -1304,7 +1323,6 @@ See `06_RANDOMNESS.md` for scope semantics and stable IDs.
 
 `maps.generated.js` is editor-owned. The first map must have a valid `initialEntryId`. In practice, giving every map one is useful for editor defaults and debugging.
 
-
 ## Map camera defaults
 
 Every map defines the base camera:
@@ -1326,28 +1344,28 @@ Camera zones are continuous region-owned state, not one-time trigger effects:
 
 ```js
 cameraZones: [
-    {
-        id: "close-up",
-        region: { col: 5, row: 2, width: 9, height: 5 },
-        priority: 10,
-        camera: {
-            zoom: 6,
-        },
-        transitionInMs: 500,
-        transitionOutMs: 500,
+  {
+    id: "close-up",
+    region: { col: 5, row: 2, width: 9, height: 5 },
+    priority: 10,
+    camera: {
+      zoom: 6,
     },
-    {
-        id: "look-ahead",
-        region: { col: 10, row: 2, width: 9, height: 5 },
-        condition: { flag: "camera.lookAhead" }, // optional
-        priority: 20,
-        camera: {
-            offsetX: 96,
-        },
-        transitionInMs: 500,
-        transitionOutMs: 500,
+    transitionInMs: 500,
+    transitionOutMs: 500,
+  },
+  {
+    id: "look-ahead",
+    region: { col: 10, row: 2, width: 9, height: 5 },
+    condition: { flag: "camera.lookAhead" }, // optional
+    priority: 20,
+    camera: {
+      offsetX: 96,
     },
-]
+    transitionInMs: 500,
+    transitionOutMs: 500,
+  },
+];
 ```
 
 A zone is active while the player is inside its rectangle, its optional condition is true, and its map is current. This is reconstructed on spawn and save load, reevaluated while stationary when conditions change, and cleared on map transitions even when no ordinary exit movement occurs.
@@ -1366,6 +1384,10 @@ Zones contain partial camera patches. Resolution order is:
 
 Later-applied properties win, while omitted properties remain inherited. Leaving one overlapping zone removes only that owner and reveals the remaining base and overrides. Zone state ignores trigger frequency; `once-per-visit` and `once-per-save` apply only to separate trigger effects.
 
+When one reconciliation adds and removes several zones at once, the replacement transition duration is the maximum of every applicable `transitionInMs` and `transitionOutMs`. This is deterministic and intentional: a slow outgoing zone can therefore make a simultaneous fast incoming zone resolve over the slower duration.
+
+An entity follow target is valid only while that entity is effectively present in the active map. Runtime room-visit overrides and the entity's authored condition are checked on every focus resolution; a missing or inactive target throws rather than continuing to follow stale persistent coordinates.
+
 Supported patch properties are `zoom`, `offsetX`, `offsetY`, `x`, `y`, and `followTarget`. A local entity target uses:
 
 ```js
@@ -1379,8 +1401,8 @@ Enter and exit changes replace unfinished camera transitions from the current re
 Logical camera coordinates remain floating point. Rendering converts complete world-space rectangle edges to screen coordinates and rounds those screen edges:
 
 ```js
-screenLeft = Math.round((worldLeft - cameraX) * zoom)
-screenRight = Math.round((worldRight - cameraX) * zoom)
+screenLeft = Math.round((worldLeft - cameraX) * zoom);
+screenRight = Math.round((worldRight - cameraX) * zoom);
 ```
 
 Base tiles, obstacle tiles, foreground tiles, entities, and the player all use the same conversion. Shared edges therefore remain identical, fixed-integer-zoom pans advance in screen-pixel increments, and camera snapping never changes collision or trigger logic. The game canvas is displayed at its native `960×640` CSS size; narrow layouts scroll rather than applying a fractional responsive scale.
@@ -1422,7 +1444,7 @@ Every present layer must have the same rectangular dimensions as `base`.
 ### Empty cells
 
 ```js
--1
+-1;
 ```
 
 Use `EMPTY_TILE_ID` in code when convenient.
@@ -1719,7 +1741,7 @@ Weights are relative and do not need to total 100.
 ### `save`
 
 ```js
-scope: "save"
+scope: "save";
 ```
 
 - The first invocation selects and stores a choice index.
@@ -1730,7 +1752,7 @@ scope: "save"
 ### `once`
 
 ```js
-scope: "once"
+scope: "once";
 ```
 
 - Selects one choice the first time.
@@ -1741,7 +1763,7 @@ scope: "once"
 ### `roomVisit`
 
 ```js
-scope: "roomVisit"
+scope: "roomVisit";
 ```
 
 - Uses the active map's visit serial.
@@ -1753,7 +1775,7 @@ scope: "roomVisit"
 ### `interaction`
 
 ```js
-scope: "interaction"
+scope: "interaction";
 ```
 
 - Uses a per-event counter starting at zero.
@@ -1764,7 +1786,7 @@ scope: "interaction"
 ### `use`
 
 ```js
-scope: "use"
+scope: "use";
 ```
 
 Mechanically identical to `interaction`, but stored in a separate counter namespace. Use it for exits, items, doors, or other explicit uses when that wording better describes the event.
@@ -1824,26 +1846,26 @@ Then in `onEnter`:
 
 ```js
 onEnter: [
-    {
-        type: "random",
-        id: "shadow-spawn",
-        scope: "roomVisit",
-        choices: [
-            {
-                weight: 10,
-                effects: [
-                    {
-                        type: "setEntityActive",
-                        entityId: "shadow",
-                        active: true,
-                        persistence: "roomVisit",
-                    },
-                ],
-            },
-            { weight: 90, effects: [] },
+  {
+    type: "random",
+    id: "shadow-spawn",
+    scope: "roomVisit",
+    choices: [
+      {
+        weight: 10,
+        effects: [
+          {
+            type: "setEntityActive",
+            entityId: "shadow",
+            active: true,
+            persistence: "roomVisit",
+          },
         ],
-    },
-]
+      },
+      { weight: 90, effects: [] },
+    ],
+  },
+];
 ```
 
 The override belongs only to that room visit.
@@ -1930,7 +1952,7 @@ The project has three registries in `sounds.js`:
 
 ```js
 export const SOUNDS = {
-    "receiver-chime": "./assets/sounds/receiver-chime.wav",
+  "receiver-chime": "./assets/sounds/receiver-chime.wav",
 };
 ```
 
@@ -1944,17 +1966,17 @@ Play with:
 
 ```js
 export const MUSIC = {
-    forest: {
-        path: "./assets/music/forest.mp3",
-        title: "Glasswood",      // optional metadata
-        volume: 0.68,            // optional, 0..1
-        loop: true,              // optional
-        loopStart: 2.5,          // optional seconds
-        loopEnd: 45.0,           // optional seconds
-        tags: ["forest"],        // optional metadata
-        license: "...",         // optional metadata
-        source: "...",          // optional metadata
-    },
+  forest: {
+    path: "./assets/music/forest.mp3",
+    title: "Glasswood", // optional metadata
+    volume: 0.68, // optional, 0..1
+    loop: true, // optional
+    loopStart: 2.5, // optional seconds
+    loopEnd: 45.0, // optional seconds
+    tags: ["forest"], // optional metadata
+    license: "...", // optional metadata
+    source: "...", // optional metadata
+  },
 };
 ```
 
@@ -1968,12 +1990,12 @@ Rules:
 
 ```js
 export const MUSIC_EFFECTS = {
-    discovery: {
-        path: "./assets/music/discovery.mp3",
-        title: "Discovery",
-        volume: 0.85,
-        tags: ["stinger"],
-    },
+  discovery: {
+    path: "./assets/music/discovery.mp3",
+    title: "Discovery",
+    volume: 0.85,
+    tags: ["stinger"],
+  },
 };
 ```
 
@@ -1994,7 +2016,7 @@ or explicitly use a transition policy of `inherit` when transitioning.
 ### Explicit silence
 
 ```js
-music: null
+music: null;
 ```
 
 ### Play a track
@@ -2030,17 +2052,17 @@ A conditional music array must end with exactly one unconditional fallback:
 
 ```js
 music: [
-    {
-        condition: { flag: "forest.changed" },
-        trackId: "strange-room",
-        playbackRate: 0.8,
-    },
-    {
-        trackId: "forest",
-        continuityId: "forest-region",
-        restart: "if-different",
-    },
-]
+  {
+    condition: { flag: "forest.changed" },
+    trackId: "strange-room",
+    playbackRate: 0.8,
+  },
+  {
+    trackId: "forest",
+    continuityId: "forest-region",
+    restart: "if-different",
+  },
+];
 ```
 
 Conditional entries before the fallback may omit `trackId` and override only playback options; they inherit the fallback track ID during reference validation/resolution.
@@ -2130,21 +2152,21 @@ The background music ducks, the stinger plays, and the background gain restores 
 
 ```js
 musicEvents: [
-    {
-        id: "first-discovery-cue",
-        frequency: "once-per-save",
-        entryId: "fromGrove",
-        probability: 0.25,
-        condition: { notFlag: "cue.disabled" },
-        effects: [
-            {
-                type: "playMusicEffect",
-                musicEffectId: "discovery",
-                duckMusicTo: 0.18,
-            },
-        ],
-    },
-]
+  {
+    id: "first-discovery-cue",
+    frequency: "once-per-save",
+    entryId: "fromGrove",
+    probability: 0.25,
+    condition: { notFlag: "cue.disabled" },
+    effects: [
+      {
+        type: "playMusicEffect",
+        musicEffectId: "discovery",
+        duckMusicTo: 0.18,
+      },
+    ],
+  },
+];
 ```
 
 Fields:
@@ -2182,10 +2204,10 @@ The current project stores atlas constants in `tiles.js`:
 
 ```js
 export const ATLAS_PATHS = {
-    world: "./assets/atlases/world.png",
-    entities: "./assets/atlases/entities.png",
-    player: "./assets/atlases/player.png",
-    debug: "./assets/atlases/debug.png",
+  world: "./assets/atlases/world.png",
+  entities: "./assets/atlases/entities.png",
+  player: "./assets/atlases/player.png",
+  debug: "./assets/atlases/debug.png",
 };
 ```
 
@@ -2269,9 +2291,9 @@ interaction
 
 ```js
 footprint: [
-    [0, 0],
-    [1, 0],
-]
+  [0, 0],
+  [1, 0],
+];
 ```
 
 - Offsets are non-negative integer pairs.
@@ -2356,19 +2378,19 @@ Add labels/categories in `editor/editor-catalog.js`:
 
 ```js
 export const TILE_EDITOR_META = {
-    [TILE_IDS.NEW_TILE]: {
-        label: "New tile",
-        category: "Nature",
-    },
+  [TILE_IDS.NEW_TILE]: {
+    label: "New tile",
+    category: "Nature",
+  },
 };
 ```
 
 ```js
 export const SPRITE_EDITOR_META = {
-    "new-sprite": {
-        label: "New sprite",
-        category: "Characters",
-    },
+  "new-sprite": {
+    label: "New sprite",
+    category: "Characters",
+  },
 };
 ```
 
@@ -2428,19 +2450,19 @@ The source folder is authoritative; each run rebuilds the atlas.
 
 ```json
 {
-    "glittering-crystal.png": {
-        "label": "Glittering crystal",
-        "category": "Interactables",
-        "size": [32, 64],
-        "frameSize": [32, 64],
-        "defaultAnimation": "glitter",
-        "animations": {
-            "glitter": {
-                "fps": 8,
-                "frames": [0, 1, 2, 3, 2, 1]
-            }
-        }
+  "glittering-crystal.png": {
+    "label": "Glittering crystal",
+    "category": "Interactables",
+    "size": [32, 64],
+    "frameSize": [32, 64],
+    "defaultAnimation": "glitter",
+    "animations": {
+      "glitter": {
+        "fps": 8,
+        "frames": [0, 1, 2, 3, 2, 1]
+      }
     }
+  }
 }
 ```
 
@@ -2489,22 +2511,22 @@ The item does not name a map or entry. A map trigger defines what using it means
 
 ```js
 triggers: [
-    {
-        id: "pink-orb-return",
-        region: { col: 0, row: 0, width: 12, height: 8 },
-        events: ["itemUse"],
-        itemId: "pink-orb",
-        frequency: "always",
-        effects: [
-            { type: "playSound", soundId: "item-use" },
-            {
-                type: "teleport",
-                mapId: "folded-room",
-                entryId: "from-orb",
-            },
-        ],
-    },
-]
+  {
+    id: "pink-orb-return",
+    region: { col: 0, row: 0, width: 12, height: 8 },
+    events: ["itemUse"],
+    itemId: "pink-orb",
+    frequency: "always",
+    effects: [
+      { type: "playSound", soundId: "item-use" },
+      {
+        type: "teleport",
+        mapId: "folded-room",
+        entryId: "from-orb",
+      },
+    ],
+  },
+];
 ```
 
 `itemUse` runs only when the player uses the matching item while their current tile is inside the trigger rectangle. Overlapping matches execute in map trigger-array order. Like movement triggers, processing stops when an earlier trigger changes maps, opens dialogue, or otherwise leaves world mode.
@@ -2560,8 +2582,12 @@ inventory: {
 Use conditions:
 
 ```js
-{ hasItem: "pink-orb" }
-{ notItem: "pink-orb" }
+{
+  hasItem: "pink-orb";
+}
+{
+  notItem: "pink-orb";
+}
 ```
 
 Use effects:
@@ -2773,47 +2799,47 @@ interaction: {
 
 ```js
 onEnter: [
-    {
-        type: "random",
-        id: "rare-visitor",
-        scope: "roomVisit",
-        choices: [
-            {
-                weight: 5,
-                effects: [
-                    {
-                        type: "setEntityActive",
-                        entityId: "visitor",
-                        active: true,
-                        persistence: "roomVisit",
-                    },
-                ],
-            },
-            { weight: 95, effects: [] },
+  {
+    type: "random",
+    id: "rare-visitor",
+    scope: "roomVisit",
+    choices: [
+      {
+        weight: 5,
+        effects: [
+          {
+            type: "setEntityActive",
+            entityId: "visitor",
+            active: true,
+            persistence: "roomVisit",
+          },
         ],
-    },
-]
+      },
+      { weight: 95, effects: [] },
+    ],
+  },
+];
 ```
 
 ## 9. Once-per-save chance
 
 ```js
 onEnter: [
-    {
-        type: "random",
-        id: "one-chance",
-        scope: "once",
-        choices: [
-            {
-                weight: 10,
-                effects: [
-                    { type: "setFlag", flag: "rare-event.happened", value: true },
-                ],
-            },
-            { weight: 90, effects: [] },
+  {
+    type: "random",
+    id: "one-chance",
+    scope: "once",
+    choices: [
+      {
+        weight: 10,
+        effects: [
+          { type: "setFlag", flag: "rare-event.happened", value: true },
         ],
-    },
-]
+      },
+      { weight: 90, effects: [] },
+    ],
+  },
+];
 ```
 
 The chance is consumed whether it succeeds or fails.
@@ -2822,26 +2848,26 @@ The chance is consumed whether it succeeds or fails.
 
 ```js
 onEnter: [
-    {
-        type: "random",
-        id: "room-colour",
-        scope: "save",
-        choices: [
-            {
-                weight: 1,
-                effects: [
-                    { type: "setTile", layer: "base", col: 2, row: 2, tileId: 7 },
-                ],
-            },
-            {
-                weight: 1,
-                effects: [
-                    { type: "setTile", layer: "base", col: 2, row: 2, tileId: 8 },
-                ],
-            },
+  {
+    type: "random",
+    id: "room-colour",
+    scope: "save",
+    choices: [
+      {
+        weight: 1,
+        effects: [
+          { type: "setTile", layer: "base", col: 2, row: 2, tileId: 7 },
         ],
-    },
-]
+      },
+      {
+        weight: 1,
+        effects: [
+          { type: "setTile", layer: "base", col: 2, row: 2, tileId: 8 },
+        ],
+      },
+    ],
+  },
+];
 ```
 
 The same branch is selected every visit. Because `setTile` is persistent, the first visit also writes the result into map state.
@@ -2891,36 +2917,36 @@ Restore:
 
 ```js
 music: [
-    {
-        condition: { flag: "forest.corrupted" },
-        trackId: "strange-room",
-        playbackRate: 0.8,
-    },
-    {
-        trackId: "forest",
-        continuityId: "forest-region",
-        restart: "if-different",
-    },
-]
+  {
+    condition: { flag: "forest.corrupted" },
+    trackId: "strange-room",
+    playbackRate: 0.8,
+  },
+  {
+    trackId: "forest",
+    continuityId: "forest-region",
+    restart: "if-different",
+  },
+];
 ```
 
 ## 14. One-time stinger on a specific entry
 
 ```js
 musicEvents: [
-    {
-        id: "first-discovery",
-        frequency: "once-per-save",
-        entryId: "fromGrove",
-        effects: [
-            {
-                type: "playMusicEffect",
-                musicEffectId: "discovery",
-                duckMusicTo: 0.18,
-            },
-        ],
-    },
-]
+  {
+    id: "first-discovery",
+    frequency: "once-per-save",
+    entryId: "fromGrove",
+    effects: [
+      {
+        type: "playMusicEffect",
+        musicEffectId: "discovery",
+        duckMusicTo: 0.18,
+      },
+    ],
+  },
+];
 ```
 
 ## 15. Random edge exit
@@ -3030,7 +3056,7 @@ No game logic changes are required when using existing tile fields.
 4. Assign `visual: { type: "sprite", id }`.
 5. For universally valid behavior, optionally add a non-empty effect array.
 6. For map-dependent behavior, add an `itemUse` trigger to the relevant map instead of referencing a map from `ITEMS`.
-5. Search map-ID references before renaming targeted maps.
+7. Search map-ID references before renaming targeted maps.
 
 ## Add a sound
 
@@ -3197,7 +3223,7 @@ Keep doorway geometry in `map-edges.js`. The game and editor both import `OPPOSI
 Many objects reject extra fields. A typo such as:
 
 ```js
-playbackrate: 0.8
+playbackrate: 0.8;
 ```
 
 will not be treated as `playbackRate`; it fails validation.
@@ -3210,23 +3236,21 @@ Invalid:
 
 ```js
 [
-    { type: "showText", pages: ["Hello."] },
-    { type: "setFlag", flag: "spoken", value: true },
-]
+  { type: "showText", pages: ["Hello."] },
+  { type: "setFlag", flag: "spoken", value: true },
+];
 ```
 
 Valid:
 
 ```js
 [
-    {
-        type: "showText",
-        pages: ["Hello."],
-        afterClose: [
-            { type: "setFlag", flag: "spoken", value: true },
-        ],
-    },
-]
+  {
+    type: "showText",
+    pages: ["Hello."],
+    afterClose: [{ type: "setFlag", flag: "spoken", value: true }],
+  },
+];
 ```
 
 ## Missing flag versus false
@@ -3238,7 +3262,9 @@ Valid:
 requires an explicitly stored false value.
 
 ```js
-{ notFlag: "x" }
+{
+  notFlag: "x";
+}
 ```
 
 accepts false or missing.
@@ -3277,7 +3303,6 @@ Map-specific tiles are shallow-merged with global tiles. Nested fields are not d
 The editor can rewrite map-owned references but cannot modify external source files. Items, global tiles, sprites, presets, or other registries may block renaming.
 
 Old saves retain old map IDs and are not migrated.
-
 
 ## Entity visual schema
 
@@ -3359,5 +3384,7 @@ Clear or migrate development saves after:
 - Zone priorities are finite; transition durations are non-negative.
 - Camera patches are nonempty and contain only supported properties.
 - Camera effects never imply a control lock. Add a future explicit cutscene/control-lock system when that behavior is required.
-- Continuous fractional zoom cannot preserve uniform source-pixel widths on every intermediate frame. Integer endpoints are the pixel-crisp guarantee.
+- If several camera zones enter or leave during one reconciliation, the transition uses the maximum applicable in/out duration. This deterministic policy may let a slow outgoing zone govern a simultaneous faster incoming change.
+- Entity follow targets use effective runtime presence, including room-visit overrides and authored conditions. Inactive or missing targets are errors.
+- Continuous fractional zoom cannot preserve uniform source-pixel widths on every intermediate frame. Translation and shared-edge snapping remain stable, while integer endpoints are the pixel-crisp guarantee.
 - Shake intensity is in screen pixels.

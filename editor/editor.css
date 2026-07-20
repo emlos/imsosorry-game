@@ -139,7 +139,7 @@ p {
 .left-panel {
   border-right: 1px solid #343641;
   width: 25vw !important;
- max-width: 25vw;  
+  max-width: 25vw;
 }
 .right-panel {
   border-left: 1px solid #343641;

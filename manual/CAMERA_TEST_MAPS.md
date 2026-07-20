@@ -1,5 +1,7 @@
 # Camera Test Maps
 
+The engine uses continuous zoom. Fractional intermediate zoom levels may produce uneven nearest-neighbor source-pixel widths; fixed integer endpoints remain crisp. When several camera-zone memberships change in one reconciliation, the camera uses the maximum applicable transition-in and transition-out duration.
+
 The first three entries in `maps.generated.js` are isolated camera regression maps grouped as `camera-tests` in the editor.
 
 The game starts on the first map in `MAPS`. To test another map, open the editor, reorder or copy that map to the first array position in exported data, then Playtest. The maps intentionally have no exits so each test remains isolated.

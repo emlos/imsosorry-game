@@ -6,10 +6,10 @@ The current project stores atlas constants in `tiles.js`:
 
 ```js
 export const ATLAS_PATHS = {
-    world: "./assets/atlases/world.png",
-    entities: "./assets/atlases/entities.png",
-    player: "./assets/atlases/player.png",
-    debug: "./assets/atlases/debug.png",
+  world: "./assets/atlases/world.png",
+  entities: "./assets/atlases/entities.png",
+  player: "./assets/atlases/player.png",
+  debug: "./assets/atlases/debug.png",
 };
 ```
 
@@ -93,9 +93,9 @@ interaction
 
 ```js
 footprint: [
-    [0, 0],
-    [1, 0],
-]
+  [0, 0],
+  [1, 0],
+];
 ```
 
 - Offsets are non-negative integer pairs.
@@ -180,19 +180,19 @@ Add labels/categories in `editor/editor-catalog.js`:
 
 ```js
 export const TILE_EDITOR_META = {
-    [TILE_IDS.NEW_TILE]: {
-        label: "New tile",
-        category: "Nature",
-    },
+  [TILE_IDS.NEW_TILE]: {
+    label: "New tile",
+    category: "Nature",
+  },
 };
 ```
 
 ```js
 export const SPRITE_EDITOR_META = {
-    "new-sprite": {
-        label: "New sprite",
-        category: "Characters",
-    },
+  "new-sprite": {
+    label: "New sprite",
+    category: "Characters",
+  },
 };
 ```
 
@@ -252,19 +252,19 @@ The source folder is authoritative; each run rebuilds the atlas.
 
 ```json
 {
-    "glittering-crystal.png": {
-        "label": "Glittering crystal",
-        "category": "Interactables",
-        "size": [32, 64],
-        "frameSize": [32, 64],
-        "defaultAnimation": "glitter",
-        "animations": {
-            "glitter": {
-                "fps": 8,
-                "frames": [0, 1, 2, 3, 2, 1]
-            }
-        }
+  "glittering-crystal.png": {
+    "label": "Glittering crystal",
+    "category": "Interactables",
+    "size": [32, 64],
+    "frameSize": [32, 64],
+    "defaultAnimation": "glitter",
+    "animations": {
+      "glitter": {
+        "fps": 8,
+        "frames": [0, 1, 2, 3, 2, 1]
+      }
     }
+  }
 }
 ```
 

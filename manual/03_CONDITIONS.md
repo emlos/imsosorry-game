@@ -14,7 +14,9 @@ Conditions are plain objects with exactly one operator. They can control:
 ### Flag is true
 
 ```js
-{ flag: "bridge.lowered" }
+{
+  flag: "bridge.lowered";
+}
 ```
 
 Equivalent to:
@@ -34,7 +36,9 @@ This is true only when the stored value is explicitly `false`. A missing flag is
 ### Flag is not true
 
 ```js
-{ notFlag: "bridge.lowered" }
+{
+  notFlag: "bridge.lowered";
+}
 ```
 
 This is true when the flag is false or missing. This is usually the correct condition for content visible before an event has occurred.
@@ -42,13 +46,17 @@ This is true when the flag is false or missing. This is usually the correct cond
 ## Item conditions
 
 ```js
-{ hasItem: "pink-orb" }
+{
+  hasItem: "pink-orb";
+}
 ```
 
 True when the inventory quantity is greater than zero.
 
 ```js
-{ notItem: "pink-orb" }
+{
+  notItem: "pink-orb";
+}
 ```
 
 True when the item is absent or has no positive quantity.
@@ -87,7 +95,9 @@ Item IDs are reference-validated.
 ### One-time entity disappears after pickup
 
 ```js
-condition: { notItem: "blue-orb" }
+condition: {
+  notItem: "blue-orb";
+}
 ```
 
 ### Alternate object after a flag
@@ -95,13 +105,17 @@ condition: { notItem: "blue-orb" }
 Original:
 
 ```js
-condition: { notFlag: "statue.changed" }
+condition: {
+  notFlag: "statue.changed";
+}
 ```
 
 Replacement:
 
 ```js
-condition: { flag: "statue.changed" }
+condition: {
+  flag: "statue.changed";
+}
 ```
 
 ### Exact false versus unset
@@ -115,7 +129,9 @@ condition: { flag: "choice.accepted", equals: false }
 For normal “not yet done” content, use:
 
 ```js
-condition: { notFlag: "choice.accepted" }
+condition: {
+  notFlag: "choice.accepted";
+}
 ```
 
 ## Mutually exclusive effect branches
@@ -124,17 +140,17 @@ Effects may each have conditions:
 
 ```js
 [
-    {
-        type: "showText",
-        condition: { flag: "machine.on" },
-        pages: ["It is running."],
-    },
-    {
-        type: "showText",
-        condition: { notFlag: "machine.on" },
-        pages: ["It is silent."],
-    },
-]
+  {
+    type: "showText",
+    condition: { flag: "machine.on" },
+    pages: ["It is running."],
+  },
+  {
+    type: "showText",
+    condition: { notFlag: "machine.on" },
+    pages: ["It is silent."],
+  },
+];
 ```
 
 The validator understands basic overlap between flag/item/all/any conditions. Mutually exclusive dialogue branches may coexist in one effect array. If two reachable branches can both open dialogue, validation fails.

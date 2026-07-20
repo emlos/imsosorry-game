@@ -1,6 +1,6 @@
-# Yume Prototype v0.9.2 — Authoring Manual
+# Yume Prototype v0.10.1 — Authoring Manual
 
-This manual documents the systems present in the attached `0.9.2` project. It is intended as the central reference for map authoring, editor use, interactions, hooks, conditions, effects, camera zones and rendering, deterministic randomness, music, assets, and common recipes.
+This manual documents the systems present in the attached `0.10.1` project. It is intended as the central reference for map authoring, editor use, interactions, hooks, conditions, effects, camera zones and rendering, deterministic randomness, music, assets, and common recipes.
 
 The code is strict by design. Most authored objects accept only the documented keys; a misspelled or unsupported key should fail during game initialization or Playtest rather than being silently ignored.
 
@@ -31,7 +31,7 @@ The code is strict by design. Most authored objects accept only the documented k
 | `maps.js`                  | Re-exports generated maps.                                                |
 | `tiles.js`                 | Tile IDs, atlas paths, and global tile definitions.                       |
 | `sprites.js`               | Entity and player visual definitions.                                     |
-| `editor/editor-catalog.js` | Editor labels, entity presets, and semantic interaction templates.      |
+| `editor/editor-catalog.js` | Editor labels, entity presets, and semantic interaction templates.        |
 | `items.js`                 | Inventory item definitions.                                               |
 | `sounds.js`                | Sound, music, and music-effect registries.                                |
 | `conditions.js`            | Condition operators and evaluation.                                       |

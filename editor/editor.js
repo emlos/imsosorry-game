@@ -1975,9 +1975,7 @@ export class MapEditor {
     return {
       id: makeUniqueId(
         "camera-zone",
-        new Set(
-          (this.currentMap.cameraZones ?? []).map((zone) => zone.id),
-        ),
+        new Set((this.currentMap.cameraZones ?? []).map((zone) => zone.id)),
       ),
       region: { ...region },
       priority: 10,
@@ -2153,8 +2151,8 @@ export class MapEditor {
           : this.selectedCameraZoneId
             ? `Camera zone: ${this.selectedCameraZoneId}`
             : this.selectedExitIndex !== null
-            ? `Exit: ${this.selectedExitIndex}`
-            : "No selection";
+              ? `Exit: ${this.selectedExitIndex}`
+              : "No selection";
     byId("selection-status").textContent = selection;
   }
 
@@ -2491,12 +2489,8 @@ export class MapEditor {
         height: Number(byId("camera-zone-height").value),
       };
       const priority = Number(byId("camera-zone-priority").value);
-      const transitionInMs = Number(
-        byId("camera-zone-transition-in").value,
-      );
-      const transitionOutMs = Number(
-        byId("camera-zone-transition-out").value,
-      );
+      const transitionInMs = Number(byId("camera-zone-transition-in").value);
+      const transitionOutMs = Number(byId("camera-zone-transition-out").value);
       const camera = JSON.parse(byId("camera-zone-camera").value.trim());
       const conditionText = byId("camera-zone-condition").value.trim();
       const condition = conditionText ? JSON.parse(conditionText) : null;
@@ -2548,9 +2542,13 @@ export class MapEditor {
       }
       if (
         condition !== null &&
-        (!condition || typeof condition !== "object" || Array.isArray(condition))
+        (!condition ||
+          typeof condition !== "object" ||
+          Array.isArray(condition))
       ) {
-        throw new Error("Camera zone condition JSON must be an object or blank.");
+        throw new Error(
+          "Camera zone condition JSON must be an object or blank.",
+        );
       }
 
       const previousId = zone.id;

@@ -1441,7 +1441,9 @@ export function validateEditorDocument(maps) {
       } else {
         if (
           camera.zoom !== undefined &&
-          (!Number.isFinite(camera.zoom) || camera.zoom < 0.25 || camera.zoom > 8)
+          (!Number.isFinite(camera.zoom) ||
+            camera.zoom < 0.25 ||
+            camera.zoom > 8)
         ) {
           errors.push(`${label}.camera.zoom must be between 0.25 and 8.`);
         }
@@ -1462,12 +1464,18 @@ export function validateEditorDocument(maps) {
           } else if (target.type === "entity") {
             if (
               typeof target.entityId !== "string" ||
-              !(map.entities ?? []).some((entity) => entity.id === target.entityId)
+              !(map.entities ?? []).some(
+                (entity) => entity.id === target.entityId,
+              )
             ) {
-              errors.push(`${label}.camera.followTarget references a missing entity.`);
+              errors.push(
+                `${label}.camera.followTarget references a missing entity.`,
+              );
             }
           } else if (Object.hasOwn(target, "entityId")) {
-            errors.push(`${label}.camera.followTarget.entityId is only valid for entity targets.`);
+            errors.push(
+              `${label}.camera.followTarget.entityId is only valid for entity targets.`,
+            );
           }
         }
       }

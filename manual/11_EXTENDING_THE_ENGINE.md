@@ -37,7 +37,7 @@ No game logic changes are required when using existing tile fields.
 4. Assign `visual: { type: "sprite", id }`.
 5. For universally valid behavior, optionally add a non-empty effect array.
 6. For map-dependent behavior, add an `itemUse` trigger to the relevant map instead of referencing a map from `ITEMS`.
-5. Search map-ID references before renaming targeted maps.
+7. Search map-ID references before renaming targeted maps.
 
 ## Add a sound
 

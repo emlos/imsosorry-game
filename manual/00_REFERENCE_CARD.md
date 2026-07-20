@@ -3,9 +3,9 @@
 ## Interaction triggers
 
 ```js
-triggers: ["action"]
-triggers: ["touch"]
-triggers: ["action", "touch"]
+triggers: ["action"];
+triggers: ["touch"];
+triggers: ["action", "touch"];
 ```
 
 - `action`: player uses the interaction button while facing the target.
@@ -16,15 +16,15 @@ triggers: ["action", "touch"]
 
 ```js
 triggers: [
-    {
-        id: "hallway-distortion",
-        region: { col: 3, row: 4, width: 5, height: 2 },
-        events: ["enter"], // enter, exit, step
-        frequency: "always", // always, once-per-visit, once-per-save
-        condition: { flag: "world.changed" }, // optional
-        effects: [/* effects */],
-    },
-]
+  {
+    id: "hallway-distortion",
+    region: { col: 3, row: 4, width: 5, height: 2 },
+    events: ["enter"], // enter, exit, step
+    frequency: "always", // always, once-per-visit, once-per-save
+    condition: { flag: "world.changed" }, // optional
+    effects: [/* effects */],
+  },
+];
 ```
 
 - Evaluated only after a completed tile movement.
@@ -43,15 +43,15 @@ Continuous region-owned overrides belong in `cameraZones`:
 
 ```js
 cameraZones: [
-    {
-        id: "close-up",
-        region: { col: 5, row: 2, width: 9, height: 5 },
-        priority: 10,
-        camera: { zoom: 6 },
-        transitionInMs: 500,
-        transitionOutMs: 400,
-    },
-]
+  {
+    id: "close-up",
+    region: { col: 5, row: 2, width: 9, height: 5 },
+    priority: 10,
+    camera: { zoom: 6 },
+    transitionInMs: 500,
+    transitionOutMs: 400,
+  },
+];
 ```
 
 Zones are reconstructed from current position and conditions, combine by priority and array order, and remove only their own partial camera patch. Shake intensity is measured in screen pixels. World rendering rounds shared rectangle edges after applying zoom; UI remains outside the canvas world.
@@ -120,7 +120,9 @@ showText
 Every effect may add:
 
 ```js
-condition: { /* condition */ }
+condition: {
+  /* condition */
+}
 ```
 
 Important dialogue rule: `showText` must be the final reachable effect in its array. Put later operations in `afterClose`.
@@ -141,13 +143,13 @@ Map `triggers[].effects` (`enter`, `exit`, `step`, or contextual `itemUse`)
 
 ## Random scopes
 
-| Scope | Behavior |
-|---|---|
-| `save` | One choice is fixed for the whole save; it executes every time invoked. |
-| `once` | Chooses and executes once for the save; later calls do nothing. |
-| `roomVisit` | Same choice throughout one room visit; rerolls on a later visit. |
-| `interaction` | Advances its own counter on each invocation. |
-| `use` | Same mechanics as interaction, but a separate counter namespace. |
+| Scope         | Behavior                                                                |
+| ------------- | ----------------------------------------------------------------------- |
+| `save`        | One choice is fixed for the whole save; it executes every time invoked. |
+| `once`        | Chooses and executes once for the save; later calls do nothing.         |
+| `roomVisit`   | Same choice throughout one room visit; rerolls on a later visit.        |
+| `interaction` | Advances its own counter on each invocation.                            |
+| `use`         | Same mechanics as interaction, but a separate counter namespace.        |
 
 ## Layers
 

@@ -97,7 +97,7 @@ Map IDs and entity IDs are technical references. Keep them stable once content b
 `editorGroup` is editor-only organization and can be changed freely:
 
 ```js
-editorGroup: "Forest"
+editorGroup: "Forest";
 ```
 
 Changing a map ID is a reference refactor. The editor updates map-owned references on a clone and commits only if valid. References in external registries such as global `TILES`, `SPRITES`, or presets block the rename and must be changed in source code first. Global item definitions are not allowed to contain map destinations.

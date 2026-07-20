@@ -58,7 +58,7 @@ Global item effects may play sounds, change flags, heal, or perform other univer
 ### 4. Map entry
 
 ```js
-onEnter: [/* effects */]
+onEnter: [/* effects */];
 ```
 
 Runs after:
@@ -77,7 +77,7 @@ map:<mapId>:onEnter
 ### 5. Map exit
 
 ```js
-onExit: [/* effects */]
+onExit: [/* effects */];
 ```
 
 Runs before an edge exit or teleport transition. If it opens dialogue, changes maps, or leaves world mode, the original transition does not continue automatically. Use this intentionally; for an exit conversation followed by travel, put the teleport in `showText.afterClose`.
@@ -92,12 +92,12 @@ map:<mapId>:onExit
 
 ```js
 musicEvents: [
-    {
-        id: "first-cue",
-        frequency: "once-per-save",
-        effects: [/* ... */],
-    },
-]
+  {
+    id: "first-cue",
+    frequency: "once-per-save",
+    effects: [/* ... */],
+  },
+];
 ```
 
 Runs on room entry after the map music is applied and before `onEnter`.
@@ -112,21 +112,21 @@ map:<mapId>:music-event:<eventId>
 
 ```js
 triggers: [
-    {
-        id: "hallway-distortion",
-        region: {
-            col: 3,
-            row: 4,
-            width: 5,
-            height: 2,
-        },
-        events: ["enter"],
-        // itemId: "pink-orb", // required when events includes itemUse
-        frequency: "always",
-        condition: { flag: "world.changed" }, // optional
-        effects: [/* non-empty effect array */],
+  {
+    id: "hallway-distortion",
+    region: {
+      col: 3,
+      row: 4,
+      width: 5,
+      height: 2,
     },
-]
+    events: ["enter"],
+    // itemId: "pink-orb", // required when events includes itemUse
+    frequency: "always",
+    condition: { flag: "world.changed" }, // optional
+    effects: [/* non-empty effect array */],
+  },
+];
 ```
 
 Camera lifetime should use `cameraZones`, not paired camera enter/exit effects. Map triggers are invisible rectangular regions independent of tiles and entities. They are evaluated after the player completes a movement into a new tile, never once per rendered frame. The runtime tracks the trigger IDs containing the player's previous tile.
@@ -246,8 +246,8 @@ import { createDefaultInteraction } from "./interactions.js";
 
 const interaction = createDefaultInteraction("effects");
 const door = createDefaultInteraction("teleport", {
-    mapId: "room-target",
-    entryId: "fromSource",
+  mapId: "room-target",
+  entryId: "fromSource",
 });
 ```
 
@@ -268,7 +268,9 @@ Choosing a template replaces the interaction JSON draft in the inspector. It doe
 Entity or tile condition:
 
 ```js
-condition: { notFlag: "object.removed" }
+condition: {
+  notFlag: "object.removed";
+}
 ```
 
 Controls whether the object exists in rendering, collision, and interactions.

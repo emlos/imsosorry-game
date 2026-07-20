@@ -1246,14 +1246,19 @@ export class Game {
     if (Object.keys(camera).length === 0) {
       throw new Error(`${label} must define at least one camera property.`);
     }
-    if (camera.zoom !== undefined) this.validateCameraZoom(camera.zoom, `${label}.zoom`);
+    if (camera.zoom !== undefined)
+      this.validateCameraZoom(camera.zoom, `${label}.zoom`);
     for (const key of ["x", "y", "offsetX", "offsetY"]) {
       if (camera[key] !== undefined && !Number.isFinite(camera[key])) {
         throw new Error(`${label}.${key} must be a finite number.`);
       }
     }
     if (camera.followTarget !== undefined) {
-      this.validateCameraFollowTarget(camera.followTarget, mapId, `${label}.followTarget`);
+      this.validateCameraFollowTarget(
+        camera.followTarget,
+        mapId,
+        `${label}.followTarget`,
+      );
     }
   }
 
@@ -4272,9 +4277,20 @@ export class Game {
       };
     }
     if (target.type === "entity") {
+      const definition = this.entityDefinitionsByMap
+        .get(target.mapId)
+        ?.get(target.entityId);
+      const mapState = this.state.maps[target.mapId];
       const entityState =
-        this.state.maps[target.mapId]?.entities[target.entityId];
-      if (!entityState?.active) {
+        definition && mapState
+          ? this.getEntityState(target.mapId, target.entityId)
+          : null;
+      if (
+        target.mapId !== this.activeMap?.id ||
+        !definition ||
+        !entityState ||
+        !this.isEntityPresent(definition, entityState)
+      ) {
         throw new Error(
           `Camera follow target "${target.entityId}" is inactive or missing.`,
         );
@@ -4491,7 +4507,9 @@ export class Game {
     if (!this.activeMap) return undefined;
     const zones = this.getActiveCameraZones();
     const nextIds = new Set(zones.map((zone) => zone.id));
-    const added = zones.filter((zone) => !this.activeCameraZoneIds.has(zone.id));
+    const added = zones.filter(
+      (zone) => !this.activeCameraZoneIds.has(zone.id),
+    );
     const removed = (this.activeMap.cameraZones ?? []).filter(
       (zone) => this.activeCameraZoneIds.has(zone.id) && !nextIds.has(zone.id),
     );
@@ -4591,10 +4609,8 @@ export class Game {
         y: start.y + (target.y - start.y) * progress,
         zoom: start.zoom + (target.zoom - start.zoom) * progress,
         followTarget: structuredClone(target.followTarget),
-        offsetX:
-          start.offsetX + (target.offsetX - start.offsetX) * progress,
-        offsetY:
-          start.offsetY + (target.offsetY - start.offsetY) * progress,
+        offsetX: start.offsetX + (target.offsetX - start.offsetX) * progress,
+        offsetY: start.offsetY + (target.offsetY - start.offsetY) * progress,
       };
       this.cameraMotion = motion;
       this.camera.zoom = motion.zoom;
@@ -4633,10 +4649,8 @@ export class Game {
       shake.elapsedMs = Math.min(shake.durationMs, shake.elapsedMs + deltaMs);
       const remaining = 1 - shake.elapsedMs / shake.durationMs;
       const phase = shake.elapsedMs * 0.09;
-      this.camera.shakeX =
-        Math.sin(phase * 1.7) * shake.intensity * remaining;
-      this.camera.shakeY =
-        Math.cos(phase * 2.3) * shake.intensity * remaining;
+      this.camera.shakeX = Math.sin(phase * 1.7) * shake.intensity * remaining;
+      this.camera.shakeY = Math.cos(phase * 2.3) * shake.intensity * remaining;
       if (shake.elapsedMs >= shake.durationMs) {
         this.camera.shake = null;
         this.camera.shakeX = 0;
@@ -4789,8 +4803,7 @@ export class Game {
       playerSprite.kind === "image"
         ? playerSprite.size
         : [TILE_SIZE, TILE_SIZE];
-    const playerWorldX =
-      this.player.x + (TILE_SIZE - playerSize[0]) / 2;
+    const playerWorldX = this.player.x + (TILE_SIZE - playerSize[0]) / 2;
     const playerWorldY = this.player.y + TILE_SIZE - playerSize[1];
     const playerScreenRect = this.worldRectToScreen(
       playerWorldX,
@@ -4863,12 +4876,7 @@ export class Game {
       worldX = entity.state.col * TILE_SIZE + (TILE_SIZE - width) / 2;
       worldY = entity.state.row * TILE_SIZE + TILE_SIZE - height;
     }
-    const screenRect = this.worldRectToScreen(
-      worldX,
-      worldY,
-      width,
-      height,
-    );
+    const screenRect = this.worldRectToScreen(worldX, worldY, width, height);
 
     const animationId = resolveAnimationId(visual, [visual.defaultAnimation]);
     const frame = resolveVisualFrame(

@@ -55,7 +55,7 @@ Weights are relative and do not need to total 100.
 ### `save`
 
 ```js
-scope: "save"
+scope: "save";
 ```
 
 - The first invocation selects and stores a choice index.
@@ -66,7 +66,7 @@ scope: "save"
 ### `once`
 
 ```js
-scope: "once"
+scope: "once";
 ```
 
 - Selects one choice the first time.
@@ -77,7 +77,7 @@ scope: "once"
 ### `roomVisit`
 
 ```js
-scope: "roomVisit"
+scope: "roomVisit";
 ```
 
 - Uses the active map's visit serial.
@@ -89,7 +89,7 @@ scope: "roomVisit"
 ### `interaction`
 
 ```js
-scope: "interaction"
+scope: "interaction";
 ```
 
 - Uses a per-event counter starting at zero.
@@ -100,7 +100,7 @@ scope: "interaction"
 ### `use`
 
 ```js
-scope: "use"
+scope: "use";
 ```
 
 Mechanically identical to `interaction`, but stored in a separate counter namespace. Use it for exits, items, doors, or other explicit uses when that wording better describes the event.
@@ -160,26 +160,26 @@ Then in `onEnter`:
 
 ```js
 onEnter: [
-    {
-        type: "random",
-        id: "shadow-spawn",
-        scope: "roomVisit",
-        choices: [
-            {
-                weight: 10,
-                effects: [
-                    {
-                        type: "setEntityActive",
-                        entityId: "shadow",
-                        active: true,
-                        persistence: "roomVisit",
-                    },
-                ],
-            },
-            { weight: 90, effects: [] },
+  {
+    type: "random",
+    id: "shadow-spawn",
+    scope: "roomVisit",
+    choices: [
+      {
+        weight: 10,
+        effects: [
+          {
+            type: "setEntityActive",
+            entityId: "shadow",
+            active: true,
+            persistence: "roomVisit",
+          },
         ],
-    },
-]
+      },
+      { weight: 90, effects: [] },
+    ],
+  },
+];
 ```
 
 The override belongs only to that room visit.

@@ -165,12 +165,14 @@
 
         <section id="camera-zone-tools-section" hidden>
           <h2>Camera zones</h2>
-          <button id="add-camera-zone" type="button">Add 1×1 camera zone</button>
+          <button id="add-camera-zone" type="button">
+            Add 1×1 camera zone
+          </button>
           <div id="camera-zone-list" class="compact-list"></div>
           <p class="hint">
-            Drag empty space to create a rectangle. Drag a zone to move it.
-            Drag the selected zone’s handles to resize it. Overlapping zones
-            combine by priority, then list order.
+            Drag empty space to create a rectangle. Drag a zone to move it. Drag
+            the selected zone’s handles to resize it. Overlapping zones combine
+            by priority, then list order.
           </p>
         </section>
 
@@ -452,27 +454,65 @@
           <h2>Camera zone</h2>
           <label>ID<input id="camera-zone-id" type="text" /></label>
           <div class="field-pair">
-            <label>Column<input id="camera-zone-col" type="number" min="0" step="1" /></label>
-            <label>Row<input id="camera-zone-row" type="number" min="0" step="1" /></label>
+            <label
+              >Column<input id="camera-zone-col" type="number" min="0" step="1"
+            /></label>
+            <label
+              >Row<input id="camera-zone-row" type="number" min="0" step="1"
+            /></label>
           </div>
           <div class="field-pair">
-            <label>Width<input id="camera-zone-width" type="number" min="1" step="1" /></label>
-            <label>Height<input id="camera-zone-height" type="number" min="1" step="1" /></label>
+            <label
+              >Width<input
+                id="camera-zone-width"
+                type="number"
+                min="1"
+                step="1"
+            /></label>
+            <label
+              >Height<input
+                id="camera-zone-height"
+                type="number"
+                min="1"
+                step="1"
+            /></label>
           </div>
-          <label>Priority<input id="camera-zone-priority" type="number" step="1" /></label>
+          <label
+            >Priority<input id="camera-zone-priority" type="number" step="1"
+          /></label>
           <div class="field-pair">
-            <label>Transition in (ms)<input id="camera-zone-transition-in" type="number" min="0" step="50" /></label>
-            <label>Transition out (ms)<input id="camera-zone-transition-out" type="number" min="0" step="50" /></label>
+            <label
+              >Transition in (ms)<input
+                id="camera-zone-transition-in"
+                type="number"
+                min="0"
+                step="50"
+            /></label>
+            <label
+              >Transition out (ms)<input
+                id="camera-zone-transition-out"
+                type="number"
+                min="0"
+                step="50"
+            /></label>
           </div>
           <label>
-            Camera patch JSON<textarea id="camera-zone-camera" rows="10" spellcheck="false"></textarea>
+            Camera patch JSON<textarea
+              id="camera-zone-camera"
+              rows="10"
+              spellcheck="false"
+            ></textarea>
           </label>
           <p class="hint">
-            Partial properties combine with the map base and lower-priority zones.
-            Supported keys: zoom, offsetX, offsetY, x, y, followTarget.
+            Partial properties combine with the map base and lower-priority
+            zones. Supported keys: zoom, offsetX, offsetY, x, y, followTarget.
           </p>
           <label>
-            Condition JSON<textarea id="camera-zone-condition" rows="7" spellcheck="false"></textarea>
+            Condition JSON<textarea
+              id="camera-zone-condition"
+              rows="7"
+              spellcheck="false"
+            ></textarea>
           </label>
           <div class="button-row">
             <button id="move-camera-zone-up" type="button">Earlier</button>
@@ -480,7 +520,9 @@
           </div>
           <div class="button-row">
             <button id="apply-camera-zone" type="button">Apply</button>
-            <button id="delete-camera-zone" type="button" class="danger">Delete</button>
+            <button id="delete-camera-zone" type="button" class="danger">
+              Delete
+            </button>
           </div>
         </section>
 

@@ -10,7 +10,7 @@ The project has three registries in `sounds.js`:
 
 ```js
 export const SOUNDS = {
-    "receiver-chime": "./assets/sounds/receiver-chime.wav",
+  "receiver-chime": "./assets/sounds/receiver-chime.wav",
 };
 ```
 
@@ -24,17 +24,17 @@ Play with:
 
 ```js
 export const MUSIC = {
-    forest: {
-        path: "./assets/music/forest.mp3",
-        title: "Glasswood",      // optional metadata
-        volume: 0.68,            // optional, 0..1
-        loop: true,              // optional
-        loopStart: 2.5,          // optional seconds
-        loopEnd: 45.0,           // optional seconds
-        tags: ["forest"],        // optional metadata
-        license: "...",         // optional metadata
-        source: "...",          // optional metadata
-    },
+  forest: {
+    path: "./assets/music/forest.mp3",
+    title: "Glasswood", // optional metadata
+    volume: 0.68, // optional, 0..1
+    loop: true, // optional
+    loopStart: 2.5, // optional seconds
+    loopEnd: 45.0, // optional seconds
+    tags: ["forest"], // optional metadata
+    license: "...", // optional metadata
+    source: "...", // optional metadata
+  },
 };
 ```
 
@@ -48,12 +48,12 @@ Rules:
 
 ```js
 export const MUSIC_EFFECTS = {
-    discovery: {
-        path: "./assets/music/discovery.mp3",
-        title: "Discovery",
-        volume: 0.85,
-        tags: ["stinger"],
-    },
+  discovery: {
+    path: "./assets/music/discovery.mp3",
+    title: "Discovery",
+    volume: 0.85,
+    tags: ["stinger"],
+  },
 };
 ```
 
@@ -74,7 +74,7 @@ or explicitly use a transition policy of `inherit` when transitioning.
 ### Explicit silence
 
 ```js
-music: null
+music: null;
 ```
 
 ### Play a track
@@ -110,17 +110,17 @@ A conditional music array must end with exactly one unconditional fallback:
 
 ```js
 music: [
-    {
-        condition: { flag: "forest.changed" },
-        trackId: "strange-room",
-        playbackRate: 0.8,
-    },
-    {
-        trackId: "forest",
-        continuityId: "forest-region",
-        restart: "if-different",
-    },
-]
+  {
+    condition: { flag: "forest.changed" },
+    trackId: "strange-room",
+    playbackRate: 0.8,
+  },
+  {
+    trackId: "forest",
+    continuityId: "forest-region",
+    restart: "if-different",
+  },
+];
 ```
 
 Conditional entries before the fallback may omit `trackId` and override only playback options; they inherit the fallback track ID during reference validation/resolution.
@@ -210,21 +210,21 @@ The background music ducks, the stinger plays, and the background gain restores 
 
 ```js
 musicEvents: [
-    {
-        id: "first-discovery-cue",
-        frequency: "once-per-save",
-        entryId: "fromGrove",
-        probability: 0.25,
-        condition: { notFlag: "cue.disabled" },
-        effects: [
-            {
-                type: "playMusicEffect",
-                musicEffectId: "discovery",
-                duckMusicTo: 0.18,
-            },
-        ],
-    },
-]
+  {
+    id: "first-discovery-cue",
+    frequency: "once-per-save",
+    entryId: "fromGrove",
+    probability: 0.25,
+    condition: { notFlag: "cue.disabled" },
+    effects: [
+      {
+        type: "playMusicEffect",
+        musicEffectId: "discovery",
+        duckMusicTo: 0.18,
+      },
+    ],
+  },
+];
 ```
 
 Fields:

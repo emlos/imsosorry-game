@@ -42,7 +42,6 @@
 
 `maps.generated.js` is editor-owned. The first map must have a valid `initialEntryId`. In practice, giving every map one is useful for editor defaults and debugging.
 
-
 ## Map camera defaults
 
 Every map defines the base camera:
@@ -64,28 +63,28 @@ Camera zones are continuous region-owned state, not one-time trigger effects:
 
 ```js
 cameraZones: [
-    {
-        id: "close-up",
-        region: { col: 5, row: 2, width: 9, height: 5 },
-        priority: 10,
-        camera: {
-            zoom: 6,
-        },
-        transitionInMs: 500,
-        transitionOutMs: 500,
+  {
+    id: "close-up",
+    region: { col: 5, row: 2, width: 9, height: 5 },
+    priority: 10,
+    camera: {
+      zoom: 6,
     },
-    {
-        id: "look-ahead",
-        region: { col: 10, row: 2, width: 9, height: 5 },
-        condition: { flag: "camera.lookAhead" }, // optional
-        priority: 20,
-        camera: {
-            offsetX: 96,
-        },
-        transitionInMs: 500,
-        transitionOutMs: 500,
+    transitionInMs: 500,
+    transitionOutMs: 500,
+  },
+  {
+    id: "look-ahead",
+    region: { col: 10, row: 2, width: 9, height: 5 },
+    condition: { flag: "camera.lookAhead" }, // optional
+    priority: 20,
+    camera: {
+      offsetX: 96,
     },
-]
+    transitionInMs: 500,
+    transitionOutMs: 500,
+  },
+];
 ```
 
 A zone is active while the player is inside its rectangle, its optional condition is true, and its map is current. This is reconstructed on spawn and save load, reevaluated while stationary when conditions change, and cleared on map transitions even when no ordinary exit movement occurs.
@@ -104,6 +103,10 @@ Zones contain partial camera patches. Resolution order is:
 
 Later-applied properties win, while omitted properties remain inherited. Leaving one overlapping zone removes only that owner and reveals the remaining base and overrides. Zone state ignores trigger frequency; `once-per-visit` and `once-per-save` apply only to separate trigger effects.
 
+When one reconciliation adds and removes several zones at once, the replacement transition duration is the maximum of every applicable `transitionInMs` and `transitionOutMs`. This is deterministic and intentional: a slow outgoing zone can therefore make a simultaneous fast incoming zone resolve over the slower duration.
+
+An entity follow target is valid only while that entity is effectively present in the active map. Runtime room-visit overrides and the entity's authored condition are checked on every focus resolution; a missing or inactive target throws rather than continuing to follow stale persistent coordinates.
+
 Supported patch properties are `zoom`, `offsetX`, `offsetY`, `x`, `y`, and `followTarget`. A local entity target uses:
 
 ```js
@@ -117,8 +120,8 @@ Enter and exit changes replace unfinished camera transitions from the current re
 Logical camera coordinates remain floating point. Rendering converts complete world-space rectangle edges to screen coordinates and rounds those screen edges:
 
 ```js
-screenLeft = Math.round((worldLeft - cameraX) * zoom)
-screenRight = Math.round((worldRight - cameraX) * zoom)
+screenLeft = Math.round((worldLeft - cameraX) * zoom);
+screenRight = Math.round((worldRight - cameraX) * zoom);
 ```
 
 Base tiles, obstacle tiles, foreground tiles, entities, and the player all use the same conversion. Shared edges therefore remain identical, fixed-integer-zoom pans advance in screen-pixel increments, and camera snapping never changes collision or trigger logic. The game canvas is displayed at its native `960×640` CSS size; narrow layouts scroll rather than applying a fractional responsive scale.
@@ -160,7 +163,7 @@ Every present layer must have the same rectangular dimensions as `base`.
 ### Empty cells
 
 ```js
--1
+-1;
 ```
 
 Use `EMPTY_TILE_ID` in code when convenient.

@@ -518,9 +518,14 @@ export class EditorRenderer {
     const width = zone.region.width * TILE_SIZE;
     const height = zone.region.height * TILE_SIZE;
     const points = [
-      [x, y], [x + width / 2, y], [x + width, y],
-      [x, y + height / 2], [x + width, y + height / 2],
-      [x, y + height], [x + width / 2, y + height], [x + width, y + height],
+      [x, y],
+      [x + width / 2, y],
+      [x + width, y],
+      [x, y + height / 2],
+      [x + width, y + height / 2],
+      [x, y + height],
+      [x + width / 2, y + height],
+      [x + width, y + height],
     ];
     this.ctx.fillStyle = "#e8fbff";
     this.ctx.strokeStyle = "#12677f";

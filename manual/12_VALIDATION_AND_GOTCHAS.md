@@ -5,7 +5,7 @@
 Many objects reject extra fields. A typo such as:
 
 ```js
-playbackrate: 0.8
+playbackrate: 0.8;
 ```
 
 will not be treated as `playbackRate`; it fails validation.
@@ -18,23 +18,21 @@ Invalid:
 
 ```js
 [
-    { type: "showText", pages: ["Hello."] },
-    { type: "setFlag", flag: "spoken", value: true },
-]
+  { type: "showText", pages: ["Hello."] },
+  { type: "setFlag", flag: "spoken", value: true },
+];
 ```
 
 Valid:
 
 ```js
 [
-    {
-        type: "showText",
-        pages: ["Hello."],
-        afterClose: [
-            { type: "setFlag", flag: "spoken", value: true },
-        ],
-    },
-]
+  {
+    type: "showText",
+    pages: ["Hello."],
+    afterClose: [{ type: "setFlag", flag: "spoken", value: true }],
+  },
+];
 ```
 
 ## Missing flag versus false
@@ -46,7 +44,9 @@ Valid:
 requires an explicitly stored false value.
 
 ```js
-{ notFlag: "x" }
+{
+  notFlag: "x";
+}
 ```
 
 accepts false or missing.
@@ -85,7 +85,6 @@ Map-specific tiles are shallow-merged with global tiles. Nested fields are not d
 The editor can rewrite map-owned references but cannot modify external source files. Items, global tiles, sprites, presets, or other registries may block renaming.
 
 Old saves retain old map IDs and are not migrated.
-
 
 ## Entity visual schema
 
@@ -167,5 +166,7 @@ Clear or migrate development saves after:
 - Zone priorities are finite; transition durations are non-negative.
 - Camera patches are nonempty and contain only supported properties.
 - Camera effects never imply a control lock. Add a future explicit cutscene/control-lock system when that behavior is required.
-- Continuous fractional zoom cannot preserve uniform source-pixel widths on every intermediate frame. Integer endpoints are the pixel-crisp guarantee.
+- If several camera zones enter or leave during one reconciliation, the transition uses the maximum applicable in/out duration. This deterministic policy may let a slow outgoing zone govern a simultaneous faster incoming change.
+- Entity follow targets use effective runtime presence, including room-visit overrides and authored conditions. Inactive or missing targets are errors.
+- Continuous fractional zoom cannot preserve uniform source-pixel widths on every intermediate frame. Translation and shared-edge snapping remain stable, while integer endpoints are the pixel-crisp guarantee.
 - Shake intensity is in screen pixels.

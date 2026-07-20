@@ -300,7 +300,9 @@ A transition cannot begin while dialogue is still open; put it in `afterClose`.
 ### `saveGame`
 
 ```js
-{ type: "saveGame" }
+{
+  type: "saveGame";
+}
 ```
 
 Usually placed in save-point dialogue `afterClose`.

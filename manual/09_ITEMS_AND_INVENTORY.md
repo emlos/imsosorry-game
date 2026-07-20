@@ -30,22 +30,22 @@ The item does not name a map or entry. A map trigger defines what using it means
 
 ```js
 triggers: [
-    {
-        id: "pink-orb-return",
-        region: { col: 0, row: 0, width: 12, height: 8 },
-        events: ["itemUse"],
-        itemId: "pink-orb",
-        frequency: "always",
-        effects: [
-            { type: "playSound", soundId: "item-use" },
-            {
-                type: "teleport",
-                mapId: "folded-room",
-                entryId: "from-orb",
-            },
-        ],
-    },
-]
+  {
+    id: "pink-orb-return",
+    region: { col: 0, row: 0, width: 12, height: 8 },
+    events: ["itemUse"],
+    itemId: "pink-orb",
+    frequency: "always",
+    effects: [
+      { type: "playSound", soundId: "item-use" },
+      {
+        type: "teleport",
+        mapId: "folded-room",
+        entryId: "from-orb",
+      },
+    ],
+  },
+];
 ```
 
 `itemUse` runs only when the player uses the matching item while their current tile is inside the trigger rectangle. Overlapping matches execute in map trigger-array order. Like movement triggers, processing stops when an earlier trigger changes maps, opens dialogue, or otherwise leaves world mode.
@@ -101,8 +101,12 @@ inventory: {
 Use conditions:
 
 ```js
-{ hasItem: "pink-orb" }
-{ notItem: "pink-orb" }
+{
+  hasItem: "pink-orb";
+}
+{
+  notItem: "pink-orb";
+}
 ```
 
 Use effects:
