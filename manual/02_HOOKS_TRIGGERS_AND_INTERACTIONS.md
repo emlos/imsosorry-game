@@ -235,6 +235,24 @@ Allowed structure:
 
 Use direct `teleport` for a simple fixed destination. Use `handler: "effects"` with a `random` effect and nested `teleport` effects for random or conditional destinations.
 
+## Structured effect context and self-targeting
+
+Effects execute with a structured context containing the current map, stable owner ID, and source subject. Entity interactions provide:
+
+```js
+{
+    mapId,
+    ownerId,
+    subject: {
+        type: "entity",
+        mapId,
+        entityId,
+    },
+}
+```
+
+This subject is preserved through `random` choices and `showText.afterClose`. The four entity mutation effects may use `target: "self"`; validation rejects that syntax from tile interactions, triggers, items, map hooks, and music events. Explicit `entityId` targeting remains available for cross-entity and cross-map mutations.
+
 ## Handler defaults and editor templates
 
 Interaction defaults are authoring factories, not runtime fallback behavior. Every saved interaction is still validated exactly as written. Missing keys, empty effect arrays, bad item IDs, and broken map references remain errors.

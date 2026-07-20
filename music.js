@@ -249,7 +249,19 @@ export function validateMapMusicReferences(game, map) {
     if (event.condition !== undefined) {
       validateConditionReferences(game, event.condition, `${label}.condition`);
     }
-    validateEffectsReferences(game, event.effects, map.id, `${label}.effects`);
+    validateEffectsReferences(
+      game,
+      event.effects,
+      {
+        mapId: map.id,
+        subject: {
+          type: "musicEvent",
+          mapId: map.id,
+          eventId: event.id,
+        },
+      },
+      `${label}.effects`,
+    );
   }
 }
 

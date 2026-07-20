@@ -68,7 +68,6 @@ export function createSavePointInteraction({
 
 export function createItemPickupInteraction(context = {}) {
   const itemId = getTemplateItemId(context);
-  const entityId = context.entity?.id ?? "entity-id";
 
   return createDefaultInteraction("effects", {
     effects: [
@@ -83,7 +82,7 @@ export function createItemPickupInteraction(context = {}) {
         afterClose: [
           {
             type: "setEntityActive",
-            entityId,
+            target: "self",
             active: false,
           },
         ],
@@ -184,7 +183,7 @@ export const INTERACTION_TEMPLATES = [
     notice(context) {
       return context.itemIds?.length
         ? ""
-        : 'ITEMS is empty; replace the placeholder "item-id" after defining an item.';
+        : 'ITEMS is empty; define the item explicitly, then replace the invalid "item-id" reference. Runtime and Playtest will not create a placeholder item.';
     },
   },
   {

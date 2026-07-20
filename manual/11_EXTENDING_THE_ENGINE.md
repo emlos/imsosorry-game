@@ -121,6 +121,8 @@ A handler needs:
 
 `createDefault()` is an authoring convenience only. Runtime validation must not fill in omitted data or repair malformed interactions. Expose handler defaults through `createDefaultInteraction(handlerId, options)`.
 
+Effect execution and reference validation receive a structured context with `mapId`, `ownerId` when executing, and a `subject`. Preserve the complete context when delegating to nested effect arrays. Do not reconstruct subject identity from an owner string.
+
 Also update map graph/refactor logic if the handler contains teleports or map references.
 
 Prefer composing existing effects rather than adding a handler when possible. `handler: "effects"` is the general extension point. Semantic combinations such as save points, pickups, and conditional dialogue belong in `editor/editor-catalog.js` and should be added to `INTERACTION_TEMPLATES`.

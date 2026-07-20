@@ -170,3 +170,17 @@ Clear or migrate development saves after:
 - Entity follow targets use effective runtime presence, including room-visit overrides and authored conditions. Inactive or missing targets are errors.
 - Continuous fractional zoom cannot preserve uniform source-pixel widths on every intermediate frame. Translation and shared-edge snapping remain stable, while integer endpoints are the pixel-crisp guarantee.
 - Shake intensity is in screen pixels.
+
+## Missing item references
+
+Missing item IDs are hard errors in the editor, Playtest, production startup, triggers, and saves. The runtime never creates placeholder items from broken references. Author an intentional placeholder as a real entry in `data/items.js` when that is genuinely desired.
+
+## Entity self-targeting
+
+Self-targeting is explicit rather than inferred from a missing `entityId`:
+
+```js
+{ type: "setEntityActive", target: "self", active: false }
+```
+
+`target: "self"` and `entityId` are mutually exclusive, and `mapId` cannot accompany self-targeting. It is valid only within an entity interaction. Nested random and dialogue-after-close effects preserve that entity subject.

@@ -456,12 +456,11 @@ const MAP_SCOPED_EFFECT_TYPES = new Set([
   "teleport",
 ]);
 
-const ENTITY_REFERENCE_EFFECT_TYPES = new Set([
+const ENTITY_MUTATION_EFFECT_TYPES = new Set([
   "setEntityActive",
   "setEntityPosition",
   "setEntityVisual",
   "setEntityCollision",
-  "cameraFollow",
 ]);
 
 export function findMapIdReferences(value, mapId, path = "value", output = []) {
@@ -765,6 +764,7 @@ function validateEditorEffectsReferences(
   path,
   mapById,
   errors,
+  subject = null,
   randomIds = new Set(),
 ) {
   if (effects === undefined) return;
@@ -790,23 +790,64 @@ function validateEditorEffectsReferences(
     }
 
     if (
-      ENTITY_REFERENCE_EFFECT_TYPES.has(effect.type) &&
-      typeof effect.entityId === "string"
+      (effect.type === "addItem" || effect.type === "removeItem") &&
+      (typeof effect.itemId !== "string" ||
+        !Object.hasOwn(ITEMS, effect.itemId))
     ) {
-      const targetMapId = effect.mapId ?? sourceMap.id;
-      const targetMap = mapById.get(targetMapId);
+      errors.push(
+        `${effectPath} references missing item "${String(effect.itemId)}" in ITEMS.`,
+      );
+    }
 
-      if (!targetMap) {
+    if (ENTITY_MUTATION_EFFECT_TYPES.has(effect.type)) {
+      const hasEntityId = Object.hasOwn(effect, "entityId");
+      const hasTarget = Object.hasOwn(effect, "target");
+      let targetMapId = null;
+      let targetEntityId = null;
+
+      if (hasEntityId === hasTarget) {
+        errors.push(
+          `${effectPath} must define exactly one of entityId or target: "self".`,
+        );
+      } else if (hasTarget) {
+        if (effect.target !== "self") {
+          errors.push(`${effectPath}.target must be "self".`);
+        }
+        if (Object.hasOwn(effect, "mapId")) {
+          errors.push(`${effectPath}.mapId is invalid with target: "self".`);
+        }
+        if (subject?.type !== "entity") {
+          errors.push(
+            `${effectPath} uses target: "self" outside an entity interaction.`,
+          );
+        } else {
+          targetMapId = subject.mapId;
+          targetEntityId = subject.entityId;
+        }
+      } else if (
+        typeof effect.entityId !== "string" ||
+        effect.entityId.length === 0
+      ) {
+        errors.push(`${effectPath}.entityId must be a nonempty string.`);
+      } else {
+        targetMapId = effect.mapId ?? sourceMap.id;
+        targetEntityId = effect.entityId;
+      }
+
+      const targetMap =
+        typeof targetMapId === "string" ? mapById.get(targetMapId) : null;
+      if (targetMapId !== null && !targetMap) {
         errors.push(
           `${effectPath} targets missing map "${String(targetMapId)}".`,
         );
       } else if (
+        targetMap &&
         !(targetMap.entities ?? []).some(
-          (entity) => entity?.id === effect.entityId,
+          (entity) => entity?.id === targetEntityId,
         )
       ) {
         errors.push(
-          `${effectPath} targets missing entity "${effect.entityId}" in "${targetMapId}".`,
+          `${effectPath} targets missing entity "${String(targetEntityId)}" in "${targetMapId}".`,
         );
       }
 
@@ -845,6 +886,24 @@ function validateEditorEffectsReferences(
       }
     }
 
+    if (
+      effect.type === "cameraFollow" &&
+      effect.target === "entity" &&
+      typeof effect.entityId === "string"
+    ) {
+      const targetMap = mapById.get(sourceMap.id);
+      if (
+        !targetMap ||
+        !(targetMap.entities ?? []).some(
+          (entity) => entity?.id === effect.entityId,
+        )
+      ) {
+        errors.push(
+          `${effectPath} targets missing entity "${effect.entityId}" in "${sourceMap.id}".`,
+        );
+      }
+    }
+
     if (effect.type === "showText") {
       validateEditorEffectsReferences(
         effect.afterClose,
@@ -852,6 +911,7 @@ function validateEditorEffectsReferences(
         `${effectPath}.afterClose`,
         mapById,
         errors,
+        subject,
         randomIds,
       );
     }
@@ -896,6 +956,7 @@ function validateEditorEffectsReferences(
           `${effectPath}.choices[${choiceIndex}].effects`,
           mapById,
           errors,
+          subject,
           randomIds,
         );
       }
@@ -973,6 +1034,7 @@ function validateEditorInteractionReferences(
   path,
   mapById,
   errors,
+  subject,
 ) {
   if (
     !interaction ||
@@ -1002,6 +1064,7 @@ function validateEditorInteractionReferences(
       `${path}.effects`,
       mapById,
       errors,
+      subject,
     );
   }
 }
@@ -1648,6 +1711,11 @@ export function validateEditorDocument(maps) {
         `${map.id}.entities[${index}].interaction`,
         mapById,
         errors,
+        {
+          type: "entity",
+          mapId: map.id,
+          entityId: entity?.id,
+        },
       );
     }
 
@@ -1668,6 +1736,11 @@ export function validateEditorDocument(maps) {
         `${map.id}.tiles.${tileId}.interaction`,
         mapById,
         errors,
+        {
+          type: "tile",
+          mapId: map.id,
+          tileId,
+        },
       );
     }
 

@@ -98,23 +98,37 @@ export const INTERACTION_HANDLERS = new Map([
         validateEffectsDefinition(interaction.effects, `Effects for ${label}`);
       },
 
-      validateReferences({ game, interaction, sourceMapId, label }) {
+      validateReferences({ game, interaction, context, label }) {
         validateEffectsReferences(
           game,
           interaction.effects,
-          sourceMapId,
+          context,
           `Effects for ${label}`,
         );
       },
 
       execute({ game, target, sourceMapId }) {
-        const ownerId =
-          target.kind === "entity"
-            ? `map:${sourceMapId}:entity:${target.entityId}`
-            : `map:${sourceMapId}:tile-events`;
+        const isEntity = target.kind === "entity";
+        const ownerId = isEntity
+          ? `map:${sourceMapId}:entity:${target.entityId}`
+          : `map:${sourceMapId}:tile-events`;
+        const subject = isEntity
+          ? {
+              type: "entity",
+              mapId: sourceMapId,
+              entityId: target.entityId,
+            }
+          : {
+              type: "tile",
+              mapId: sourceMapId,
+              tileId: target.tileId,
+              col: target.anchor.col,
+              row: target.anchor.row,
+            };
         game.runEffects(target.interaction.effects, {
           mapId: sourceMapId,
           ownerId,
+          subject,
         });
       },
     },
@@ -181,12 +195,12 @@ export const INTERACTION_HANDLERS = new Map([
         }
       },
 
-      validateReferences({ game, interaction, sourceMapId, label }) {
+      validateReferences({ game, interaction, context, label }) {
         const { mapId, entryId } = interaction.params;
         game.validateEntryReference(
           mapId,
           entryId,
-          `${label} from "${sourceMapId}"`,
+          `${label} from "${context.mapId}"`,
         );
       },
 
@@ -260,7 +274,7 @@ export function validateInteractionDefinition(interaction, label) {
 export function validateInteractionReferences(
   game,
   interaction,
-  sourceMapId,
+  context,
   label,
 ) {
   if (interaction.condition) {
@@ -272,26 +286,5 @@ export function validateInteractionReferences(
   }
 
   const handler = INTERACTION_HANDLERS.get(interaction.handler);
-  handler.validateReferences?.({ game, interaction, sourceMapId, label });
+  handler.validateReferences?.({ game, interaction, context, label });
 }
-
-//TODO:
-// for structs like these the behavior desired is in the comments:
-// {
-//     "handler": "effects",
-//     "triggers": [
-//         "action"
-//     ],
-//     "effects": [
-//         {
-//             "type": "addItem",
-//             "itemId": "item-id", //if item id is missing, create a placeholder item in the inventory, mark a warning for validation
-//             "quantity": 1
-//         },
-//         {
-//             "type": "setEntityActive",
-//             "entityId": "animatedSavePoint", //can be omitted if its the object thats being interacted with.
-//             "active": false
-//         }
-//     ]
-// }

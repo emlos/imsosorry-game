@@ -371,7 +371,10 @@ export class Game {
       validateEffectsReferences(
         this,
         item.effects,
-        null,
+        {
+          mapId: null,
+          subject: { type: "item", itemId },
+        },
         `Effects for Item "${itemId}"`,
       );
     }
@@ -1064,7 +1067,14 @@ export class Game {
             validateInteractionReferences(
               this,
               interaction,
-              map.id,
+              {
+                mapId: map.id,
+                subject: {
+                  type: "tile",
+                  mapId: map.id,
+                  tileId,
+                },
+              },
               `interaction on tile ${String(tileId)} in "${map.id}"`,
             );
           }
@@ -1078,7 +1088,10 @@ export class Game {
       validateEffectsReferences(
         this,
         map.onEnter,
-        map.id,
+        {
+          mapId: map.id,
+          subject: { type: "map", mapId: map.id, hook: "onEnter" },
+        },
         `Map "${map.id}" onEnter`,
       );
     }
@@ -1086,7 +1099,10 @@ export class Game {
       validateEffectsReferences(
         this,
         map.onExit,
-        map.id,
+        {
+          mapId: map.id,
+          subject: { type: "map", mapId: map.id, hook: "onExit" },
+        },
         `Map "${map.id}" onExit`,
       );
     }
@@ -1108,7 +1124,14 @@ export class Game {
       validateEffectsReferences(
         this,
         trigger.effects,
-        map.id,
+        {
+          mapId: map.id,
+          subject: {
+            type: "trigger",
+            mapId: map.id,
+            triggerId: trigger.id,
+          },
+        },
         `Effects for trigger "${trigger.id}" in "${map.id}"`,
       );
     }
@@ -1144,7 +1167,14 @@ export class Game {
       validateInteractionReferences(
         this,
         entity.interaction,
-        map.id,
+        {
+          mapId: map.id,
+          subject: {
+            type: "entity",
+            mapId: map.id,
+            entityId: entity.id,
+          },
+        },
         `interaction for entity "${entity.id}" in "${map.id}"`,
       );
     }
@@ -1755,6 +1785,11 @@ export class Game {
     this.runEffects(trigger.effects, {
       mapId: sourceMapId,
       ownerId: `map:${sourceMapId}:trigger:${trigger.id}`,
+      subject: {
+        type: "trigger",
+        mapId: sourceMapId,
+        triggerId: trigger.id,
+      },
     });
 
     this.canvas.dispatchEvent(
@@ -3037,7 +3072,7 @@ export class Game {
   }
 
   //TODO: should this be async?
-  showText({ pages, speaker, afterClose, mapId, ownerId }) {
+  showText({ pages, speaker, afterClose, effectContext }) {
     if (this.mode !== "world") {
       throw new Error(
         `Cannot open dialogue while game mode is "${this.mode}".`,
@@ -3056,7 +3091,7 @@ export class Game {
           const result =
             afterClose === null
               ? undefined
-              : this.runEffects(afterClose, { mapId, ownerId });
+              : this.runEffects(afterClose, effectContext);
           if (result && typeof result.then === "function") {
             void result.then(resolve);
           } else {
@@ -3162,6 +3197,11 @@ export class Game {
       this.runEffects(event.effects, {
         mapId: map.id,
         ownerId: `map:${map.id}:music-event:${event.id}`,
+        subject: {
+          type: "musicEvent",
+          mapId: map.id,
+          eventId: event.id,
+        },
       });
     }
   }
@@ -3178,6 +3218,7 @@ export class Game {
         this.runEffects(map.onExit, {
           mapId: sourceMapId,
           ownerId: `map:${sourceMapId}:onExit`,
+          subject: { type: "map", mapId: sourceMapId, hook: "onExit" },
         });
       }
     } finally {
@@ -3261,6 +3302,7 @@ export class Game {
       this.runEffects(map.onEnter, {
         mapId,
         ownerId: `map:${mapId}:onEnter`,
+        subject: { type: "map", mapId, hook: "onEnter" },
       });
     }
 
@@ -3473,6 +3515,7 @@ export class Game {
       ? this.runEffects(item.effects, {
           mapId: sourceMapId,
           ownerId: `item:${itemId}`,
+          subject: { type: "item", itemId },
         })
       : undefined;
     if (result && typeof result.then === "function") {
@@ -3495,8 +3538,8 @@ export class Game {
     return evaluateCondition(runtimeState, condition);
   }
 
-  runEffects(effects, { mapId, ownerId }) {
-    return runEffects(this, effects, { mapId, ownerId });
+  runEffects(effects, context) {
+    return runEffects(this, effects, context);
   }
 
   getRandomEventKey(ownerId, randomId) {

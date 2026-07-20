@@ -99,7 +99,29 @@ Value must be positive.
 
 ## Entity mutations
 
-When `mapId` is omitted, the effect targets its current effect-context map.
+When `mapId` is omitted, an explicit `entityId` targets the current effect-context map.
+
+Entity interactions may instead target their own entity explicitly:
+
+```js
+{
+    type: "setEntityActive",
+    target: "self",
+    active: false,
+}
+```
+
+`target: "self"` is supported consistently by `setEntityActive`, `setEntityPosition`, `setEntityVisual`, and `setEntityCollision`.
+
+Rules:
+
+- Define exactly one of `entityId` or `target: "self"`.
+- `mapId` is invalid with `target: "self"`.
+- Self-targeting is valid only for effects originating from an entity interaction.
+- Tile interactions, map triggers, items, map hooks, and music events cannot use self-targeting.
+- Nested `random` choices and `showText.afterClose` effects retain the original entity subject.
+
+Runtime and reference validation remain strict; omitting both target forms is an error.
 
 ### `setEntityActive`
 
@@ -135,7 +157,7 @@ Current room visit only:
 }
 ```
 
-`roomVisit` persistence is allowed only for an entity in the active/current map. The temporary override disappears on a later room visit, but is included when saving inside the current visit.
+`roomVisit` persistence is allowed only for an entity in the active/current map. The temporary override disappears on a later room visit, but is included when saving inside the current visit. In an entity interaction, replace `entityId` with `target: "self"` to mutate the interacted entity.
 
 ### `setEntityPosition`
 
@@ -149,7 +171,7 @@ Current room visit only:
 }
 ```
 
-Entity positions use non-negative integer cells.
+Entity positions use non-negative integer cells. Entity interactions may use `target: "self"` instead of `entityId`.
 
 ### `setEntityVisual`
 
@@ -179,6 +201,16 @@ Or reuse a tile visual from the target map:
 {
     type: "setEntityCollision",
     entityId: "door",
+    collision: false,
+}
+```
+
+Self-targeted form inside an entity interaction:
+
+```js
+{
+    type: "setEntityCollision",
+    target: "self",
     collision: false,
 }
 ```

@@ -56,6 +56,18 @@ cameraZones: [
 
 Zones are reconstructed from current position and conditions, combine by priority and array order, and remove only their own partial camera patch. Shake intensity is measured in screen pixels. World rendering rounds shared rectangle edges after applying zoom; UI remains outside the canvas world.
 
+## Entity self-target effects
+
+Inside an entity interaction only:
+
+```js
+{ type: "setEntityActive", target: "self", active: false }
+```
+
+Supported by `setEntityActive`, `setEntityPosition`, `setEntityVisual`, and `setEntityCollision`. Do not combine `target: "self"` with `entityId` or `mapId`. Nested random and `afterClose` effects retain the entity subject.
+
+Missing item IDs remain validation errors; no runtime placeholder is created.
+
 ## Interaction authoring templates
 
 In the entity inspector, choose a template and click **Replace JSON with template**. Available starting points: dialogue, teleport, save point, item pickup, switch/flag change, inspect once, and conditional dialogue. The replacement is only a draft until **Apply**. Runtime validation remains strict.

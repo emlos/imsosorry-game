@@ -63,3 +63,4 @@ Use **Camera Zones** mode for continuous region-owned camera state. A zone suppl
 The runtime uses one shared world-to-screen rectangle conversion for tiles, entities, and the player. Fixed integer zoom pans are snapped in screen space, shared edges stay joined, and integer zoom endpoints remain crisp. Continuous fractional zoom frames intentionally accept nearest-neighbor pixel-width variation.
 
 Trigger mode supports `itemUse` events. Select the item in the trigger inspector; the trigger fires when that item is used while the player stands inside its rectangle.
+Entity mutation effects may use explicit `target: "self"` only in entity interactions. The editor preserves that subject through nested random and dialogue-after-close effects, reports self-targeting in invalid source contexts, and reports missing item IDs without creating placeholder definitions.

@@ -147,7 +147,7 @@ map:<mapId>:trigger:<triggerId>
             { type: "addItem", itemId: "lantern-fragment", quantity: 1 },
             {
                 type: "setEntityActive",
-                entityId: "lantern-fragment-pickup",
+                target: "self",
                 active: false,
             },
         ],
@@ -158,3 +158,5 @@ map:<mapId>:trigger:<triggerId>
 ```
 
 The persistent entity-state change makes the pickup disappear and remain gone after saving. The item definition and entity can reference the same animated sprite.
+
+Missing item IDs are never invented at runtime. A misspelled, renamed, or deleted `itemId` remains a hard validation error. The editor reports the broken reference, and the pickup template leaves an explicit invalid `"item-id"` value when no item definitions exist. Define the item in `data/items.js` before Playtest or production startup. A placeholder item is valid only when deliberately authored as a real `ITEMS` entry.

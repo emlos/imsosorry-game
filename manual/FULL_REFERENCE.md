@@ -1,4 +1,4 @@
-# Yume Prototype v0.11
+# Yume Prototype v0.11.1
 
 Generated from the project source on 2026-07-20.
 
@@ -61,6 +61,18 @@ cameraZones: [
 ```
 
 Zones are reconstructed from current position and conditions, combine by priority and array order, and remove only their own partial camera patch. Shake intensity is measured in screen pixels. World rendering rounds shared rectangle edges after applying zoom; UI remains outside the canvas world.
+
+## Entity self-target effects
+
+Inside an entity interaction only:
+
+```js
+{ type: "setEntityActive", target: "self", active: false }
+```
+
+Supported by `setEntityActive`, `setEntityPosition`, `setEntityVisual`, and `setEntityCollision`. Do not combine `target: "self"` with `entityId` or `mapId`. Nested random and `afterClose` effects retain the entity subject.
+
+Missing item IDs remain validation errors; no runtime placeholder is created.
 
 ## Interaction authoring templates
 
@@ -590,6 +602,24 @@ Allowed structure:
 
 Use direct `teleport` for a simple fixed destination. Use `handler: "effects"` with a `random` effect and nested `teleport` effects for random or conditional destinations.
 
+## Structured effect context and self-targeting
+
+Effects execute with a structured context containing the current map, stable owner ID, and source subject. Entity interactions provide:
+
+```js
+{
+    mapId,
+    ownerId,
+    subject: {
+        type: "entity",
+        mapId,
+        entityId,
+    },
+}
+```
+
+This subject is preserved through `random` choices and `showText.afterClose`. The four entity mutation effects may use `target: "self"`; validation rejects that syntax from tile interactions, triggers, items, map hooks, and music events. Explicit `entityId` targeting remains available for cross-entity and cross-map mutations.
+
 ## Handler defaults and editor templates
 
 Interaction defaults are authoring factories, not runtime fallback behavior. Every saved interaction is still validated exactly as written. Missing keys, empty effect arrays, bad item IDs, and broken map references remain errors.
@@ -919,7 +949,29 @@ Value must be positive.
 
 ## Entity mutations
 
-When `mapId` is omitted, the effect targets its current effect-context map.
+When `mapId` is omitted, an explicit `entityId` targets the current effect-context map.
+
+Entity interactions may instead target their own entity explicitly:
+
+```js
+{
+    type: "setEntityActive",
+    target: "self",
+    active: false,
+}
+```
+
+`target: "self"` is supported consistently by `setEntityActive`, `setEntityPosition`, `setEntityVisual`, and `setEntityCollision`.
+
+Rules:
+
+- Define exactly one of `entityId` or `target: "self"`.
+- `mapId` is invalid with `target: "self"`.
+- Self-targeting is valid only for effects originating from an entity interaction.
+- Tile interactions, map triggers, items, map hooks, and music events cannot use self-targeting.
+- Nested `random` choices and `showText.afterClose` effects retain the original entity subject.
+
+Runtime and reference validation remain strict; omitting both target forms is an error.
 
 ### `setEntityActive`
 
@@ -955,7 +1007,7 @@ Current room visit only:
 }
 ```
 
-`roomVisit` persistence is allowed only for an entity in the active/current map. The temporary override disappears on a later room visit, but is included when saving inside the current visit.
+`roomVisit` persistence is allowed only for an entity in the active/current map. The temporary override disappears on a later room visit, but is included when saving inside the current visit. In an entity interaction, replace `entityId` with `target: "self"` to mutate the interacted entity.
 
 ### `setEntityPosition`
 
@@ -969,7 +1021,7 @@ Current room visit only:
 }
 ```
 
-Entity positions use non-negative integer cells.
+Entity positions use non-negative integer cells. Entity interactions may use `target: "self"` instead of `entityId`.
 
 ### `setEntityVisual`
 
@@ -999,6 +1051,16 @@ Or reuse a tile visual from the target map:
 {
     type: "setEntityCollision",
     entityId: "door",
+    collision: false,
+}
+```
+
+Self-targeted form inside an entity interaction:
+
+```js
+{
+    type: "setEntityCollision",
+    target: "self",
     collision: false,
 }
 ```
@@ -2632,7 +2694,7 @@ map:<mapId>:trigger:<triggerId>
             { type: "addItem", itemId: "lantern-fragment", quantity: 1 },
             {
                 type: "setEntityActive",
-                entityId: "lantern-fragment-pickup",
+                target: "self",
                 active: false,
             },
         ],
@@ -2643,6 +2705,8 @@ map:<mapId>:trigger:<triggerId>
 ```
 
 The persistent entity-state change makes the pickup disappear and remain gone after saving. The item definition and entity can reference the same animated sprite.
+
+Missing item IDs are never invented at runtime. A misspelled, renamed, or deleted `itemId` remains a hard validation error. The editor reports the broken reference, and the pickup template leaves an explicit invalid `"item-id"` value when no item definitions exist. Define the item in `data/items.js` before Playtest or production startup. A placeholder item is valid only when deliberately authored as a real `ITEMS` entry.
 
 ---
 
@@ -3144,6 +3208,8 @@ A handler needs:
 
 `createDefault()` is an authoring convenience only. Runtime validation must not fill in omitted data or repair malformed interactions. Expose handler defaults through `createDefaultInteraction(handlerId, options)`.
 
+Effect execution and reference validation receive a structured context with `mapId`, `ownerId` when executing, and a `subject`. Preserve the complete context when delegating to nested effect arrays. Do not reconstruct subject identity from an owner string.
+
 Also update map graph/refactor logic if the handler contains teleports or map references.
 
 Prefer composing existing effects rather than adding a handler when possible. `handler: "effects"` is the general extension point. Semantic combinations such as save points, pickups, and conditional dialogue belong in `editor/editor-catalog.js` and should be added to `INTERACTION_TEMPLATES`.
@@ -3392,3 +3458,17 @@ Clear or migrate development saves after:
 - Entity follow targets use effective runtime presence, including room-visit overrides and authored conditions. Inactive or missing targets are errors.
 - Continuous fractional zoom cannot preserve uniform source-pixel widths on every intermediate frame. Translation and shared-edge snapping remain stable, while integer endpoints are the pixel-crisp guarantee.
 - Shake intensity is in screen pixels.
+
+## Missing item references
+
+Missing item IDs are hard errors in the editor, Playtest, production startup, triggers, and saves. The runtime never creates placeholder items from broken references. Author an intentional placeholder as a real entry in `data/items.js` when that is genuinely desired.
+
+## Entity self-targeting
+
+Self-targeting is explicit rather than inferred from a missing `entityId`:
+
+```js
+{ type: "setEntityActive", target: "self", active: false }
+```
+
+`target: "self"` and `entityId` are mutually exclusive, and `mapId` cannot accompany self-targeting. It is valid only within an entity interaction. Nested random and dialogue-after-close effects preserve that entity subject.
